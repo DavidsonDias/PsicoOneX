@@ -79,7 +79,7 @@ export const Benefits = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button variant="hero" size="lg">
+                <Button variant="hero" size="lg" onClick={() => window.location.href = '/auth'}>
                   Começar Agora - 15 Dias Grátis
                 </Button>
                 <Button variant="outline" size="lg">

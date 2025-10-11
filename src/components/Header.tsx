@@ -37,10 +37,10 @@ export const Header = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={() => window.location.href = '/auth'}>
               Entrar
             </Button>
-            <Button variant="hero" size="sm">
+            <Button variant="hero" size="sm" onClick={() => window.location.href = '/auth'}>
               Começar Grátis
             </Button>
           </div>
@@ -70,10 +70,10 @@ export const Header = () => {
               Contato
             </a>
             <div className="flex flex-col gap-2 pt-2">
-              <Button variant="ghost" size="sm" className="w-full">
+              <Button variant="ghost" size="sm" className="w-full" onClick={() => window.location.href = '/auth'}>
                 Entrar
               </Button>
-              <Button variant="hero" size="sm" className="w-full">
+              <Button variant="hero" size="sm" className="w-full" onClick={() => window.location.href = '/auth'}>
                 Começar Grátis
               </Button>
             </div>
