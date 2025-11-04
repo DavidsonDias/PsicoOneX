@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Users, Calendar, FileText, DollarSign, LogOut, User } from "lucide-react";
+import { Brain, Users, Calendar, FileText, DollarSign, LogOut, User, Settings } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -97,6 +97,9 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/configuracoes")}>
+              <Settings className="h-5 w-5" />
+            </Button>
             <div className="flex items-center gap-2 text-sm">
               <User className="w-4 h-4" />
               <span className="font-medium">{profile?.full_name}</span>
