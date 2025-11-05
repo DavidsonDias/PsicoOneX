@@ -11,6 +11,8 @@ import Agenda from "./pages/Agenda";
 import MedicalRecords from "./pages/MedicalRecords";
 import Financeiro from "./pages/Financeiro";
 import Configuracoes from "./pages/Configuracoes";
+import PortalPaciente from "./pages/PortalPaciente";
+import Relatorios from "./pages/Relatorios";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +32,8 @@ const App = () => (
           <Route path="/prontuarios" element={<MedicalRecords />} />
           <Route path="/financeiro" element={<Financeiro />} />
           <Route path="/configuracoes" element={<Configuracoes />} />
+          <Route path="/portal-paciente" element={<PortalPaciente />} />
+          <Route path="/relatorios" element={<Relatorios />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

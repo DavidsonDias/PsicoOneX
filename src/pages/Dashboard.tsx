@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Users, Calendar, FileText, DollarSign, LogOut, User, Settings } from "lucide-react";
+import { Brain, Users, Calendar, FileText, DollarSign, LogOut, User, Settings, Heart, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -207,6 +207,28 @@ export default function Dashboard() {
               <div className="text-left">
                 <div className="font-semibold">Financeiro</div>
                 <div className="text-xs text-muted-foreground">Controle de pagamentos</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-6 justify-start"
+              onClick={() => navigate("/portal-paciente")}
+            >
+              <Heart className="w-5 h-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Portal do Paciente</div>
+                <div className="text-xs text-muted-foreground">Tarefas e diário emocional</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-6 justify-start"
+              onClick={() => navigate("/relatorios")}
+            >
+              <BarChart3 className="w-5 h-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Relatórios</div>
+                <div className="text-xs text-muted-foreground">Análises e métricas</div>
               </div>
             </Button>
           </CardContent>
