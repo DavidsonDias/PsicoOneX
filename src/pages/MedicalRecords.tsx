@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, FileText, Calendar, User, Search } from "lucide-react";
+import { ArrowLeft, Plus, FileText, Calendar, User, Search, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -43,6 +43,7 @@ const MedicalRecords = () => {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null);
   const [userId, setUserId] = useState<string>("");
+  const [generatingAI, setGeneratingAI] = useState(false);
   const [formData, setFormData] = useState({
     patient_id: "",
     session_date: format(new Date(), "yyyy-MM-dd"),
@@ -100,6 +101,48 @@ const MedicalRecords = () => {
       return;
     }
     setPatients(data || []);
+  };
+
+  const generateWithAI = async () => {
+    if (!formData.patient_id) {
+      toast.error("Selecione um paciente primeiro");
+      return;
+    }
+
+    const patient = patients.find(p => p.id === formData.patient_id);
+    if (!patient) return;
+
+    setGeneratingAI(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-medical-record', {
+        body: {
+          complaints: formData.complaints,
+          observations: formData.observations,
+          techniques_used: formData.techniques_used,
+          evolution: formData.evolution,
+          patient_name: patient.full_name
+        }
+      });
+
+      if (error) throw error;
+
+      setFormData({
+        ...formData,
+        complaints: data.complaints || formData.complaints,
+        observations: data.observations || formData.observations,
+        techniques_used: data.techniques_used || formData.techniques_used,
+        evolution: data.evolution || formData.evolution,
+        next_steps: data.next_steps || formData.next_steps
+      });
+
+      toast.success("Prontuário gerado com IA!");
+    } catch (error) {
+      console.error('Error generating with AI:', error);
+      toast.error("Erro ao gerar com IA");
+    } finally {
+      setGeneratingAI(false);
+    }
   };
 
   const handleCreateRecord = async (e: React.FormEvent) => {
@@ -181,7 +224,20 @@ const MedicalRecords = () => {
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Novo Registro de Sessão</DialogTitle>
+                <DialogTitle className="flex items-center justify-between">
+                  <span>Novo Registro de Sessão</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={generateWithAI}
+                    disabled={generatingAI || !formData.patient_id}
+                    className="gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {generatingAI ? "Gerando..." : "Gerar com IA"}
+                  </Button>
+                </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreateRecord} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">

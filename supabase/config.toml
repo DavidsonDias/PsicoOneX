@@ -1,1 +1,4 @@
 project_id = "jlnpehjlfwejwshvxwhs"
+
+[functions.generate-medical-record]
+verify_jwt = false
