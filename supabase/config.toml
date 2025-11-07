@@ -2,3 +2,6 @@ project_id = "jlnpehjlfwejwshvxwhs"
 
 [functions.generate-medical-record]
 verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false

@@ -60,18 +60,26 @@ export default function Financeiro() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Tabela ainda não existe - aguardando migration
-    const data: any[] = [];
-    const error = null;
+    const { data, error } = await supabase
+      .from("financial_transactions")
+      .select(`
+        *,
+        patients (
+          full_name
+        )
+      `)
+      .eq("psychologist_id", user.id)
+      .order("created_at", { ascending: false });
 
     if (error) {
       toast.error("Erro ao carregar transações");
       return;
     }
 
-    const formatted = data.map((t: any) => ({
+    const formatted = (data || []).map((t: any) => ({
       ...t,
-      patient_name: t.patients?.name
+      patient_name: t.patients?.full_name,
+      payment_status: t.status
     }));
 
     setTransactions(formatted);
@@ -84,10 +92,10 @@ export default function Financeiro() {
 
     const { data } = await supabase
       .from("patients")
-      .select("id, name")
+      .select("id, full_name")
       .eq("psychologist_id", user.id)
       .eq("status", "active")
-      .order("name");
+      .order("full_name");
 
     if (data) setPatients(data);
   };
@@ -118,12 +126,28 @@ export default function Financeiro() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Tabela ainda não existe - aguardando migration
-    const error = { message: "Funcionalidade será habilitada após atualização do banco" };
-    toast.info("Funcionalidade financeira será habilitada em breve");
-    return;
+    const transactionData: any = {
+      psychologist_id: user.id,
+      type: formData.get("type"),
+      amount: parseFloat(formData.get("amount") as string),
+      description: formData.get("description"),
+      category: formData.get("category"),
+      payment_method: formData.get("payment_method"),
+      status: formData.get("payment_status"),
+      due_date: formData.get("due_date"),
+    };
+
+    const patientId = formData.get("patient_id");
+    if (patientId) {
+      transactionData.patient_id = patientId;
+    }
+
+    const { error } = await supabase
+      .from("financial_transactions")
+      .insert(transactionData);
 
     if (error) {
+      console.error("Error creating transaction:", error);
       toast.error("Erro ao criar transação");
       return;
     }
@@ -209,11 +233,11 @@ export default function Financeiro() {
                         <SelectValue placeholder="Selecione o paciente" />
                       </SelectTrigger>
                       <SelectContent>
-                        {patients.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
+                      {patients.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.full_name}
+                        </SelectItem>
+                      ))}
                       </SelectContent>
                     </Select>
                   </div>

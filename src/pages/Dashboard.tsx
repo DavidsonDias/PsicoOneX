@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Users, Calendar, FileText, DollarSign, LogOut, User, Settings, Heart, BarChart3, Video } from "lucide-react";
+import { Brain, Users, Calendar, FileText, DollarSign, LogOut, User, Settings, Heart, BarChart3, Video, Shield } from "lucide-react";
 import { toast } from "sonner";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState({
@@ -242,6 +244,20 @@ export default function Dashboard() {
                 <div className="text-xs text-muted-foreground">Consultas online</div>
               </div>
             </Button>
+            
+            {isAdmin && (
+              <Button
+                variant="outline"
+                className="h-auto py-6 justify-start"
+                onClick={() => navigate("/admin/usuarios")}
+              >
+                <Shield className="w-5 h-5 mr-3" />
+                <div className="text-left">
+                  <div className="font-semibold">Gerenciar Usuários</div>
+                  <div className="text-xs text-muted-foreground">Controle de permissões</div>
+                </div>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </main>

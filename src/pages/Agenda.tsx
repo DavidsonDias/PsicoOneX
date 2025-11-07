@@ -28,6 +28,7 @@ interface Appointment {
 interface Patient {
   id: string;
   full_name: string;
+  email?: string;
 }
 
 const Agenda = () => {
@@ -87,7 +88,7 @@ const Agenda = () => {
   const loadPatients = async () => {
     const { data, error } = await supabase
       .from("patients")
-      .select("id, full_name")
+      .select("id, full_name, email")
       .eq("status", "active")
       .order("full_name");
 
@@ -124,6 +125,27 @@ const Agenda = () => {
     }
 
     toast.success("Agendamento criado com sucesso!");
+    
+    // Send notification to patient
+    try {
+      const patient = patients.find(p => p.id === formData.patient_id);
+      if (patient) {
+        await supabase.functions.invoke('send-notification', {
+          body: {
+            to: patient.email || "paciente@example.com", // Use real email
+            subject: "Consulta Agendada - PsicoOne",
+            message: "Sua consulta foi agendada com sucesso. Aguardamos você!",
+            type: "appointment_confirmation",
+            patient_name: patient.full_name,
+            appointment_date: scheduledAt
+          }
+        });
+      }
+    } catch (notifError) {
+      console.error("Error sending notification:", notifError);
+      // Don't fail the appointment creation if notification fails
+    }
+    
     setDialogOpen(false);
     setFormData({
       patient_id: "",
