@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Users, Calendar, FileText, DollarSign, LogOut, User, Settings, Heart, BarChart3, Video, Shield } from "lucide-react";
+import { Brain, Users, Calendar, FileText, DollarSign, LogOut, User, Settings, Heart, BarChart3, Video, Shield, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { useUserRole } from "@/hooks/useUserRole";
 
@@ -242,6 +242,17 @@ export default function Dashboard() {
               <div className="text-left">
                 <div className="font-semibold">Teleatendimento</div>
                 <div className="text-xs text-muted-foreground">Consultas online</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-6 justify-start"
+              onClick={() => navigate("/documentos")}
+            >
+              <Receipt className="w-5 h-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Documentos</div>
+                <div className="text-xs text-muted-foreground">Recibos e declarações</div>
               </div>
             </Button>
             
