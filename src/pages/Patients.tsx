@@ -9,13 +9,25 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ActionMenu } from "@/components/ui/action-menu";
+
+interface Patient {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  birth_date: string | null;
+  notes: string | null;
+  status: string;
+}
 
 export default function Patients() {
   const navigate = useNavigate();
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
   useEffect(() => {
     checkAuthAndLoadPatients();
@@ -71,6 +83,50 @@ export default function Patients() {
       (e.target as HTMLFormElement).reset();
     } catch (error: any) {
       toast.error("Erro ao cadastrar paciente");
+    }
+  };
+
+  const handleEditPatient = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingPatient) return;
+    
+    const formData = new FormData(e.currentTarget);
+
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({
+          full_name: formData.get("full_name") as string,
+          email: formData.get("email") as string,
+          phone: formData.get("phone") as string,
+          birth_date: formData.get("birth_date") as string,
+          notes: formData.get("notes") as string,
+        })
+        .eq("id", editingPatient.id);
+
+      if (error) throw error;
+
+      toast.success("Paciente atualizado com sucesso!");
+      setEditingPatient(null);
+      loadPatients();
+    } catch (error: any) {
+      toast.error("Erro ao atualizar paciente");
+    }
+  };
+
+  const handleDeletePatient = async (patientId: string) => {
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .delete()
+        .eq("id", patientId);
+
+      if (error) throw error;
+
+      toast.success("Paciente excluído com sucesso!");
+      loadPatients();
+    } catch (error: any) {
+      toast.error("Erro ao excluir paciente");
     }
   };
 
@@ -188,9 +244,15 @@ export default function Patients() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredPatients.map((patient) => (
-              <Card key={patient.id} className="hover:border-primary/50 transition-all cursor-pointer">
-                <CardHeader>
+              <Card key={patient.id} className="hover:border-primary/50 transition-all">
+                <CardHeader className="flex flex-row items-start justify-between space-y-0">
                   <CardTitle className="text-lg">{patient.full_name}</CardTitle>
+                  <ActionMenu
+                    onEdit={() => setEditingPatient(patient)}
+                    onDelete={() => handleDeletePatient(patient.id)}
+                    deleteTitle="Excluir Paciente"
+                    deleteDescription={`Tem certeza que deseja excluir ${patient.full_name}? Todos os registros associados serão removidos.`}
+                  />
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   {patient.email && (
@@ -222,6 +284,76 @@ export default function Patients() {
           </div>
         )}
       </main>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingPatient} onOpenChange={(open) => !open && setEditingPatient(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Paciente</DialogTitle>
+            <DialogDescription>
+              Atualize os dados do paciente
+            </DialogDescription>
+          </DialogHeader>
+          {editingPatient && (
+            <form onSubmit={handleEditPatient} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit_full_name">Nome Completo *</Label>
+                  <Input 
+                    id="edit_full_name" 
+                    name="full_name" 
+                    defaultValue={editingPatient.full_name}
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_email">E-mail</Label>
+                  <Input 
+                    id="edit_email" 
+                    name="email" 
+                    type="email"
+                    defaultValue={editingPatient.email || ""}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_phone">Telefone</Label>
+                  <Input 
+                    id="edit_phone" 
+                    name="phone"
+                    defaultValue={editingPatient.phone || ""}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_birth_date">Data de Nascimento</Label>
+                  <Input 
+                    id="edit_birth_date" 
+                    name="birth_date" 
+                    type="date"
+                    defaultValue={editingPatient.birth_date || ""}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_notes">Observações</Label>
+                <Textarea 
+                  id="edit_notes" 
+                  name="notes" 
+                  rows={3}
+                  defaultValue={editingPatient.notes || ""}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditingPatient(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="hero">
+                  Salvar Alterações
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
