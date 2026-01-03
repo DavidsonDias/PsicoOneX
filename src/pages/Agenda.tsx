@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Plus, Clock, User, Calendar as CalendarIcon } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ActionMenu } from "@/components/ui/action-menu";
 
 interface Appointment {
   id: string;
@@ -38,6 +39,7 @@ const Agenda = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [userId, setUserId] = useState<string>("");
   const [formData, setFormData] = useState({
     patient_id: "",
@@ -132,7 +134,7 @@ const Agenda = () => {
       if (patient) {
         await supabase.functions.invoke('send-notification', {
           body: {
-            to: patient.email || "paciente@example.com", // Use real email
+            to: patient.email || "paciente@example.com",
             subject: "Consulta Agendada - PsicoOne",
             message: "Sua consulta foi agendada com sucesso. Aguardamos você!",
             type: "appointment_confirmation",
@@ -143,17 +145,72 @@ const Agenda = () => {
       }
     } catch (notifError) {
       console.error("Error sending notification:", notifError);
-      // Don't fail the appointment creation if notification fails
     }
     
     setDialogOpen(false);
+    resetForm();
+    await loadAppointments(userId);
+  };
+
+  const handleEditAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAppointment) return;
+
+    const scheduledAt = `${formData.date}T${formData.time}:00`;
+
+    const { error } = await supabase
+      .from("appointments")
+      .update({
+        patient_id: formData.patient_id,
+        scheduled_at: scheduledAt,
+        notes: formData.notes || null
+      })
+      .eq("id", editingAppointment.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar agendamento");
+      return;
+    }
+
+    toast.success("Agendamento atualizado com sucesso!");
+    setEditingAppointment(null);
+    resetForm();
+    await loadAppointments(userId);
+  };
+
+  const handleDeleteAppointment = async (appointmentId: string) => {
+    const { error } = await supabase
+      .from("appointments")
+      .delete()
+      .eq("id", appointmentId);
+
+    if (error) {
+      toast.error("Erro ao excluir agendamento");
+      return;
+    }
+
+    toast.success("Agendamento excluído com sucesso!");
+    await loadAppointments(userId);
+  };
+
+  const resetForm = () => {
     setFormData({
       patient_id: "",
       date: format(new Date(), "yyyy-MM-dd"),
       time: "09:00",
       notes: ""
     });
-    await loadAppointments(userId);
+  };
+
+  const openEditDialog = (appointment: Appointment) => {
+    const dateTime = new Date(appointment.scheduled_at);
+    setFormData({
+      patient_id: appointment.patient_id,
+      date: format(dateTime, "yyyy-MM-dd"),
+      time: format(dateTime, "HH:mm"),
+      notes: appointment.notes || ""
+    });
+    setEditingAppointment(appointment);
   };
 
   const handleStatusChange = async (appointmentId: string, newStatus: string) => {
@@ -354,9 +411,17 @@ const Agenda = () => {
                             <span>{format(new Date(appointment.scheduled_at), "HH:mm")}</span>
                           </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(appointment.status || "scheduled")}`}>
-                          {getStatusLabel(appointment.status || "scheduled")}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(appointment.status || "scheduled")}`}>
+                            {getStatusLabel(appointment.status || "scheduled")}
+                          </span>
+                          <ActionMenu
+                            onEdit={() => openEditDialog(appointment)}
+                            onDelete={() => handleDeleteAppointment(appointment.id)}
+                            deleteTitle="Excluir Agendamento"
+                            deleteDescription="Tem certeza que deseja excluir este agendamento?"
+                          />
+                        </div>
                       </div>
 
                       {appointment.notes && (
@@ -385,6 +450,72 @@ const Agenda = () => {
           </div>
         </div>
       </main>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingAppointment} onOpenChange={(open) => { if (!open) { setEditingAppointment(null); resetForm(); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Agendamento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditAppointment} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit_patient">Paciente *</Label>
+              <Select value={formData.patient_id} onValueChange={(value) => setFormData({...formData, patient_id: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patients.map(patient => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_date">Data *</Label>
+                <Input
+                  id="edit_date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_time">Horário *</Label>
+                <Input
+                  id="edit_time"
+                  type="time"
+                  value={formData.time}
+                  onChange={(e) => setFormData({...formData, time: e.target.value})}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_notes">Observações</Label>
+              <Textarea
+                id="edit_notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                placeholder="Informações adicionais sobre o agendamento"
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => { setEditingAppointment(null); resetForm(); }}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="flex-1">
+                Salvar Alterações
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

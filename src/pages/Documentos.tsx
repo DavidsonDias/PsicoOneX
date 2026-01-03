@@ -17,7 +17,8 @@ import {
   ClipboardList,
   Download,
   Printer,
-  Save
+  Save,
+  AlertCircle
 } from "lucide-react";
 import { SignaturePad } from "@/components/documents/SignaturePad";
 import { DocumentPreview } from "@/components/documents/DocumentPreview";
@@ -47,6 +48,7 @@ export default function Documentos() {
   const [documentType, setDocumentType] = useState<DocumentType>("receipt");
   const [signature, setSignature] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const [patientError, setPatientError] = useState(false);
   
   // Form fields
   const [formData, setFormData] = useState({
@@ -85,10 +87,10 @@ export default function Documentos() {
       .from("patients")
       .select("id, full_name, cpf, email")
       .eq("psychologist_id", user.id)
-      .order("name");
+      .order("full_name");
 
     if (patientsData) {
-      setPatients(patientsData.map(p => ({ ...p, full_name: p.full_name })));
+      setPatients(patientsData);
     }
 
     // Load saved signature from localStorage
@@ -121,7 +123,7 @@ export default function Documentos() {
   const getDocumentData = () => {
     const patient = getSelectedPatient();
     return {
-      patientName: patient?.full_name || "Nome do Paciente",
+      patientName: patient?.full_name || "Selecione um paciente",
       patientCpf: patient?.cpf || undefined,
       professionalName: profile?.full_name || "Nome do Profissional",
       professionalCrp: profile?.crp || "00/00000",
@@ -134,7 +136,19 @@ export default function Documentos() {
     };
   };
 
+  const validateDocument = () => {
+    if (!selectedPatient) {
+      setPatientError(true);
+      toast.error("Selecione um paciente para gerar o documento");
+      return false;
+    }
+    setPatientError(false);
+    return true;
+  };
+
   const handlePrint = () => {
+    if (!validateDocument()) return;
+
     const printContent = document.getElementById("document-preview");
     if (!printContent) return;
 
@@ -200,7 +214,7 @@ export default function Documentos() {
   };
 
   const handleDownloadPDF = () => {
-    // For now, use print to PDF
+    if (!validateDocument()) return;
     handlePrint();
     toast.info("Use 'Salvar como PDF' na janela de impressão");
   };
@@ -263,12 +277,20 @@ export default function Documentos() {
                   </TabsList>
                 </Tabs>
 
-                {/* Patient Selection */}
+                {/* Patient Selection - Required */}
                 <div>
-                  <Label>Paciente</Label>
-                  <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione um paciente" />
+                  <Label className="flex items-center gap-1">
+                    Paciente <span className="text-destructive">*</span>
+                  </Label>
+                  <Select 
+                    value={selectedPatient} 
+                    onValueChange={(v) => {
+                      setSelectedPatient(v);
+                      setPatientError(false);
+                    }}
+                  >
+                    <SelectTrigger className={`mt-1 ${patientError ? 'border-destructive ring-destructive' : ''}`}>
+                      <SelectValue placeholder="Selecione um paciente (obrigatório)" />
                     </SelectTrigger>
                     <SelectContent>
                       {patients.map((patient) => (
@@ -278,6 +300,12 @@ export default function Documentos() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {patientError && (
+                    <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      Selecione um paciente para continuar
+                    </p>
+                  )}
                 </div>
 
                 {/* Date */}

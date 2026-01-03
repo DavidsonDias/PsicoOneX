@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, FileText, Calendar, User, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, Download, Trash2, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ActionMenu } from "@/components/ui/action-menu";
 
 interface MedicalRecord {
   id: string;
@@ -25,6 +26,15 @@ interface MedicalRecord {
   patients: {
     full_name: string;
   };
+}
+
+interface Attachment {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
 }
 
 interface Patient {
@@ -42,8 +52,11 @@ const MedicalRecords = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<MedicalRecord | null>(null);
   const [userId, setUserId] = useState<string>("");
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [formData, setFormData] = useState({
     patient_id: "",
     session_date: format(new Date(), "yyyy-MM-dd"),
@@ -101,6 +114,20 @@ const MedicalRecords = () => {
       return;
     }
     setPatients(data || []);
+  };
+
+  const loadAttachments = async (recordId: string) => {
+    const { data, error } = await supabase
+      .from("medical_record_attachments")
+      .select("*")
+      .eq("medical_record_id", recordId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error loading attachments:", error);
+      return;
+    }
+    setAttachments(data || []);
   };
 
   const generateWithAI = async () => {
@@ -174,6 +201,71 @@ const MedicalRecords = () => {
 
     toast.success("Prontuário criado com sucesso!");
     setDialogOpen(false);
+    resetForm();
+    await loadRecords(userId);
+  };
+
+  const handleEditRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRecord) return;
+
+    const { error } = await supabase
+      .from("medical_records")
+      .update({
+        patient_id: formData.patient_id,
+        session_date: formData.session_date,
+        session_number: formData.session_number,
+        complaints: formData.complaints || null,
+        observations: formData.observations || null,
+        techniques_used: formData.techniques_used || null,
+        evolution: formData.evolution || null,
+        next_steps: formData.next_steps || null
+      })
+      .eq("id", editingRecord.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar prontuário");
+      return;
+    }
+
+    toast.success("Prontuário atualizado com sucesso!");
+    setEditingRecord(null);
+    resetForm();
+    await loadRecords(userId);
+  };
+
+  const handleDeleteRecord = async (recordId: string) => {
+    const { error } = await supabase
+      .from("medical_records")
+      .delete()
+      .eq("id", recordId);
+
+    if (error) {
+      toast.error("Erro ao excluir prontuário");
+      return;
+    }
+
+    toast.success("Prontuário excluído com sucesso!");
+    setViewDialogOpen(false);
+    setSelectedRecord(null);
+    await loadRecords(userId);
+  };
+
+  const openEditDialog = (record: MedicalRecord) => {
+    setFormData({
+      patient_id: record.patient_id,
+      session_date: record.session_date,
+      session_number: record.session_number || 1,
+      complaints: record.complaints || "",
+      observations: record.observations || "",
+      techniques_used: record.techniques_used || "",
+      evolution: record.evolution || "",
+      next_steps: record.next_steps || ""
+    });
+    setEditingRecord(record);
+  };
+
+  const resetForm = () => {
     setFormData({
       patient_id: "",
       session_date: format(new Date(), "yyyy-MM-dd"),
@@ -184,7 +276,96 @@ const MedicalRecords = () => {
       evolution: "",
       next_steps: ""
     });
-    await loadRecords(userId);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedRecord || !e.target.files?.[0]) return;
+
+    const file = e.target.files[0];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    if (file.size > maxSize) {
+      toast.error("Arquivo muito grande. Máximo 10MB.");
+      return;
+    }
+
+    setUploadingFile(true);
+
+    try {
+      const filePath = `${userId}/${selectedRecord.id}/${Date.now()}_${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("medical-attachments")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase
+        .from("medical_record_attachments")
+        .insert({
+          medical_record_id: selectedRecord.id,
+          file_name: file.name,
+          file_path: filePath,
+          file_type: file.type,
+          file_size: file.size,
+          uploaded_by: userId
+        });
+
+      if (dbError) throw dbError;
+
+      toast.success("Arquivo anexado com sucesso!");
+      await loadAttachments(selectedRecord.id);
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Erro ao anexar arquivo");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: Attachment) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("medical-attachments")
+        .download(attachment.file_path);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = attachment.file_name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error("Erro ao baixar arquivo");
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: Attachment) => {
+    try {
+      await supabase.storage
+        .from("medical-attachments")
+        .remove([attachment.file_path]);
+
+      await supabase
+        .from("medical_record_attachments")
+        .delete()
+        .eq("id", attachment.id);
+
+      toast.success("Arquivo excluído!");
+      if (selectedRecord) {
+        await loadAttachments(selectedRecord.id);
+      }
+    } catch (error) {
+      toast.error("Erro ao excluir arquivo");
+    }
+  };
+
+  const openViewDialog = async (record: MedicalRecord) => {
+    setSelectedRecord(record);
+    setViewDialogOpen(true);
+    await loadAttachments(record.id);
   };
 
   const filteredRecords = records.filter(record => {
@@ -193,6 +374,12 @@ const MedicalRecords = () => {
     const matchesPatient = selectedPatient === "all" || record.patient_id === selectedPatient;
     return matchesSearch && matchesPatient;
   });
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
 
   if (loading) {
     return (
@@ -378,13 +565,9 @@ const MedicalRecords = () => {
           ) : (
             <div className="grid gap-4">
               {filteredRecords.map(record => (
-                <div key={record.id} className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors cursor-pointer"
-                     onClick={() => {
-                       setSelectedRecord(record);
-                       setViewDialogOpen(true);
-                     }}>
+                <div key={record.id} className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="space-y-1">
+                    <div className="space-y-1 cursor-pointer flex-1" onClick={() => openViewDialog(record)}>
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-primary" />
                         <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
@@ -397,21 +580,29 @@ const MedicalRecords = () => {
                         <span>Sessão #{record.session_number || 1}</span>
                       </div>
                     </div>
+                    <ActionMenu
+                      onEdit={() => openEditDialog(record)}
+                      onDelete={() => handleDeleteRecord(record.id)}
+                      deleteTitle="Excluir Prontuário"
+                      deleteDescription="Tem certeza que deseja excluir este prontuário? Todos os anexos também serão removidos."
+                    />
                   </div>
 
-                  {record.complaints && (
-                    <div className="mb-3">
-                      <p className="text-sm font-medium text-foreground mb-1">Queixas:</p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{record.complaints}</p>
-                    </div>
-                  )}
+                  <div className="cursor-pointer" onClick={() => openViewDialog(record)}>
+                    {record.complaints && (
+                      <div className="mb-3">
+                        <p className="text-sm font-medium text-foreground mb-1">Queixas:</p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{record.complaints}</p>
+                      </div>
+                    )}
 
-                  {record.observations && (
-                    <div>
-                      <p className="text-sm font-medium text-foreground mb-1">Observações:</p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
-                    </div>
-                  )}
+                    {record.observations && (
+                      <div>
+                        <p className="text-sm font-medium text-foreground mb-1">Observações:</p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -419,6 +610,7 @@ const MedicalRecords = () => {
         </div>
       </main>
 
+      {/* View Dialog with Attachments */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -465,18 +657,195 @@ const MedicalRecords = () => {
               {selectedRecord.evolution && (
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Evolução do Tratamento</h4>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{selectedRecord.evolution}</p>
+                  <p className="text-muted-foreground">{selectedRecord.evolution}</p>
                 </div>
               )}
 
               {selectedRecord.next_steps && (
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Próximos Passos</h4>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{selectedRecord.next_steps}</p>
+                  <p className="text-muted-foreground">{selectedRecord.next_steps}</p>
                 </div>
               )}
+
+              {/* Attachments Section */}
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-semibold text-foreground flex items-center gap-2">
+                    <Paperclip className="h-4 w-4" />
+                    Anexos ({attachments.length})
+                  </h4>
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={uploadingFile}
+                    />
+                    <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                      <span>
+                        <Upload className="h-4 w-4" />
+                        {uploadingFile ? "Enviando..." : "Anexar Arquivo"}
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+
+                {attachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Nenhum anexo neste prontuário
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {attachments.map(attachment => (
+                      <div key={attachment.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-primary" />
+                          <div>
+                            <p className="font-medium text-sm">{attachment.file_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(attachment.file_size)} • {format(new Date(attachment.created_at), "dd/MM/yyyy HH:mm")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDownloadAttachment(attachment)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteAttachment(attachment)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingRecord} onOpenChange={(open) => { if (!open) { setEditingRecord(null); resetForm(); } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Editar Prontuário</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={generateWithAI}
+                disabled={generatingAI || !formData.patient_id}
+                className="gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                {generatingAI ? "Gerando..." : "Gerar com IA"}
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditRecord} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Paciente *</Label>
+                <Select value={formData.patient_id} onValueChange={(value) => setFormData({...formData, patient_id: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o paciente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients.map(patient => (
+                      <SelectItem key={patient.id} value={patient.id}>
+                        {patient.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Data da Sessão *</Label>
+                <Input
+                  type="date"
+                  value={formData.session_date}
+                  onChange={(e) => setFormData({...formData, session_date: e.target.value})}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Número da Sessão</Label>
+              <Input
+                type="number"
+                min="1"
+                value={formData.session_number}
+                onChange={(e) => setFormData({...formData, session_number: parseInt(e.target.value)})}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Queixas Apresentadas</Label>
+              <Textarea
+                value={formData.complaints}
+                onChange={(e) => setFormData({...formData, complaints: e.target.value})}
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Observações Clínicas</Label>
+              <Textarea
+                value={formData.observations}
+                onChange={(e) => setFormData({...formData, observations: e.target.value})}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Técnicas Utilizadas</Label>
+              <Textarea
+                value={formData.techniques_used}
+                onChange={(e) => setFormData({...formData, techniques_used: e.target.value})}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Evolução do Tratamento</Label>
+              <Textarea
+                value={formData.evolution}
+                onChange={(e) => setFormData({...formData, evolution: e.target.value})}
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Próximos Passos</Label>
+              <Textarea
+                value={formData.next_steps}
+                onChange={(e) => setFormData({...formData, next_steps: e.target.value})}
+                rows={2}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => { setEditingRecord(null); resetForm(); }}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="flex-1">
+                Salvar Alterações
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
