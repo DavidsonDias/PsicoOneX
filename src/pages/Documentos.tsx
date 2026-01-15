@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,19 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { 
-  ArrowLeft, 
-  FileText, 
-  Receipt, 
-  FileCheck, 
-  ClipboardList,
-  Download,
-  Printer,
-  Save,
-  AlertCircle
-} from "lucide-react";
+import { FileText, Receipt, FileCheck, ClipboardList, Download, Printer, Save, AlertCircle } from "lucide-react";
 import { SignaturePad } from "@/components/documents/SignaturePad";
 import { DocumentPreview } from "@/components/documents/DocumentPreview";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 interface Patient {
   id: string;
@@ -40,7 +30,6 @@ interface Profile {
 type DocumentType = "receipt" | "declaration" | "certificate" | "report";
 
 export default function Documentos() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -50,7 +39,6 @@ export default function Documentos() {
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [patientError, setPatientError] = useState(false);
   
-  // Form fields
   const [formData, setFormData] = useState({
     value: 0,
     sessionCount: 1,
@@ -65,12 +53,8 @@ export default function Documentos() {
 
   const checkAuthAndLoadData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/auth");
-      return;
-    }
+    if (!user) return;
 
-    // Load profile
     const { data: profileData } = await supabase
       .from("profiles")
       .select("id, full_name, crp, clinic_name")
@@ -82,18 +66,14 @@ export default function Documentos() {
       setProfile(profileData);
     }
 
-    // Load patients
     const { data: patientsData } = await supabase
       .from("patients")
       .select("id, full_name, cpf, email")
       .eq("psychologist_id", user.id)
       .order("full_name");
 
-    if (patientsData) {
-      setPatients(patientsData);
-    }
+    if (patientsData) setPatients(patientsData);
 
-    // Load saved signature from localStorage
     const saved = localStorage.getItem(`signature_${user.id}`);
     if (saved) {
       setSavedSignature(saved);
@@ -103,9 +83,7 @@ export default function Documentos() {
     setLoading(false);
   };
 
-  const handleSignatureChange = (sig: string | null) => {
-    setSignature(sig);
-  };
+  const handleSignatureChange = (sig: string | null) => setSignature(sig);
 
   const saveSignature = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -113,12 +91,10 @@ export default function Documentos() {
 
     localStorage.setItem(`signature_${user.id}`, signature);
     setSavedSignature(signature);
-    toast.success("Assinatura salva com sucesso!");
+    toast.success("Assinatura salva!");
   };
 
-  const getSelectedPatient = () => {
-    return patients.find(p => p.id === selectedPatient);
-  };
+  const getSelectedPatient = () => patients.find(p => p.id === selectedPatient);
 
   const getDocumentData = () => {
     const patient = getSelectedPatient();
@@ -139,7 +115,7 @@ export default function Documentos() {
   const validateDocument = () => {
     if (!selectedPatient) {
       setPatientError(true);
-      toast.error("Selecione um paciente para gerar o documento");
+      toast.error("Selecione um paciente");
       return false;
     }
     setPatientError(false);
@@ -164,53 +140,21 @@ export default function Documentos() {
         <head>
           <title>Documento - PsicoOne</title>
           <style>
-            body {
-              font-family: 'Times New Roman', serif;
-              padding: 40px;
-              max-width: 800px;
-              margin: 0 auto;
-              color: #1a1a2e;
-            }
-            h2 {
-              text-align: center;
-              text-transform: uppercase;
-              letter-spacing: 2px;
-              border-bottom: 2px solid #1a1a2e;
-              padding-bottom: 16px;
-              margin-bottom: 32px;
-            }
-            p {
-              line-height: 1.8;
-              text-align: justify;
-            }
-            .signature-area {
-              margin-top: 60px;
-              text-align: center;
-            }
-            .signature-line {
-              width: 300px;
-              border-bottom: 1px solid #1a1a2e;
-              margin: 0 auto 8px;
-            }
-            img {
-              max-height: 80px;
-            }
-            @media print {
-              body { padding: 20px; }
-            }
+            body { font-family: 'Times New Roman', serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #1a1a2e; }
+            h2 { text-align: center; text-transform: uppercase; letter-spacing: 2px; border-bottom: 2px solid #1a1a2e; padding-bottom: 16px; margin-bottom: 32px; }
+            p { line-height: 1.8; text-align: justify; }
+            .signature-area { margin-top: 60px; text-align: center; }
+            .signature-line { width: 300px; border-bottom: 1px solid #1a1a2e; margin: 0 auto 8px; }
+            img { max-height: 80px; }
           </style>
         </head>
-        <body>
-          ${printContent.innerHTML}
-        </body>
+        <body>${printContent.innerHTML}</body>
       </html>
     `);
 
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+    setTimeout(() => printWindow.print(), 250);
   };
 
   const handleDownloadPDF = () => {
@@ -221,213 +165,166 @@ export default function Documentos() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse text-primary">Carregando...</div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-pulse text-primary">Carregando...</div>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <div className="container mx-auto p-6 max-w-7xl">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Documentos</h1>
-            <p className="text-muted-foreground">Emita recibos, declarações e documentos personalizados</p>
-          </div>
-        </div>
+    <AppLayout title="Documentos" description="Emita recibos, declarações e documentos personalizados">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Form Section */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Configurar Documento
+              </CardTitle>
+              <CardDescription>Selecione o tipo de documento e preencha as informações</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Tabs value={documentType} onValueChange={(v) => setDocumentType(v as DocumentType)}>
+                <TabsList className="grid grid-cols-4 w-full">
+                  <TabsTrigger value="receipt" className="gap-1 text-xs">
+                    <Receipt className="h-3 w-3" />Recibo
+                  </TabsTrigger>
+                  <TabsTrigger value="declaration" className="gap-1 text-xs">
+                    <FileCheck className="h-3 w-3" />Declaração
+                  </TabsTrigger>
+                  <TabsTrigger value="certificate" className="gap-1 text-xs">
+                    <FileText className="h-3 w-3" />Atestado
+                  </TabsTrigger>
+                  <TabsTrigger value="report" className="gap-1 text-xs">
+                    <ClipboardList className="h-3 w-3" />Relatório
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Form Section */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Configurar Documento
-                </CardTitle>
-                <CardDescription>
-                  Selecione o tipo de documento e preencha as informações
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Document Type Tabs */}
-                <Tabs value={documentType} onValueChange={(v) => setDocumentType(v as DocumentType)}>
-                  <TabsList className="grid grid-cols-4 w-full">
-                    <TabsTrigger value="receipt" className="gap-1 text-xs">
-                      <Receipt className="h-3 w-3" />
-                      Recibo
-                    </TabsTrigger>
-                    <TabsTrigger value="declaration" className="gap-1 text-xs">
-                      <FileCheck className="h-3 w-3" />
-                      Declaração
-                    </TabsTrigger>
-                    <TabsTrigger value="certificate" className="gap-1 text-xs">
-                      <FileText className="h-3 w-3" />
-                      Atestado
-                    </TabsTrigger>
-                    <TabsTrigger value="report" className="gap-1 text-xs">
-                      <ClipboardList className="h-3 w-3" />
-                      Relatório
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-
-                {/* Patient Selection - Required */}
-                <div>
-                  <Label className="flex items-center gap-1">
-                    Paciente <span className="text-destructive">*</span>
-                  </Label>
-                  <Select 
-                    value={selectedPatient} 
-                    onValueChange={(v) => {
-                      setSelectedPatient(v);
-                      setPatientError(false);
-                    }}
-                  >
-                    <SelectTrigger className={`mt-1 ${patientError ? 'border-destructive ring-destructive' : ''}`}>
-                      <SelectValue placeholder="Selecione um paciente (obrigatório)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {patients.map((patient) => (
-                        <SelectItem key={patient.id} value={patient.id}>
-                          {patient.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {patientError && (
-                    <p className="text-sm text-destructive mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      Selecione um paciente para continuar
-                    </p>
-                  )}
-                </div>
-
-                {/* Date */}
-                <div>
-                  <Label>Data</Label>
-                  <Input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-
-                {/* Clinic Name */}
-                <div>
-                  <Label>Nome da Clínica (opcional)</Label>
-                  <Input
-                    value={formData.clinicName}
-                    onChange={(e) => setFormData({ ...formData, clinicName: e.target.value })}
-                    placeholder="Ex: Clínica de Psicologia"
-                    className="mt-1"
-                  />
-                </div>
-
-                {/* Receipt-specific fields */}
-                {documentType === "receipt" && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Valor (R$)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={formData.value}
-                          onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label>Nº de Sessões</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={formData.sessionCount}
-                          onChange={(e) => setFormData({ ...formData, sessionCount: Number(e.target.value) })}
-                          className="mt-1"
-                        />
-                      </div>
-                    </div>
-                  </>
+              <div>
+                <Label className="flex items-center gap-1">
+                  Paciente <span className="text-destructive">*</span>
+                </Label>
+                <Select 
+                  value={selectedPatient} 
+                  onValueChange={(v) => { setSelectedPatient(v); setPatientError(false); }}
+                >
+                  <SelectTrigger className={`mt-1 ${patientError ? 'border-destructive' : ''}`}>
+                    <SelectValue placeholder="Selecione um paciente (obrigatório)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients.map((patient) => (
+                      <SelectItem key={patient.id} value={patient.id}>
+                        {patient.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {patientError && (
+                  <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Selecione um paciente
+                  </p>
                 )}
+              </div>
 
-                {/* Content field for certificate and report */}
-                {(documentType === "certificate" || documentType === "report") && (
+              <div>
+                <Label>Data</Label>
+                <Input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label>Nome da Clínica (opcional)</Label>
+                <Input
+                  value={formData.clinicName}
+                  onChange={(e) => setFormData({ ...formData, clinicName: e.target.value })}
+                  placeholder="Ex: Clínica de Psicologia"
+                  className="mt-1"
+                />
+              </div>
+
+              {documentType === "receipt" && (
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Conteúdo</Label>
-                    <Textarea
-                      value={formData.content}
-                      onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                      placeholder={
-                        documentType === "certificate"
-                          ? "Descreva a situação clínica..."
-                          : "Escreva o relatório..."
-                      }
-                      rows={6}
+                    <Label>Valor (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.value}
+                      onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
                       className="mt-1"
                     />
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  <div>
+                    <Label>Nº de Sessões</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={formData.sessionCount}
+                      onChange={(e) => setFormData({ ...formData, sessionCount: Number(e.target.value) })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              )}
 
-            {/* Signature Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Assinatura Digital</CardTitle>
-                <CardDescription>
-                  Desenhe sua assinatura ou use a salva
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <SignaturePad 
-                  onSignatureChange={handleSignatureChange}
-                  initialSignature={savedSignature}
-                />
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={saveSignature}
-                  disabled={!signature}
-                  className="gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  Salvar como padrão
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+              {(documentType === "certificate" || documentType === "report") && (
+                <div>
+                  <Label>Conteúdo</Label>
+                  <Textarea
+                    value={formData.content}
+                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                    placeholder={documentType === "certificate" ? "Descreva a situação clínica..." : "Escreva o relatório..."}
+                    rows={6}
+                    className="mt-1"
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          {/* Preview Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Pré-visualização</h2>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
-                  <Printer className="h-4 w-4" />
-                  Imprimir
-                </Button>
-                <Button size="sm" onClick={handleDownloadPDF} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Baixar PDF
-                </Button>
-              </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Assinatura Digital</CardTitle>
+              <CardDescription>Desenhe sua assinatura ou use a salva</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <SignaturePad onSignatureChange={handleSignatureChange} initialSignature={savedSignature} />
+              <Button variant="outline" size="sm" onClick={saveSignature} disabled={!signature} className="gap-2">
+                <Save className="h-4 w-4" />
+                Salvar como padrão
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Preview Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Pré-visualização</h2>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+                <Printer className="h-4 w-4" />
+                Imprimir
+              </Button>
+              <Button size="sm" onClick={handleDownloadPDF} className="gap-2">
+                <Download className="h-4 w-4" />
+                Baixar PDF
+              </Button>
             </div>
-
-            <DocumentPreview 
-              type={documentType}
-              data={getDocumentData()}
-            />
           </div>
+
+          <DocumentPreview type={documentType} data={getDocumentData()} />
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }
