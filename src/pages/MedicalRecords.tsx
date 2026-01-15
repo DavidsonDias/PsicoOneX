@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -8,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, Download, Trash2, Upload } from "lucide-react";
+import { Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, Download, Trash2, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 interface MedicalRecord {
   id: string;
