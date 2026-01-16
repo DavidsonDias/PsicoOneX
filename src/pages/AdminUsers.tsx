@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Shield, UserCog } from "lucide-react";
+import { Shield, UserCog } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 interface UserWithRoles {
   id: string;
@@ -31,7 +31,7 @@ const AdminUsers = () => {
       }
       loadUsers();
     }
-  }, [isAdmin, roleLoading]);
+  }, [isAdmin, roleLoading, navigate]);
 
   const loadUsers = async () => {
     try {
@@ -41,7 +41,6 @@ const AdminUsers = () => {
         return;
       }
 
-      // Load all profiles
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, full_name");
@@ -52,7 +51,6 @@ const AdminUsers = () => {
         return;
       }
 
-      // Load all user roles
       const { data: userRoles, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id, role");
@@ -63,17 +61,14 @@ const AdminUsers = () => {
         return;
       }
 
-      // Get auth users to get emails (admin only can see this)
       let authUsers: any[] = [];
       try {
         const { data } = await supabase.auth.admin.listUsers();
         authUsers = data?.users || [];
       } catch (authError) {
         console.error("Error loading auth users:", authError);
-        // Continue without emails if there's an error
       }
 
-      // Combine data
       const usersWithRoles: UserWithRoles[] = (profiles || []).map(profile => {
         const authUser = authUsers.find((u: any) => u.id === profile.id);
         const roles = userRoles?.filter(r => r.user_id === profile.id).map(r => r.role as string) || [];
@@ -176,79 +171,63 @@ const AdminUsers = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Administração de Usuários</h1>
-              <p className="text-sm text-muted-foreground">Gerencie perfis e permissões</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid gap-6">
-          {users.map(user => (
-            <Card key={user.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <UserCog className="h-5 w-5" />
-                      {user.full_name}
-                    </CardTitle>
-                    <CardDescription>{user.email}</CardDescription>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {user.roles.map(role => (
-                      <Badge
-                        key={role}
-                        className={`${getRoleBadgeColor(role)} cursor-pointer`}
-                        onClick={() => removeRole(user.id, role as 'admin' | 'psychologist' | 'secretary')}
-                      >
-                        <Shield className="h-3 w-3 mr-1" />
-                        {getRoleLabel(role)}
-                      </Badge>
-                    ))}
-                  </div>
+    <AppLayout title="Administração de Usuários" description="Gerencie perfis e permissões">
+      <div className="grid gap-6">
+        {users.map(user => (
+          <Card key={user.id}>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserCog className="h-5 w-5" />
+                    {user.full_name}
+                  </CardTitle>
+                  <CardDescription>{user.email}</CardDescription>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <Select onValueChange={(role) => addRole(user.id, role as 'admin' | 'psychologist' | 'secretary')}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Adicionar perfil" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {!user.roles.includes("admin") && (
-                        <SelectItem value="admin">Administrador</SelectItem>
-                      )}
-                      {!user.roles.includes("psychologist") && (
-                        <SelectItem value="psychologist">Psicólogo</SelectItem>
-                      )}
-                      {!user.roles.includes("secretary") && (
-                        <SelectItem value="secretary">Secretária</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-wrap gap-2">
+                  {user.roles.map(role => (
+                    <Badge
+                      key={role}
+                      className={`${getRoleBadgeColor(role)} cursor-pointer`}
+                      onClick={() => removeRole(user.id, role as 'admin' | 'psychologist' | 'secretary')}
+                    >
+                      <Shield className="h-3 w-3 mr-1" />
+                      {getRoleLabel(role)}
+                    </Badge>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <Select onValueChange={(role) => addRole(user.id, role as 'admin' | 'psychologist' | 'secretary')}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Adicionar perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!user.roles.includes("admin") && (
+                      <SelectItem value="admin">Administrador</SelectItem>
+                    )}
+                    {!user.roles.includes("psychologist") && (
+                      <SelectItem value="psychologist">Psicólogo</SelectItem>
+                    )}
+                    {!user.roles.includes("secretary") && (
+                      <SelectItem value="secretary">Secretária</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
 
-          {users.length === 0 && (
-            <Card className="text-center py-12">
-              <p className="text-muted-foreground">Nenhum usuário encontrado</p>
-            </Card>
-          )}
-        </div>
-      </main>
-    </div>
+        {users.length === 0 && (
+          <Card className="text-center py-12">
+            <p className="text-muted-foreground">Nenhum usuário encontrado</p>
+          </Card>
+        )}
+      </div>
+    </AppLayout>
   );
 };
 
