@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Video, VideoOff, Mic, MicOff, Monitor, MonitorOff, Phone } from "lucide-react";
+import { Video, VideoOff, Mic, MicOff, Monitor, MonitorOff, Phone } from "lucide-react";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 interface Patient {
   id: string;
@@ -15,7 +15,6 @@ interface Patient {
 }
 
 const Teleatendimento = () => {
-  const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<string>("");
   const [roomId, setRoomId] = useState<string>("");
@@ -34,10 +33,7 @@ const Teleatendimento = () => {
 
   const checkAuthAndLoadPatients = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      navigate("/auth");
-      return;
-    }
+    if (!session) return;
 
     const { data, error } = await supabase
       .from("patients")
@@ -79,12 +75,10 @@ const Teleatendimento = () => {
       const newRoomId = roomId || generateRoomId();
       setInCall(true);
 
-      // Copy room link to clipboard
       const roomLink = `${window.location.origin}/sala/${newRoomId}`;
       await navigator.clipboard.writeText(roomLink);
       toast.success("Link da sala copiado! Envie para o paciente.");
 
-      // Initialize WebRTC
       initializeWebRTC(stream);
     } catch (error) {
       console.error("Error starting call:", error);
@@ -94,9 +88,7 @@ const Teleatendimento = () => {
 
   const initializeWebRTC = (stream: MediaStream) => {
     const configuration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' }
-      ]
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     };
 
     const peerConnection = new RTCPeerConnection(configuration);
@@ -114,7 +106,6 @@ const Teleatendimento = () => {
 
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        // Send ICE candidate to remote peer via signaling server
         console.log("New ICE candidate:", event.candidate);
       }
     };
@@ -143,10 +134,7 @@ const Teleatendimento = () => {
   const toggleScreenShare = async () => {
     try {
       if (!screenSharing) {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true
-        });
-
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         const screenTrack = screenStream.getVideoTracks()[0];
         const sender = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
         
@@ -194,148 +182,129 @@ const Teleatendimento = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
+    <AppLayout title="Teleatendimento" description="Consultas online seguras">
+      {!inCall ? (
+        <Card className="max-w-2xl mx-auto p-8">
+          <h2 className="text-2xl font-bold text-foreground mb-6">Iniciar Consulta Online</h2>
+          
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="patient">Selecione o Paciente</Label>
+              <Select value={selectedPatient} onValueChange={setSelectedPatient}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha um paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patients.map(patient => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="roomId">ID da Sala (opcional)</Label>
+              <Input
+                id="roomId"
+                value={roomId}
+                onChange={(e) => setRoomId(e.target.value)}
+                placeholder="Deixe vazio para gerar automaticamente"
+              />
+              <p className="text-xs text-muted-foreground">
+                Um link único será gerado e copiado automaticamente
+              </p>
+            </div>
+
+            <Button onClick={startCall} className="w-full gap-2">
+              <Video className="h-5 w-5" />
+              Iniciar Consulta
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Teleatendimento</h1>
-              <p className="text-sm text-muted-foreground">Consultas online seguras</p>
-            </div>
           </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        {!inCall ? (
-          <Card className="max-w-2xl mx-auto p-8">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Iniciar Consulta Online</h2>
-            
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="patient">Selecione o Paciente</Label>
-                <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Escolha um paciente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map(patient => (
-                      <SelectItem key={patient.id} value={patient.id}>
-                        {patient.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="roomId">ID da Sala (opcional)</Label>
-                <Input
-                  id="roomId"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
-                  placeholder="Deixe vazio para gerar automaticamente"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Um link único será gerado e copiado automaticamente
-                </p>
-              </div>
-
-              <Button onClick={startCall} className="w-full gap-2">
-                <Video className="h-5 w-5" />
-                Iniciar Consulta
-              </Button>
-            </div>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Remote Video */}
-              <Card className="relative aspect-video bg-muted overflow-hidden">
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-4 left-4 bg-background/80 px-3 py-1 rounded-md">
-                  <p className="text-sm font-medium">Paciente</p>
-                </div>
-              </Card>
-
-              {/* Local Video */}
-              <Card className="relative aspect-video bg-muted overflow-hidden">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-4 left-4 bg-background/80 px-3 py-1 rounded-md">
-                  <p className="text-sm font-medium">Você</p>
-                </div>
-              </Card>
-            </div>
-
-            {/* Controls */}
-            <Card className="p-6">
-              <div className="flex items-center justify-center gap-4">
-                <Button
-                  variant={audioEnabled ? "default" : "destructive"}
-                  size="icon"
-                  onClick={toggleAudio}
-                  className="h-12 w-12 rounded-full"
-                >
-                  {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-                </Button>
-
-                <Button
-                  variant={videoEnabled ? "default" : "destructive"}
-                  size="icon"
-                  onClick={toggleVideo}
-                  className="h-12 w-12 rounded-full"
-                >
-                  {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-                </Button>
-
-                <Button
-                  variant={screenSharing ? "secondary" : "default"}
-                  size="icon"
-                  onClick={toggleScreenShare}
-                  className="h-12 w-12 rounded-full"
-                >
-                  {screenSharing ? <MonitorOff className="h-5 w-5" /> : <Monitor className="h-5 w-5" />}
-                </Button>
-
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  onClick={endCall}
-                  className="h-12 w-12 rounded-full"
-                >
-                  <Phone className="h-5 w-5" />
-                </Button>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="relative aspect-video bg-muted overflow-hidden">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-4 left-4 bg-background/80 px-3 py-1 rounded-md">
+                <p className="text-sm font-medium">Paciente</p>
               </div>
             </Card>
 
-            {roomId && (
-              <Card className="p-4 bg-primary/5">
-                <p className="text-sm text-center">
-                  <strong>Link da Sala:</strong> {window.location.origin}/sala/{roomId}
-                </p>
-                <p className="text-xs text-center text-muted-foreground mt-1">
-                  Link copiado para área de transferência
-                </p>
-              </Card>
-            )}
+            <Card className="relative aspect-video bg-muted overflow-hidden">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-4 left-4 bg-background/80 px-3 py-1 rounded-md">
+                <p className="text-sm font-medium">Você</p>
+              </div>
+            </Card>
           </div>
-        )}
-      </main>
-    </div>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                variant={audioEnabled ? "default" : "destructive"}
+                size="icon"
+                onClick={toggleAudio}
+                className="h-12 w-12 rounded-full"
+              >
+                {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+              </Button>
+
+              <Button
+                variant={videoEnabled ? "default" : "destructive"}
+                size="icon"
+                onClick={toggleVideo}
+                className="h-12 w-12 rounded-full"
+              >
+                {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+              </Button>
+
+              <Button
+                variant={screenSharing ? "secondary" : "default"}
+                size="icon"
+                onClick={toggleScreenShare}
+                className="h-12 w-12 rounded-full"
+              >
+                {screenSharing ? <MonitorOff className="h-5 w-5" /> : <Monitor className="h-5 w-5" />}
+              </Button>
+
+              <Button
+                variant="destructive"
+                size="icon"
+                onClick={endCall}
+                className="h-12 w-12 rounded-full"
+              >
+                <Phone className="h-5 w-5" />
+              </Button>
+            </div>
+          </Card>
+
+          {roomId && (
+            <Card className="p-4 bg-primary/5">
+              <p className="text-sm text-center">
+                <strong>Link da Sala:</strong> {window.location.origin}/sala/{roomId}
+              </p>
+              <p className="text-xs text-center text-muted-foreground mt-1">
+                Link copiado para área de transferência
+              </p>
+            </Card>
+          )}
+        </div>
+      )}
+    </AppLayout>
   );
 };
 
