@@ -43,7 +43,6 @@ interface Patient {
 }
 
 const MedicalRecords = () => {
-  const navigate = useNavigate();
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +74,6 @@ const MedicalRecords = () => {
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      navigate("/auth");
       return;
     }
     setUserId(session.user.id);
@@ -390,225 +388,212 @@ const MedicalRecords = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
+    <AppLayout title="Prontuários" description="Registros clínicos das sessões">
+      <div className="flex justify-end mb-6">
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Novo Prontuário
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Prontuários</h1>
-              <p className="text-sm text-muted-foreground">Registros clínicos das sessões</p>
-            </div>
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Novo Prontuário
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="flex items-center justify-between">
-                  <span>Novo Registro de Sessão</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={generateWithAI}
-                    disabled={generatingAI || !formData.patient_id}
-                    className="gap-2"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {generatingAI ? "Gerando..." : "Gerar com IA"}
-                  </Button>
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateRecord} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="patient">Paciente *</Label>
-                    <Select value={formData.patient_id} onValueChange={(value) => setFormData({...formData, patient_id: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o paciente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {patients.map(patient => (
-                          <SelectItem key={patient.id} value={patient.id}>
-                            {patient.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="session_date">Data da Sessão *</Label>
-                    <Input
-                      id="session_date"
-                      type="date"
-                      value={formData.session_date}
-                      onChange={(e) => setFormData({...formData, session_date: e.target.value})}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="session_number">Número da Sessão</Label>
-                  <Input
-                    id="session_number"
-                    type="number"
-                    min="1"
-                    value={formData.session_number}
-                    onChange={(e) => setFormData({...formData, session_number: parseInt(e.target.value)})}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="complaints">Queixas Apresentadas</Label>
-                  <Textarea
-                    id="complaints"
-                    value={formData.complaints}
-                    onChange={(e) => setFormData({...formData, complaints: e.target.value})}
-                    placeholder="Motivo da consulta e queixas do paciente"
-                    rows={2}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="observations">Observações Clínicas</Label>
-                  <Textarea
-                    id="observations"
-                    value={formData.observations}
-                    onChange={(e) => setFormData({...formData, observations: e.target.value})}
-                    placeholder="Estado emocional, comportamento, relatos relevantes"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="techniques_used">Técnicas Utilizadas</Label>
-                  <Textarea
-                    id="techniques_used"
-                    value={formData.techniques_used}
-                    onChange={(e) => setFormData({...formData, techniques_used: e.target.value})}
-                    placeholder="Técnicas aplicadas, exercícios propostos, discussões"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="evolution">Evolução do Tratamento</Label>
-                  <Textarea
-                    id="evolution"
-                    value={formData.evolution}
-                    onChange={(e) => setFormData({...formData, evolution: e.target.value})}
-                    placeholder="Progressos observados e mudanças no quadro clínico"
-                    rows={2}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="next_steps">Próximos Passos</Label>
-                  <Textarea
-                    id="next_steps"
-                    value={formData.next_steps}
-                    onChange={(e) => setFormData({...formData, next_steps: e.target.value})}
-                    placeholder="Plano para as próximas sessões e orientações"
-                    rows={2}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full">
-                  Salvar Prontuário
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Novo Registro de Sessão</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={generateWithAI}
+                  disabled={generatingAI || !formData.patient_id}
+                  className="gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {generatingAI ? "Gerando..." : "Gerar com IA"}
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Buscar por paciente ou queixas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-              <SelectTrigger className="w-full sm:w-[250px]">
-                <SelectValue placeholder="Filtrar por paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os pacientes</SelectItem>
-                {patients.map(patient => (
-                  <SelectItem key={patient.id} value={patient.id}>
-                    {patient.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {filteredRecords.length === 0 ? (
-            <div className="text-center py-12 bg-card border border-border rounded-lg">
-              <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <p className="text-muted-foreground">Nenhum prontuário encontrado</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {filteredRecords.map(record => (
-                <div key={record.id} className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="space-y-1 cursor-pointer flex-1" onClick={() => openViewDialog(record)}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-primary" />
-                        <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
-                        </div>
-                        <span>Sessão #{record.session_number || 1}</span>
-                      </div>
-                    </div>
-                    <ActionMenu
-                      onEdit={() => openEditDialog(record)}
-                      onDelete={() => handleDeleteRecord(record.id)}
-                      deleteTitle="Excluir Prontuário"
-                      deleteDescription="Tem certeza que deseja excluir este prontuário? Todos os anexos também serão removidos."
-                    />
-                  </div>
-
-                  <div className="cursor-pointer" onClick={() => openViewDialog(record)}>
-                    {record.complaints && (
-                      <div className="mb-3">
-                        <p className="text-sm font-medium text-foreground mb-1">Queixas:</p>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{record.complaints}</p>
-                      </div>
-                    )}
-
-                    {record.observations && (
-                      <div>
-                        <p className="text-sm font-medium text-foreground mb-1">Observações:</p>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
-                      </div>
-                    )}
-                  </div>
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreateRecord} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="patient">Paciente *</Label>
+                  <Select value={formData.patient_id} onValueChange={(value) => setFormData({...formData, patient_id: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o paciente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {patients.map(patient => (
+                        <SelectItem key={patient.id} value={patient.id}>
+                          {patient.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="session_date">Data da Sessão *</Label>
+                  <Input
+                    id="session_date"
+                    type="date"
+                    value={formData.session_date}
+                    onChange={(e) => setFormData({...formData, session_date: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="session_number">Número da Sessão</Label>
+                <Input
+                  id="session_number"
+                  type="number"
+                  min="1"
+                  value={formData.session_number}
+                  onChange={(e) => setFormData({...formData, session_number: parseInt(e.target.value)})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="complaints">Queixas Apresentadas</Label>
+                <Textarea
+                  id="complaints"
+                  value={formData.complaints}
+                  onChange={(e) => setFormData({...formData, complaints: e.target.value})}
+                  placeholder="Motivo da consulta e queixas do paciente"
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="observations">Observações Clínicas</Label>
+                <Textarea
+                  id="observations"
+                  value={formData.observations}
+                  onChange={(e) => setFormData({...formData, observations: e.target.value})}
+                  placeholder="Estado emocional, comportamento, relatos relevantes"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="techniques_used">Técnicas Utilizadas</Label>
+                <Textarea
+                  id="techniques_used"
+                  value={formData.techniques_used}
+                  onChange={(e) => setFormData({...formData, techniques_used: e.target.value})}
+                  placeholder="Técnicas aplicadas, exercícios propostos, discussões"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="evolution">Evolução do Tratamento</Label>
+                <Textarea
+                  id="evolution"
+                  value={formData.evolution}
+                  onChange={(e) => setFormData({...formData, evolution: e.target.value})}
+                  placeholder="Progressos observados e mudanças no quadro clínico"
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="next_steps">Próximos Passos</Label>
+                <Textarea
+                  id="next_steps"
+                  value={formData.next_steps}
+                  onChange={(e) => setFormData({...formData, next_steps: e.target.value})}
+                  placeholder="Plano para as próximas sessões e orientações"
+                  rows={2}
+                />
+              </div>
+
+              <Button type="submit" className="w-full">
+                Salvar Prontuário
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Buscar por paciente ou queixas..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={selectedPatient} onValueChange={setSelectedPatient}>
+            <SelectTrigger className="w-full sm:w-[250px]">
+              <SelectValue placeholder="Filtrar por paciente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os pacientes</SelectItem>
+              {patients.map(patient => (
+                <SelectItem key={patient.id} value={patient.id}>
+                  {patient.full_name}
+                </SelectItem>
               ))}
-            </div>
-          )}
+            </SelectContent>
+          </Select>
         </div>
-      </main>
+
+        {filteredRecords.length === 0 ? (
+          <div className="text-center py-12 bg-card border border-border rounded-lg">
+            <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <p className="text-muted-foreground">Nenhum prontuário encontrado</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {filteredRecords.map(record => (
+              <div key={record.id} className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="space-y-1 cursor-pointer flex-1" onClick={() => openViewDialog(record)}>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                      </div>
+                      <span>Sessão #{record.session_number || 1}</span>
+                    </div>
+                  </div>
+                  <ActionMenu
+                    onEdit={() => openEditDialog(record)}
+                    onDelete={() => handleDeleteRecord(record.id)}
+                    deleteTitle="Excluir Prontuário"
+                    deleteDescription="Tem certeza que deseja excluir este prontuário? Todos os anexos também serão removidos."
+                  />
+                </div>
+
+                <div className="cursor-pointer" onClick={() => openViewDialog(record)}>
+                  {record.complaints && (
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-foreground mb-1">Queixas:</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{record.complaints}</p>
+                    </div>
+                  )}
+
+                  {record.observations && (
+                    <div>
+                      <p className="text-sm font-medium text-foreground mb-1">Observações:</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* View Dialog with Attachments */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
@@ -848,7 +833,7 @@ const MedicalRecords = () => {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppLayout>
   );
 };
 
