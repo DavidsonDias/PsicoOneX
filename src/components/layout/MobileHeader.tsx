@@ -109,7 +109,7 @@ export function MobileHeader({ isAdmin, onOpenSearch, notifications = 0 }: Mobil
             <Brain className="w-5 h-5 text-white" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-base bg-gradient-primary bg-clip-text text-transparent">
+            <span className="font-bold text-base text-gradient-primary">
               PsicoOne
             </span>
             <span className="text-[9px] text-muted-foreground -mt-0.5">Enterprise</span>
@@ -146,7 +146,7 @@ export function MobileHeader({ isAdmin, onOpenSearch, notifications = 0 }: Mobil
                       <Brain className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-bold text-base bg-gradient-primary bg-clip-text text-transparent">
+                      <span className="font-bold text-base text-gradient-primary">
                         PsicoOne
                       </span>
                       <span className="text-[9px] text-muted-foreground -mt-0.5">Enterprise</span>

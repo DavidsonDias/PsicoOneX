@@ -64,7 +64,7 @@ export const Pricing = () => {
         <div className="max-w-3xl mx-auto text-center mb-16 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
             <span className="text-foreground">Planos para </span>
-            <span className="bg-gradient-primary bg-clip-text text-transparent">cada momento</span>
+            <span className="text-gradient-primary">cada momento</span>
           </h2>
           <p className="text-lg text-muted-foreground">
             Escolha o plano ideal para sua prática profissional

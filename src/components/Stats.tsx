@@ -31,7 +31,7 @@ export const Stats = () => {
           {stats.map((stat, index) => (
             <div key={index} className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <span className="text-4xl md:text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                <span className="text-4xl md:text-5xl font-bold text-gradient-primary">
                   {stat.value}
                 </span>
                 {index === 1 && <TrendingUp className="w-8 h-8 text-primary" />}

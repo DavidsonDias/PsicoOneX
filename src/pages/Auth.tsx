@@ -76,7 +76,7 @@ export default function Auth() {
           <div className="w-16 h-16 rounded-xl bg-gradient-primary flex items-center justify-center shadow-lg">
             <Brain className="w-10 h-10 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold text-gradient-primary">
             PsicoOne
           </h1>
           <p className="text-muted-foreground text-center">
