@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,7 +15,6 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
   ClipboardList,
   Bell,
   Search,
@@ -29,6 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 interface NavItem {
   icon: React.ElementType;
@@ -63,7 +62,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ isAdmin, onOpenCommandPalette, notifications = 0 }: AppSidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, toggleCollapsed } = useSidebar();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -147,7 +146,7 @@ export function AppSidebar({ isAdmin, onOpenCommandPalette, notifications = 0 }:
       initial={false}
       animate={{ width: collapsed ? 72 : 280 }}
       transition={{ duration: 0.2, ease: "easeInOut" }}
-      className="fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card"
+      className="fixed left-0 top-0 z-40 hidden lg:flex h-screen flex-col border-r border-border bg-card"
     >
       {/* Logo */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-border">
@@ -187,6 +186,24 @@ export function AppSidebar({ isAdmin, onOpenCommandPalette, notifications = 0 }:
               <span className="text-xs">⌘</span>K
             </kbd>
           </Button>
+        </div>
+      )}
+
+      {collapsed && (
+        <div className="p-2">
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-full h-10"
+                onClick={onOpenCommandPalette}
+              >
+                <Search className="h-5 w-5 text-muted-foreground" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Buscar (⌘K)</TooltipContent>
+          </Tooltip>
         </div>
       )}
 
@@ -274,7 +291,7 @@ export function AppSidebar({ isAdmin, onOpenCommandPalette, notifications = 0 }:
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={toggleCollapsed}
           className="w-full h-9 text-muted-foreground hover:text-foreground"
         >
           {collapsed ? (

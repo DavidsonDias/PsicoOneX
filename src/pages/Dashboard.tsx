@@ -129,18 +129,18 @@ export default function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-6 lg:mb-8"
       >
-        <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
           Olá, {profile?.full_name?.split(' ')[0]}! 👋
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           Bem-vindo ao seu painel de gestão profissional
         </p>
       </motion.div>
 
-      {/* Stats Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Stats Grid - Mobile optimized */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8">
         <StatCard
           icon={Users}
           title="Pacientes Ativos"
@@ -175,7 +175,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Today's Schedule */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -184,52 +184,52 @@ export default function Dashboard() {
           className="lg:col-span-2"
         >
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   Agenda de Hoje
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => navigate("/agenda")}>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => navigate("/agenda")}>
                 Ver Tudo
                 <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 pt-0">
               {todayAppointments.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhum agendamento para hoje</p>
+                <div className="text-center py-6 sm:py-8 text-muted-foreground">
+                  <Calendar className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm sm:text-base">Nenhum agendamento para hoje</p>
                   <Button 
                     variant="link" 
-                    className="mt-2"
+                    className="mt-2 text-sm"
                     onClick={() => navigate("/agenda")}
                   >
                     Criar agendamento
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {todayAppointments.map((apt, index) => (
                     <motion.div
                       key={apt.id}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="flex items-center gap-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                      className="flex items-center gap-3 sm:gap-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                     >
-                      <div className={`w-2 h-2 rounded-full ${getStatusColor(apt.status)}`} />
-                      <div className="flex-1">
-                        <p className="font-medium">{apt.patients.full_name}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${getStatusColor(apt.status)}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm sm:text-base truncate">{apt.patients.full_name}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           {format(new Date(apt.scheduled_at), "HH:mm")}
                         </p>
                       </div>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="shrink-0">
                         <CheckCircle2 className="h-4 w-4" />
                       </Button>
                     </motion.div>
@@ -247,30 +247,30 @@ export default function Dashboard() {
           transition={{ delay: 0.3 }}
         >
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-amber-500" />
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
                 Alertas
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 p-4 pt-0">
               {pendingPayments > 0 && (
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <DollarSign className="h-5 w-5 text-amber-500 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-sm">Pagamentos Pendentes</p>
-                    <p className="text-xs text-muted-foreground">
+                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-xs sm:text-sm">Pagamentos Pendentes</p>
+                    <p className="text-xs text-muted-foreground truncate">
                       R$ {pendingPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a receber
                     </p>
                   </div>
                 </div>
               )}
               <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/10 border border-primary/20">
-                <Sparkles className="h-5 w-5 text-primary mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">Dica do dia</p>
+                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-xs sm:text-sm">Dica do dia</p>
                   <p className="text-xs text-muted-foreground">
-                    Use ⌘K para busca rápida em qualquer tela
+                    Use ⌘K para busca rápida
                   </p>
                 </div>
               </div>
@@ -284,16 +284,16 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="mt-8"
+        className="mt-6 lg:mt-8"
       >
         <Card>
-          <CardHeader>
-            <CardTitle>Ações Rápidas</CardTitle>
-            <CardDescription>
-              Acesse as principais funcionalidades do sistema
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base sm:text-lg">Ações Rápidas</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              Acesse as principais funcionalidades
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-2 sm:gap-4 p-4 pt-0">
             {quickActions.map((action, index) => (
               <motion.div
                 key={action.path}
@@ -303,17 +303,17 @@ export default function Dashboard() {
               >
                 <Button
                   variant="outline"
-                  className="w-full h-auto py-4 justify-start gap-4 group hover:border-primary/50"
+                  className="w-full h-auto py-3 sm:py-4 flex-col sm:flex-row sm:justify-start gap-2 sm:gap-4 group hover:border-primary/50"
                   onClick={() => navigate(action.path)}
                 >
                   <div className={`p-2 rounded-lg bg-muted group-hover:bg-primary/10 transition-colors ${action.color}`}>
-                    <action.icon className="h-5 w-5" />
+                    <action.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
-                  <div className="text-left">
-                    <div className="font-semibold">{action.label}</div>
-                    <div className="text-xs text-muted-foreground">{action.description}</div>
+                  <div className="text-center sm:text-left">
+                    <div className="font-semibold text-xs sm:text-sm">{action.label}</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{action.description}</div>
                   </div>
-                  <ArrowRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ArrowRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block" />
                 </Button>
               </motion.div>
             ))}
