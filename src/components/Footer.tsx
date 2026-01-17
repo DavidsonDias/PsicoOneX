@@ -13,7 +13,7 @@ export const Footer = () => {
               <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
                 <Brain className="w-6 h-6 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              <span className="text-xl font-bold text-gradient-primary">
                 PsicoOne
               </span>
             </div>

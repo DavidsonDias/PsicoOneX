@@ -95,7 +95,7 @@ export const Features = () => {
         <div className="max-w-3xl mx-auto text-center mb-16 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
             <span className="text-foreground">Tudo que você precisa em </span>
-            <span className="bg-gradient-primary bg-clip-text text-transparent">uma plataforma</span>
+            <span className="text-gradient-primary">uma plataforma</span>
           </h2>
           <p className="text-lg text-muted-foreground">
             12 módulos completos que automatizam sua prática clínica e administrativa

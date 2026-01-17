@@ -43,7 +43,7 @@ export const Benefits = () => {
         <div className="max-w-6xl mx-auto mb-20">
           <div className="text-center mb-12 space-y-4">
             <h2 className="text-4xl md:text-5xl font-bold">
-              <span className="bg-gradient-primary bg-clip-text text-transparent">Por que </span>
+              <span className="text-gradient-primary">Por que </span>
               <span className="text-foreground">escolher o PsicoOne?</span>
             </h2>
           </div>

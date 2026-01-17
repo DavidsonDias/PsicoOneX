@@ -162,7 +162,7 @@ export function AppSidebar({ isAdmin, onOpenCommandPalette, notifications = 0 }:
                 exit={{ opacity: 0, x: -10 }}
                 className="flex flex-col"
               >
-                <span className="font-bold text-lg bg-gradient-primary bg-clip-text text-transparent">
+                <span className="font-bold text-lg text-gradient-primary">
                   PsicoOne
                 </span>
                 <span className="text-[10px] text-muted-foreground -mt-0.5">Enterprise</span>
