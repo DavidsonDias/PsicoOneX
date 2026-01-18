@@ -164,8 +164,8 @@ export default function Patients() {
                   <Input id="email" name="email" type="email" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input id="phone" name="phone" />
+                  <Label htmlFor="phone">Telefone *</Label>
+                  <Input id="phone" name="phone" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="birth_date">Data de Nascimento</Label>
@@ -294,11 +294,12 @@ export default function Patients() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit_phone">Telefone</Label>
+                  <Label htmlFor="edit_phone">Telefone *</Label>
                   <Input 
                     id="edit_phone" 
                     name="phone"
                     defaultValue={editingPatient.phone || ""}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
