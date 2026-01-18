@@ -58,13 +58,17 @@ export default function Patients() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      const email = formData.get("email") as string;
+      const birthDate = formData.get("birth_date") as string;
+      const notes = formData.get("notes") as string;
+
       const { error } = await supabase.from("patients").insert({
         psychologist_id: session.user.id,
         full_name: formData.get("full_name") as string,
-        email: formData.get("email") as string,
+        email: email || null,
         phone: formData.get("phone") as string,
-        birth_date: formData.get("birth_date") as string,
-        notes: formData.get("notes") as string,
+        birth_date: birthDate || null,
+        notes: notes || null,
       });
 
       if (error) throw error;
@@ -85,14 +89,18 @@ export default function Patients() {
     const formData = new FormData(e.currentTarget);
 
     try {
+      const email = formData.get("email") as string;
+      const birthDate = formData.get("birth_date") as string;
+      const notes = formData.get("notes") as string;
+
       const { error } = await supabase
         .from("patients")
         .update({
           full_name: formData.get("full_name") as string,
-          email: formData.get("email") as string,
+          email: email || null,
           phone: formData.get("phone") as string,
-          birth_date: formData.get("birth_date") as string,
-          notes: formData.get("notes") as string,
+          birth_date: birthDate || null,
+          notes: notes || null,
         })
         .eq("id", editingPatient.id);
 
