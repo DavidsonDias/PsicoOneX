@@ -1,81 +1,175 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Brain, Calendar, FileText, CreditCard, Video, Shield } from "lucide-react";
+import { ArrowRight, Brain, Calendar, FileText, CreditCard, Video, Shield, Sparkles, Play } from "lucide-react";
+import { motion } from "framer-motion";
+import { FloatingElement } from "@/components/ui/floating-element";
 
 export const Hero = () => {
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+        delayChildren: 0.2,
+      },
+    },
+  } as const;
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+      },
+    },
+  } as const;
+
   return (
-    <section className="relative bg-gradient-hero overflow-hidden">
-      <div className="container mx-auto px-4 py-20 md:py-32">
-        <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-card border border-border">
-            <Brain className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">Gestão Inteligente, Cuidado Humano</span>
-          </div>
-
-          {/* Main Heading */}
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-            <span className="text-gradient-primary">PsicoOne</span>
-            <br />
-            <span className="text-foreground">Sistema Completo para Psicólogos</span>
-          </h1>
-
-          {/* Subtitle */}
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Automatize tarefas administrativas, libere tempo para o atendimento clínico e 
-            profissionalize sua gestão com a plataforma mais completa do mercado.
-          </p>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-            <Button variant="hero" size="lg" className="group" onClick={() => window.location.href = '/auth'}>
-              Começar Teste Gratuito
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
-            <Button variant="outline" size="lg">
-              Ver Demonstração
-            </Button>
-          </div>
-
-          {/* Trust Indicators */}
-          <div className="flex flex-wrap justify-center gap-6 pt-8 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-primary" />
-              <span>100% Conforme LGPD</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4 text-primary" />
-              <span>IA Integrada</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Video className="w-4 h-4 text-primary" />
-              <span>Teleatendimento Incluso</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Feature Cards Grid */}
-        <div className="grid md:grid-cols-3 gap-6 mt-20 max-w-5xl mx-auto">
-          <FeatureCard
-            icon={Calendar}
-            title="Agenda Inteligente"
-            description="Agendamento online, lembretes automáticos e sincronização com Google Calendar"
-          />
-          <FeatureCard
-            icon={FileText}
-            title="Prontuário com IA"
-            description="Geração automática de prontuários economiza até 20 minutos por sessão"
-          />
-          <FeatureCard
-            icon={CreditCard}
-            title="Gestão Financeira"
-            description="Controle completo de pagamentos, recibos e emissão de notas fiscais"
-          />
-        </div>
+    <section className="relative bg-gradient-hero overflow-hidden min-h-screen flex items-center">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <FloatingElement className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" delay={0} duration={4}>
+          <div />
+        </FloatingElement>
+        <FloatingElement className="absolute bottom-1/4 right-1/4 w-[32rem] h-[32rem] bg-secondary/5 rounded-full blur-3xl" delay={2} duration={5}>
+          <div />
+        </FloatingElement>
+        <FloatingElement className="absolute top-1/2 left-1/2 w-64 h-64 bg-primary/3 rounded-full blur-3xl" delay={1} duration={6}>
+          <div />
+        </FloatingElement>
       </div>
 
-      {/* Gradient Orbs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl -z-10" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl -z-10" />
+      {/* Grid pattern overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_80%)]" />
+
+      <div className="container mx-auto px-4 py-20 md:py-32 relative z-10">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="max-w-5xl mx-auto text-center space-y-8"
+        >
+          {/* Badge */}
+          <motion.div variants={itemVariants}>
+            <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-card border border-primary/20 shadow-lg">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">
+                Plataforma #1 para Psicólogos no Brasil
+              </span>
+            </span>
+          </motion.div>
+
+          {/* Main Heading */}
+          <motion.h1 
+            variants={itemVariants}
+            className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.1]"
+          >
+            <span className="text-gradient-primary">PsicoOne</span>
+            <br />
+            <span className="text-foreground">
+              O Sistema que
+              <br className="hidden md:block" /> 
+              <span className="relative inline-block">
+                Psicólogos Amam
+                <motion.span
+                  className="absolute -bottom-2 left-0 right-0 h-3 bg-primary/20 rounded-full -z-10"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: 1, duration: 0.6 }}
+                />
+              </span>
+            </span>
+          </motion.h1>
+
+          {/* Subtitle */}
+          <motion.p 
+            variants={itemVariants}
+            className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
+          >
+            Automatize prontuários com IA, reduza faltas em 40% e libere 
+            <span className="text-foreground font-medium"> 2 horas por dia </span>
+            para focar no que importa: seus pacientes.
+          </motion.p>
+
+          {/* CTA Buttons */}
+          <motion.div 
+            variants={itemVariants}
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4"
+          >
+            <Button 
+              variant="hero" 
+              size="lg" 
+              className="group text-lg px-8 py-6 shadow-xl hover:shadow-2xl transition-all" 
+              onClick={() => window.location.href = '/auth'}
+            >
+              <span>Começar Grátis - 15 Dias</span>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="lg"
+              className="group text-lg px-8 py-6"
+            >
+              <Play className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+              Ver Demonstração
+            </Button>
+          </motion.div>
+
+          {/* Trust Indicators */}
+          <motion.div 
+            variants={itemVariants}
+            className="flex flex-wrap justify-center gap-x-8 gap-y-3 pt-8"
+          >
+            {[
+              { icon: Shield, text: "100% LGPD" },
+              { icon: Brain, text: "IA Integrada" },
+              { icon: Video, text: "Teleatendimento" },
+            ].map((item, index) => (
+              <motion.div 
+                key={index}
+                className="flex items-center gap-2 text-sm text-muted-foreground"
+                whileHover={{ scale: 1.05, color: "hsl(var(--foreground))" }}
+              >
+                <item.icon className="w-4 h-4 text-primary" />
+                <span>{item.text}</span>
+              </motion.div>
+            ))}
+          </motion.div>
+        </motion.div>
+
+        {/* Feature Cards Grid */}
+        <motion.div 
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.6 }}
+          className="grid md:grid-cols-3 gap-6 mt-24 max-w-5xl mx-auto"
+        >
+          {[
+            {
+              icon: Calendar,
+              title: "Agenda Inteligente",
+              description: "Agendamento online, lembretes por WhatsApp e sincronização com Google Calendar",
+              gradient: "from-blue-500/20 to-cyan-500/20",
+            },
+            {
+              icon: FileText,
+              title: "Prontuário com IA",
+              description: "Geração automática de prontuários economiza até 20 minutos por sessão",
+              gradient: "from-purple-500/20 to-pink-500/20",
+            },
+            {
+              icon: CreditCard,
+              title: "Gestão Financeira",
+              description: "Controle completo de pagamentos, recibos e emissão de notas fiscais",
+              gradient: "from-green-500/20 to-emerald-500/20",
+            },
+          ].map((feature, index) => (
+            <FeatureCard key={index} {...feature} index={index} />
+          ))}
+        </motion.div>
+      </div>
     </section>
   );
 };
@@ -84,19 +178,32 @@ interface FeatureCardProps {
   icon: React.ElementType;
   title: string;
   description: string;
+  gradient: string;
+  index: number;
 }
 
-const FeatureCard = ({ icon: Icon, title, description }: FeatureCardProps) => {
+const FeatureCard = ({ icon: Icon, title, description, gradient, index }: FeatureCardProps) => {
   return (
-    <div className="group relative p-6 rounded-xl bg-card border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
-      <div className="absolute inset-0 bg-gradient-card rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="relative space-y-3">
-        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-          <Icon className="w-6 h-6 text-primary" />
-        </div>
-        <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 1 + index * 0.15 }}
+      whileHover={{ y: -8, scale: 1.02 }}
+      className="group relative p-8 rounded-2xl bg-card/80 backdrop-blur-lg border border-border hover:border-primary/50 transition-all duration-500 hover:shadow-2xl"
+    >
+      {/* Gradient background on hover */}
+      <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+      
+      <div className="relative space-y-4">
+        <motion.div 
+          className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center shadow-lg"
+          whileHover={{ rotate: [0, -10, 10, 0], transition: { duration: 0.5 } }}
+        >
+          <Icon className="w-7 h-7 text-primary-foreground" />
+        </motion.div>
+        <h3 className="text-xl font-bold text-card-foreground">{title}</h3>
+        <p className="text-muted-foreground leading-relaxed">{description}</p>
       </div>
-    </div>
+    </motion.div>
   );
 };
