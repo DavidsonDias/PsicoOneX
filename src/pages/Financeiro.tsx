@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,11 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
+ import { StatsOverview } from "@/components/ui/stats-overview";
+ import { FinancialChart } from "@/components/financial/FinancialChart";
+ import { TransactionList } from "@/components/financial/TransactionList";
+ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Transaction {
   id: string;
@@ -251,15 +254,54 @@ export default function Financeiro() {
   }
 
   return (
-    <AppLayout title="Gestão Financeira" description="Controle completo de receitas e despesas">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <StatCard icon={TrendingUp} title="Receitas" value={`R$ ${totalIncome.toFixed(2)}`} variant="green" />
-        <StatCard icon={TrendingDown} title="Despesas" value={`R$ ${totalExpense.toFixed(2)}`} variant="red" />
-        <StatCard icon={DollarSign} title="Saldo Líquido" value={`R$ ${(totalIncome - totalExpense).toFixed(2)}`} variant="blue" />
-        <StatCard icon={Calendar} title="Pendente" value={`R$ ${pending.toFixed(2)}`} variant="amber" />
-      </div>
+     <AppLayout title="Gestão Financeira Enterprise" description="Controle completo de receitas, despesas e análises">
+       {/* Stats Overview */}
+       <StatsOverview
+         stats={[
+           {
+             label: "Receitas",
+             value: `R$ ${totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+             icon: TrendingUp,
+             color: "green",
+             change: 18,
+           },
+           {
+             label: "Despesas",
+             value: `R$ ${totalExpense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+             icon: TrendingDown,
+             color: "red",
+             change: -5,
+           },
+           {
+             label: "Saldo Líquido",
+             value: `R$ ${(totalIncome - totalExpense).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+             icon: DollarSign,
+             color: "blue",
+             change: 12,
+           },
+           {
+             label: "Pendente",
+             value: `R$ ${pending.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+             icon: Calendar,
+             color: "amber",
+           },
+         ]}
+         className="mb-6"
+       />
 
+       {/* Financial Chart */}
+       <FinancialChart
+         data={[
+           { month: "Jan", receita: 9000, despesa: 3500 },
+           { month: "Fev", receita: 10400, despesa: 3800 },
+           { month: "Mar", receita: 9600, despesa: 3500 },
+           { month: "Abr", receita: 12200, despesa: 4200 },
+           { month: "Mai", receita: 11000, despesa: 3900 },
+           { month: "Jun", receita: totalIncome || 13400, despesa: totalExpense || 4500 },
+         ]}
+       />
+
+       <div className="mt-6" />
       {/* Filters & Actions */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
         <div className="flex flex-wrap gap-3">

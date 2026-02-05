@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Clock, User, Calendar as CalendarIcon } from "lucide-react";
+ import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
+ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+ import { AppointmentTimeline } from "@/components/agenda/AppointmentTimeline";
+ import { QuickStats } from "@/components/agenda/QuickStats";
+ import { ActionMenu } from "@/components/ui/action-menu";
 
 interface Appointment {
   id: string;
@@ -23,6 +26,8 @@ interface Appointment {
   scheduled_at: string;
   status: string;
   notes: string | null;
+   type?: string;
+   duration_minutes?: number;
   patients: {
     full_name: string;
     phone: string;
@@ -43,11 +48,14 @@ export default function Agenda() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [userId, setUserId] = useState<string>("");
+   const [viewMode, setViewMode] = useState<"timeline" | "list">("timeline");
   const [formData, setFormData] = useState({
     patient_id: "",
     date: format(new Date(), "yyyy-MM-dd"),
     time: "09:00",
-    notes: ""
+     notes: "",
+     type: "presential",
+     duration: "50"
   });
 
   useEffect(() => {
@@ -67,7 +75,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from("appointments")
       .select(`
-        id, patient_id, scheduled_at, status, notes,
+         id, patient_id, scheduled_at, status, notes, type, duration_minutes,
         patients (full_name, phone)
       `)
       .eq("psychologist_id", psychologistId)
@@ -181,7 +189,9 @@ export default function Agenda() {
       patient_id: "",
       date: format(new Date(), "yyyy-MM-dd"),
       time: "09:00",
-      notes: ""
+       notes: "",
+       type: "presential",
+       duration: "50"
     });
   };
 
@@ -191,7 +201,9 @@ export default function Agenda() {
       patient_id: appointment.patient_id,
       date: format(dateTime, "yyyy-MM-dd"),
       time: format(dateTime, "HH:mm"),
-      notes: appointment.notes || ""
+       notes: appointment.notes || "",
+       type: appointment.type || "presential",
+       duration: String(appointment.duration_minutes || 50)
     });
     setEditingAppointment(appointment);
   };
@@ -200,15 +212,12 @@ export default function Agenda() {
     isSameDay(new Date(apt.scheduled_at), selectedDate)
   );
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      scheduled: "bg-blue-500",
-      confirmed: "bg-green-500",
-      completed: "bg-purple-500",
-      cancelled: "bg-red-500",
-      no_show: "bg-orange-500"
-    };
-    return colors[status] || colors.scheduled;
+   const stats = {
+     total: filteredAppointments.length,
+     confirmed: filteredAppointments.filter(a => a.status === "confirmed").length,
+     completed: filteredAppointments.filter(a => a.status === "completed").length,
+     cancelled: filteredAppointments.filter(a => a.status === "cancelled").length,
+     pending: filteredAppointments.filter(a => a.status === "scheduled").length,
   };
 
   const getStatusLabel = (status: string) => {
@@ -233,18 +242,22 @@ export default function Agenda() {
   }
 
   return (
-    <AppLayout title="Agenda" description="Gerencie seus agendamentos">
-      <div className="flex justify-end mb-6">
+     <AppLayout title="Agenda Inteligente" description="Gerencie seus agendamentos com eficiência">
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+         <QuickStats stats={stats} />
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+             <Button className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
               Novo Agendamento
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Novo Agendamento</DialogTitle>
+               <DialogTitle className="flex items-center gap-2">
+                 <CalendarIcon className="h-5 w-5 text-primary" />
+                 Novo Agendamento
+               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreateAppointment} className="space-y-4">
               <div className="space-y-2">
@@ -262,7 +275,7 @@ export default function Agenda() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Data *</Label>
                   <Input
@@ -273,7 +286,7 @@ export default function Agenda() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Horário *</Label>
+                   <Label>Hora *</Label>
                   <Input
                     type="time"
                     value={formData.time}
@@ -281,6 +294,43 @@ export default function Agenda() {
                     required
                   />
                 </div>
+                 <div className="space-y-2">
+                   <Label>Duração</Label>
+                   <Select value={formData.duration} onValueChange={(v) => setFormData({...formData, duration: v})}>
+                     <SelectTrigger>
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="30">30 min</SelectItem>
+                       <SelectItem value="50">50 min</SelectItem>
+                       <SelectItem value="60">1 hora</SelectItem>
+                       <SelectItem value="90">1h 30min</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+               </div>
+               <div className="space-y-2">
+                 <Label>Tipo de Atendimento</Label>
+                 <div className="flex gap-3">
+                   <Button
+                     type="button"
+                     variant={formData.type === "presential" ? "default" : "outline"}
+                     className="flex-1 gap-2"
+                     onClick={() => setFormData({...formData, type: "presential"})}
+                   >
+                     <MapPin className="h-4 w-4" />
+                     Presencial
+                   </Button>
+                   <Button
+                     type="button"
+                     variant={formData.type === "online" ? "default" : "outline"}
+                     className="flex-1 gap-2"
+                     onClick={() => setFormData({...formData, type: "online"})}
+                   >
+                     <Video className="h-4 w-4" />
+                     Online
+                   </Button>
+                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Observações</Label>
@@ -297,82 +347,107 @@ export default function Agenda() {
         </Dialog>
       </div>
 
-      <div className="grid lg:grid-cols-[350px,1fr] gap-8">
+       <div className="grid lg:grid-cols-[320px,1fr] gap-6">
         {/* Calendar Sidebar */}
         <div className="space-y-4">
           <Card>
-            <CardContent className="p-4">
+             <CardContent className="p-3">
               <Calendar
                 mode="single"
                 selected={selectedDate}
                 onSelect={(date) => date && setSelectedDate(date)}
                 locale={ptBR}
-                className="rounded-md"
+                 className="rounded-md w-full"
               />
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Legenda</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {[
-                { color: "bg-blue-500", label: "Agendado" },
-                { color: "bg-green-500", label: "Confirmado" },
-                { color: "bg-purple-500", label: "Realizado" },
-                { color: "bg-red-500", label: "Cancelado" },
-                { color: "bg-orange-500", label: "Faltou" },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                  <span>{item.label}</span>
-                </div>
-              ))}
             </CardContent>
           </Card>
         </div>
 
         {/* Appointments List */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5 text-primary" />
-              {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-            </CardTitle>
+           <CardHeader className="pb-4">
+             <div className="flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                 <Button
+                   variant="ghost"
+                   size="icon"
+                   onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
+                 >
+                   <ChevronLeft className="h-4 w-4" />
+                 </Button>
+                 <CardTitle className="flex items-center gap-2 text-lg">
+                   <CalendarIcon className="h-5 w-5 text-primary" />
+                   {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                 </CardTitle>
+                 <Button
+                   variant="ghost"
+                   size="icon"
+                   onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
+                 >
+                   <ChevronRight className="h-4 w-4" />
+                 </Button>
+               </div>
+               <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "timeline" | "list")}>
+                 <TabsList className="h-8">
+                   <TabsTrigger value="timeline" className="px-3 text-xs">
+                     <LayoutGrid className="h-3 w-3" />
+                   </TabsTrigger>
+                   <TabsTrigger value="list" className="px-3 text-xs">
+                     <List className="h-3 w-3" />
+                   </TabsTrigger>
+                 </TabsList>
+               </Tabs>
+             </div>
           </CardHeader>
           <CardContent>
             {filteredAppointments.length === 0 ? (
-              <div className="text-center py-12">
-                <CalendarIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                <p className="text-muted-foreground">Nenhum agendamento para esta data</p>
+               <div className="text-center py-16">
+                 <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-30" />
+                 <p className="text-lg font-medium mb-1">Nenhum agendamento</p>
+                 <p className="text-sm text-muted-foreground">
+                   Não há consultas agendadas para {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
+                 </p>
               </div>
+             ) : viewMode === "timeline" ? (
+               <AppointmentTimeline
+                 appointments={filteredAppointments}
+                 onEdit={openEditDialog}
+                 onDelete={handleDeleteAppointment}
+                 onStatusChange={handleStatusChange}
+               />
             ) : (
-              <div className="space-y-4">
+               <div className="space-y-3">
                 {filteredAppointments.map((appointment, index) => (
                   <motion.div
                     key={appointment.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                     className="border border-border rounded-lg p-4 hover:bg-muted/30 hover:border-primary/30 transition-all"
                   >
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-semibold">{appointment.patients.full_name}</span>
+                           <User className="h-4 w-4 text-primary" />
+                           <span className="font-medium">{appointment.patients.full_name}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           <Clock className="h-4 w-4" />
                           <span>{format(new Date(appointment.scheduled_at), "HH:mm")}</span>
+                           {appointment.type === "online" ? (
+                             <Badge variant="outline" className="text-xs">
+                               <Video className="h-3 w-3 mr-1" />
+                               Online
+                             </Badge>
+                           ) : (
+                             <Badge variant="outline" className="text-xs">
+                               <MapPin className="h-3 w-3 mr-1" />
+                               Presencial
+                             </Badge>
+                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="gap-1">
-                          <div className={`w-2 h-2 rounded-full ${getStatusColor(appointment.status || "scheduled")}`} />
-                          {getStatusLabel(appointment.status || "scheduled")}
-                        </Badge>
                         <ActionMenu
                           onEdit={() => openEditDialog(appointment)}
                           onDelete={() => handleDeleteAppointment(appointment.id)}
@@ -382,16 +457,12 @@ export default function Agenda() {
                       </div>
                     </div>
 
-                    {appointment.notes && (
-                      <p className="text-sm text-muted-foreground mt-2">{appointment.notes}</p>
-                    )}
-
-                    <div className="mt-3">
-                      <Select 
-                        value={appointment.status || "scheduled"} 
+                     <div className="mt-3 flex items-center gap-3">
+                       <Select
+                         value={appointment.status || "scheduled"}
                         onValueChange={(value) => handleStatusChange(appointment.id, value)}
                       >
-                        <SelectTrigger className="w-[180px]">
+                         <SelectTrigger className="w-[160px] h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -402,6 +473,9 @@ export default function Agenda() {
                           <SelectItem value="no_show">Faltou</SelectItem>
                         </SelectContent>
                       </Select>
+                       {appointment.notes && (
+                         <p className="text-xs text-muted-foreground truncate flex-1">{appointment.notes}</p>
+                       )}
                     </div>
                   </motion.div>
                 ))}
