@@ -6,6 +6,20 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+   build: {
+     rollupOptions: {
+       output: {
+         manualChunks: {
+           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+           'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select', '@radix-ui/react-tabs', '@radix-ui/react-tooltip'],
+           'vendor-charts': ['recharts'],
+           'vendor-motion': ['framer-motion'],
+           'vendor-supabase': ['@supabase/supabase-js'],
+         },
+       },
+     },
+     chunkSizeWarningLimit: 1000,
+   },
   server: {
     host: "::",
     port: 8080,
@@ -19,6 +33,7 @@ export default defineConfig(({ mode }) => ({
       manifest: false, // Using external manifest.json
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,

@@ -3,16 +3,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Phone, Mail, Calendar, Users, MapPin, AlertCircle } from "lucide-react";
+ import { Card, CardContent } from "@/components/ui/card";
+ import { Plus, Search, Users, LayoutGrid, List, UserPlus, TrendingUp, Clock, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+ import { StatsOverview } from "@/components/ui/stats-overview";
+ import { PatientCard } from "@/components/patients/PatientCard";
+ import { PatientDetailSheet } from "@/components/patients/PatientDetailSheet";
+ import { DataTable } from "@/components/ui/data-table";
+ import { Badge } from "@/components/ui/badge";
+ import { format } from "date-fns";
 
 interface Patient {
   id: string;
@@ -26,6 +32,7 @@ interface Patient {
   address: string | null;
   emergency_contact: string | null;
   emergency_phone: string | null;
+   created_at?: string;
 }
 
 // Máscaras de formatação
@@ -51,6 +58,9 @@ export default function Patients() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // States para campos com máscara
   const [phone, setPhone] = useState("");
@@ -194,17 +204,77 @@ export default function Patients() {
   );
 
   return (
-    <AppLayout title="Gerenciar Pacientes" description="Cadastro e consulta de pacientes">
+     <AppLayout title="Gestão de Pacientes" description="Cadastro completo e acompanhamento de pacientes">
+       {/* Stats Overview */}
+       <StatsOverview
+         stats={[
+           {
+             label: "Total de Pacientes",
+             value: patients.length,
+             icon: Users,
+             color: "blue",
+             change: 12,
+           },
+           {
+             label: "Pacientes Ativos",
+             value: patients.filter((p) => p.status === "active").length,
+             icon: TrendingUp,
+             color: "green",
+             change: 8,
+           },
+           {
+             label: "Novos este Mês",
+             value: patients.filter((p) => {
+               const created = new Date(p.created_at || "");
+               const now = new Date();
+               return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+             }).length,
+             icon: UserPlus,
+             color: "purple",
+             change: 15,
+           },
+           {
+             label: "Consultas Pendentes",
+             value: "-",
+             icon: Clock,
+             color: "amber",
+           },
+         ]}
+         className="mb-6"
+       />
+
       {/* Actions Bar */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
-        <div className="relative max-w-md flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar paciente por nome..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+       <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6 bg-card border border-border rounded-xl p-4">
+         <div className="flex flex-wrap gap-3 items-center">
+           <div className="relative">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+             <Input
+               placeholder="Buscar por nome, email ou CPF..."
+               value={searchTerm}
+               onChange={(e) => setSearchTerm(e.target.value)}
+               className="pl-10 w-[280px]"
+             />
+           </div>
+           <Select value={statusFilter} onValueChange={setStatusFilter}>
+             <SelectTrigger className="w-[140px]">
+               <SelectValue placeholder="Status" />
+             </SelectTrigger>
+             <SelectContent>
+               <SelectItem value="all">Todos</SelectItem>
+               <SelectItem value="active">Ativos</SelectItem>
+               <SelectItem value="inactive">Inativos</SelectItem>
+             </SelectContent>
+           </Select>
+           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "table")}>
+             <TabsList className="h-9">
+               <TabsTrigger value="grid" className="px-3">
+                 <LayoutGrid className="h-4 w-4" />
+               </TabsTrigger>
+               <TabsTrigger value="table" className="px-3">
+                 <List className="h-4 w-4" />
+               </TabsTrigger>
+             </TabsList>
+           </Tabs>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
@@ -216,7 +286,7 @@ export default function Patients() {
               Novo Paciente
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh]">
+           <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Cadastrar Novo Paciente</DialogTitle>
               <DialogDescription>
@@ -321,11 +391,14 @@ export default function Patients() {
         </div>
       ) : filteredPatients.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
+           <CardContent className="py-16 text-center">
             <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <p className="text-muted-foreground mb-4">
+             <p className="text-lg font-medium mb-2">
               {searchTerm ? "Nenhum paciente encontrado" : "Nenhum paciente cadastrado ainda"}
             </p>
+             <p className="text-muted-foreground mb-6">
+               {searchTerm ? "Tente ajustar os filtros de busca" : "Comece cadastrando seu primeiro paciente"}
+             </p>
             {!searchTerm && (
               <Button onClick={() => setDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
@@ -334,70 +407,76 @@ export default function Patients() {
             )}
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+       ) : viewMode === "grid" ? (
+         <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           <AnimatePresence>
-            {filteredPatients.map((patient, index) => (
-              <motion.div
+             {filteredPatients.map((patient, index) => (
+               <PatientCard
                 key={patient.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Card className="hover:border-primary/50 hover:shadow-md transition-all group">
-                  <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                    <CardTitle className="text-lg">{patient.full_name}</CardTitle>
-                    <ActionMenu
-                      onEdit={() => setEditingPatient(patient)}
-                      onDelete={() => handleDeletePatient(patient.id)}
-                      deleteTitle="Excluir Paciente"
-                      deleteDescription={`Tem certeza que deseja excluir ${patient.full_name}? Todos os registros associados serão removidos.`}
-                    />
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    {patient.email && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{patient.email}</span>
-                      </div>
-                    )}
-                    {patient.phone && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="w-4 h-4 shrink-0" />
-                        <span>{patient.phone}</span>
-                      </div>
-                    )}
-                    {patient.birth_date && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-4 h-4 shrink-0" />
-                        <span>{new Date(patient.birth_date).toLocaleDateString("pt-BR")}</span>
-                      </div>
-                    )}
-                    {patient.address && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{patient.address}</span>
-                      </div>
-                    )}
-                    {patient.emergency_contact && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{patient.emergency_contact}</span>
-                      </div>
-                    )}
-                    <div className="pt-2">
-                      <Badge variant={patient.status === "active" ? "default" : "secondary"}>
-                        {patient.status === "active" ? "Ativo" : patient.status}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                 patient={patient}
+                 index={index}
+                 onEdit={() => setEditingPatient(patient)}
+                 onDelete={() => handleDeletePatient(patient.id)}
+                 onClick={() => setSelectedPatient(patient)}
+               />
             ))}
           </AnimatePresence>
         </div>
+       ) : (
+          <DataTable<Patient>
+           data={filteredPatients}
+           searchPlaceholder="Buscar paciente..."
+            searchKey={"full_name" as keyof Patient}
+           columns={[
+             {
+               key: "full_name",
+               header: "Nome",
+               sortable: true,
+               render: (p) => (
+                 <div className="flex items-center gap-2">
+                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-xs">
+                     {p.full_name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+                   </div>
+                   <span className="font-medium">{p.full_name}</span>
+                 </div>
+               ),
+             },
+             { key: "email", header: "Email", sortable: true },
+             { key: "phone", header: "Telefone" },
+             {
+               key: "birth_date",
+               header: "Nascimento",
+               render: (p) => p.birth_date ? format(new Date(p.birth_date), "dd/MM/yyyy") : "-",
+             },
+             {
+               key: "status",
+               header: "Status",
+               render: (p) => (
+                 <Badge variant={p.status === "active" ? "default" : "secondary"}>
+                   {p.status === "active" ? "Ativo" : "Inativo"}
+                 </Badge>
+               ),
+             },
+           ]}
+           actions={(p) => (
+              <Button variant="ghost" size="sm" onClick={() => setSelectedPatient(p as Patient)}>
+               Ver
+             </Button>
+           )}
+            onRowClick={(p) => setSelectedPatient(p as Patient)}
+         />
       )}
+
+       {/* Patient Detail Sheet */}
+       <PatientDetailSheet
+         patient={selectedPatient}
+         open={!!selectedPatient}
+         onClose={() => setSelectedPatient(null)}
+         onEdit={() => {
+           setEditingPatient(selectedPatient);
+           setSelectedPatient(null);
+         }}
+       />
 
       {/* Edit Dialog */}
       <Dialog open={!!editingPatient} onOpenChange={(open) => !open && setEditingPatient(null)}>
