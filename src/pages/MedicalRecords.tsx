@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
- import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -8,17 +8,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, Download, Trash2, Upload } from "lucide-react";
- import { LayoutGrid, List, TrendingUp } from "lucide-react";
+import { Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, Download, Trash2, Upload, Brain, History, TrendingUp, Clock } from "lucide-react";
+import { LayoutGrid, List } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
- import { Card, CardContent } from "@/components/ui/card";
- import { Badge } from "@/components/ui/badge";
- import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
- import { StatsOverview } from "@/components/ui/stats-overview";
- import { RecordCard } from "@/components/medical-records/RecordCard";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StatsOverview } from "@/components/ui/stats-overview";
+import { RecordCard } from "@/components/medical-records/RecordCard";
+import { SessionTemplates } from "@/components/medical-records/SessionTemplates";
+import { PatientTimeline } from "@/components/medical-records/PatientTimeline";
 
 interface MedicalRecord {
   id: string;
@@ -380,6 +382,45 @@ const MedicalRecords = () => {
     return matchesSearch && matchesPatient;
   });
 
+  // Stats calculations
+  const recordStats = useMemo(() => {
+    const thisMonth = new Date();
+    const monthRecords = records.filter(r => {
+      const d = new Date(r.session_date);
+      return d.getMonth() === thisMonth.getMonth() && d.getFullYear() === thisMonth.getFullYear();
+    });
+    const uniquePatients = new Set(records.map(r => r.patient_id)).size;
+    return {
+      total: records.length,
+      thisMonth: monthRecords.length,
+      uniquePatients,
+      avgSessions: uniquePatients > 0 ? Math.round(records.length / uniquePatients) : 0,
+    };
+  }, [records]);
+
+  // Timeline data for selected patient
+  const patientTimelineData = useMemo(() => {
+    if (selectedPatient === "all") return [];
+    return records
+      .filter(r => r.patient_id === selectedPatient)
+      .map(r => ({
+        id: r.id,
+        date: new Date(r.session_date),
+        sessionNumber: r.session_number || 1,
+        mood: "neutral" as const,
+        highlights: r.complaints ? [r.complaints.slice(0, 50) + "..."] : [],
+        techniques: r.techniques_used ? r.techniques_used.split(",").slice(0, 2) : [],
+      }));
+  }, [records, selectedPatient]);
+
+  const handleApplyTemplate = (template: any) => {
+    setFormData({
+      ...formData,
+      techniques_used: template.techniques.join(", "),
+    });
+    toast.success(`Template "${template.name}" aplicado!`);
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
@@ -395,8 +436,65 @@ const MedicalRecords = () => {
   }
 
   return (
-    <AppLayout title="Prontuários" description="Registros clínicos das sessões">
-      <div className="flex justify-end mb-6">
+    <AppLayout title="Prontuários Inteligentes" description="Registros clínicos com IA e templates de sessão">
+      {/* Stats Overview */}
+      <StatsOverview
+        stats={[
+          {
+            label: "Total de Prontuários",
+            value: recordStats.total,
+            icon: FileText,
+            color: "blue",
+            change: 15,
+          },
+          {
+            label: "Registros este Mês",
+            value: recordStats.thisMonth,
+            icon: Calendar,
+            color: "purple",
+            change: 8,
+          },
+          {
+            label: "Pacientes Atendidos",
+            value: recordStats.uniquePatients,
+            icon: User,
+            color: "green",
+            change: 12,
+          },
+          {
+            label: "Média de Sessões",
+            value: recordStats.avgSessions,
+            icon: TrendingUp,
+            color: "amber",
+          },
+        ]}
+        className="mb-6"
+      />
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar prontuários..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-[250px]"
+            />
+          </div>
+          <Select value={selectedPatient} onValueChange={setSelectedPatient}>
+            <SelectTrigger className="w-[180px]">
+              <User className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Filtrar paciente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os pacientes</SelectItem>
+              {patients.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">

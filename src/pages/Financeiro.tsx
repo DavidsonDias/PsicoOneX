@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
- import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,16 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter } from "lucide-react";
-import { format } from "date-fns";
+import { Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter, Target, Sparkles, PieChart } from "lucide-react";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
- import { StatsOverview } from "@/components/ui/stats-overview";
- import { FinancialChart } from "@/components/financial/FinancialChart";
- import { TransactionList } from "@/components/financial/TransactionList";
- import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StatsOverview } from "@/components/ui/stats-overview";
+import { FinancialChart } from "@/components/financial/FinancialChart";
+import { FinancialProjections } from "@/components/financial/FinancialProjections";
+import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Transaction {
   id: string;
@@ -287,21 +288,82 @@ export default function Financeiro() {
            },
          ]}
          className="mb-6"
-       />
+      />
 
-       {/* Financial Chart */}
-       <FinancialChart
-         data={[
-           { month: "Jan", receita: 9000, despesa: 3500 },
-           { month: "Fev", receita: 10400, despesa: 3800 },
-           { month: "Mar", receita: 9600, despesa: 3500 },
-           { month: "Abr", receita: 12200, despesa: 4200 },
-           { month: "Mai", receita: 11000, despesa: 3900 },
-           { month: "Jun", receita: totalIncome || 13400, despesa: totalExpense || 4500 },
-         ]}
-       />
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="overview" className="mb-6">
+        <TabsList className="bg-muted/50 mb-6">
+          <TabsTrigger value="overview" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger value="projections" className="gap-2">
+            <Target className="h-4 w-4" />
+            Projeções
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="gap-2">
+            <PieChart className="h-4 w-4" />
+            Categorias
+          </TabsTrigger>
+        </TabsList>
 
-       <div className="mt-6" />
+        <TabsContent value="overview" className="space-y-6">
+          {/* Financial Chart */}
+          <FinancialChart
+            data={[
+              { month: "Jan", receita: 9000, despesa: 3500 },
+              { month: "Fev", receita: 10400, despesa: 3800 },
+              { month: "Mar", receita: 9600, despesa: 3500 },
+              { month: "Abr", receita: 12200, despesa: 4200 },
+              { month: "Mai", receita: 11000, despesa: 3900 },
+              { month: "Jun", receita: totalIncome || 13400, despesa: totalExpense || 4500 },
+            ]}
+          />
+        </TabsContent>
+
+        <TabsContent value="projections" className="space-y-6">
+          <FinancialProjections
+            data={{
+              currentMonth: totalIncome,
+              projectedMonth: Math.round(totalIncome * 1.15),
+              yearToDate: totalIncome * 6,
+              projectedYear: Math.round(totalIncome * 12 * 1.1),
+              avgSessionValue: 200,
+              monthlyTarget: 15000,
+              trend: totalIncome > totalExpense ? "up" : "down",
+              insights: [
+                "📈 Sua receita está 12% acima da média dos últimos 3 meses",
+                "💡 Considere aumentar a frequência de sessões com pacientes de longa duração",
+                "🎯 Você está a R$ " + Math.max(0, 15000 - totalIncome).toLocaleString("pt-BR") + " da meta mensal",
+              ],
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <CategoryAnalysis
+              type="income"
+              categories={[
+                { name: "Consultas", value: totalIncome * 0.85, percentage: 85, trend: "up", color: "hsl(142, 76%, 36%)" },
+                { name: "Avaliações", value: totalIncome * 0.1, percentage: 10, trend: "stable", color: "hsl(217, 91%, 60%)" },
+                { name: "Outros", value: totalIncome * 0.05, percentage: 5, trend: "down", color: "hsl(262, 83%, 58%)" },
+              ]}
+            />
+            <CategoryAnalysis
+              type="expense"
+              categories={[
+                { name: "Aluguel", value: totalExpense * 0.4, percentage: 40, trend: "stable", color: "hsl(0, 84%, 60%)" },
+                { name: "Marketing", value: totalExpense * 0.25, percentage: 25, trend: "up", color: "hsl(45, 93%, 47%)" },
+                { name: "Materiais", value: totalExpense * 0.2, percentage: 20, trend: "down", color: "hsl(262, 83%, 58%)" },
+                { name: "Outros", value: totalExpense * 0.15, percentage: 15, trend: "stable", color: "hsl(var(--muted-foreground))" },
+              ]}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      <div className="mt-6" />
       {/* Filters & Actions */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
         <div className="flex flex-wrap gap-3">
