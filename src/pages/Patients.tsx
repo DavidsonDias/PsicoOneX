@@ -423,8 +423,8 @@ export default function Patients() {
           </AnimatePresence>
         </div>
        ) : (
-          <DataTable<Patient>
-           data={filteredPatients}
+          <DataTable
+            data={filteredPatients as Patient[]}
            searchPlaceholder="Buscar paciente..."
             searchKey={"full_name" as keyof Patient}
            columns={[
