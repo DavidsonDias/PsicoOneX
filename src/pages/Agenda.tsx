@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
- import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
- import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List } from "lucide-react";
-import { format, isSameDay } from "date-fns";
+import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw } from "lucide-react";
+import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
- import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
- import { AppointmentTimeline } from "@/components/agenda/AppointmentTimeline";
- import { QuickStats } from "@/components/agenda/QuickStats";
- import { ActionMenu } from "@/components/ui/action-menu";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppointmentTimeline } from "@/components/agenda/AppointmentTimeline";
+import { QuickStats } from "@/components/agenda/QuickStats";
+import { DayOverview } from "@/components/agenda/DayOverview";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { StatsOverview } from "@/components/ui/stats-overview";
 
 interface Appointment {
   id: string;
@@ -212,13 +214,39 @@ export default function Agenda() {
     isSameDay(new Date(apt.scheduled_at), selectedDate)
   );
 
-   const stats = {
-     total: filteredAppointments.length,
-     confirmed: filteredAppointments.filter(a => a.status === "confirmed").length,
-     completed: filteredAppointments.filter(a => a.status === "completed").length,
-     cancelled: filteredAppointments.filter(a => a.status === "cancelled").length,
-     pending: filteredAppointments.filter(a => a.status === "scheduled").length,
+  const stats = {
+    total: filteredAppointments.length,
+    confirmed: filteredAppointments.filter(a => a.status === "confirmed").length,
+    completed: filteredAppointments.filter(a => a.status === "completed").length,
+    cancelled: filteredAppointments.filter(a => a.status === "cancelled").length,
+    pending: filteredAppointments.filter(a => a.status === "scheduled").length,
   };
+
+  // Day overview stats
+  const dayStats = useMemo(() => ({
+    totalSlots: 10,
+    bookedSlots: filteredAppointments.length,
+    confirmedSlots: filteredAppointments.filter(a => a.status === "confirmed").length,
+    completedSlots: filteredAppointments.filter(a => a.status === "completed").length,
+    cancelledSlots: filteredAppointments.filter(a => a.status === "cancelled").length,
+    revenue: filteredAppointments.filter(a => a.status === "completed").length * 200,
+    avgDuration: 50,
+  }), [filteredAppointments]);
+
+  // Monthly stats
+  const monthlyStats = useMemo(() => {
+    const monthStart = startOfMonth(selectedDate);
+    const monthEnd = endOfMonth(selectedDate);
+    const monthAppointments = appointments.filter(apt => {
+      const d = new Date(apt.scheduled_at);
+      return d >= monthStart && d <= monthEnd;
+    });
+    return {
+      total: monthAppointments.length,
+      completed: monthAppointments.filter(a => a.status === "completed").length,
+      cancelled: monthAppointments.filter(a => a.status === "cancelled").length,
+    };
+  }, [appointments, selectedDate]);
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -242,9 +270,46 @@ export default function Agenda() {
   }
 
   return (
-     <AppLayout title="Agenda Inteligente" description="Gerencie seus agendamentos com eficiência">
-       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-         <QuickStats stats={stats} />
+    <AppLayout title="Agenda Inteligente" description="Gerencie seus agendamentos com eficiência e insights em tempo real">
+      {/* Monthly Stats */}
+      <StatsOverview
+        stats={[
+          {
+            label: "Consultas do Mês",
+            value: monthlyStats.total,
+            icon: CalendarIcon,
+            color: "blue",
+            change: 12,
+          },
+          {
+            label: "Realizadas",
+            value: monthlyStats.completed,
+            icon: Clock,
+            color: "green",
+            change: 8,
+          },
+          {
+            label: "Cancelamentos",
+            value: monthlyStats.cancelled,
+            icon: RefreshCw,
+            color: "red",
+            change: -15,
+          },
+          {
+            label: "Taxa de Presença",
+            value: monthlyStats.total > 0 
+              ? `${Math.round((monthlyStats.completed / monthlyStats.total) * 100)}%`
+              : "0%",
+            icon: Zap,
+            color: "purple",
+            change: 5,
+          },
+        ]}
+        className="mb-6"
+      />
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <QuickStats stats={stats} />
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
              <Button className="gap-2 shrink-0">
@@ -351,16 +416,19 @@ export default function Agenda() {
         {/* Calendar Sidebar */}
         <div className="space-y-4">
           <Card>
-             <CardContent className="p-3">
+            <CardContent className="p-3">
               <Calendar
                 mode="single"
                 selected={selectedDate}
                 onSelect={(date) => date && setSelectedDate(date)}
                 locale={ptBR}
-                 className="rounded-md w-full"
+                className="rounded-md w-full"
               />
             </CardContent>
           </Card>
+          
+          {/* Day Overview */}
+          <DayOverview stats={dayStats} selectedDate={selectedDate} />
         </div>
 
         {/* Appointments List */}
