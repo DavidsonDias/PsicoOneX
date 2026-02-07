@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,20 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, Download, Trash2, Upload, Brain, History, TrendingUp, Clock } from "lucide-react";
-import { LayoutGrid, List } from "lucide-react";
+import { 
+  Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, 
+  Download, Trash2, Upload, TrendingUp, Eye, Info, Hash
+} from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatsOverview } from "@/components/ui/stats-overview";
-import { RecordCard } from "@/components/medical-records/RecordCard";
-import { SessionTemplates } from "@/components/medical-records/SessionTemplates";
-import { PatientTimeline } from "@/components/medical-records/PatientTimeline";
+import { FreeFormEditor } from "@/components/medical-records/FreeFormEditor";
+import { AttachmentUploader } from "@/components/medical-records/AttachmentUploader";
+import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
 
 interface MedicalRecord {
   id: string;
@@ -51,6 +54,20 @@ interface Patient {
   full_name: string;
 }
 
+interface PendingFile {
+  id: string;
+  file: File;
+  preview?: string;
+}
+
+interface PreviewFile {
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  createdAt?: string;
+}
+
 const MedicalRecords = () => {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -65,6 +82,11 @@ const MedicalRecords = () => {
   const [generatingAI, setGeneratingAI] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [freeFormNotes, setFreeFormNotes] = useState("");
+
   const [formData, setFormData] = useState({
     patient_id: "",
     session_date: format(new Date(), "yyyy-MM-dd"),
@@ -79,6 +101,22 @@ const MedicalRecords = () => {
   useEffect(() => {
     checkAuthAndLoadData();
   }, []);
+
+  // Auto-calculate session number when patient changes
+  const calculateNextSessionNumber = useCallback((patientId: string) => {
+    if (!patientId) return 1;
+    const patientRecords = records.filter(r => r.patient_id === patientId);
+    const maxSession = Math.max(0, ...patientRecords.map(r => r.session_number || 0));
+    return maxSession + 1;
+  }, [records]);
+
+  // Update session number when patient is selected
+  useEffect(() => {
+    if (formData.patient_id && !editingRecord) {
+      const nextSession = calculateNextSessionNumber(formData.patient_id);
+      setFormData(prev => ({ ...prev, session_number: nextSession }));
+    }
+  }, [formData.patient_id, calculateNextSessionNumber, editingRecord]);
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -155,7 +193,8 @@ const MedicalRecords = () => {
           observations: formData.observations,
           techniques_used: formData.techniques_used,
           evolution: formData.evolution,
-          patient_name: patient.full_name
+          patient_name: patient.full_name,
+          free_notes: freeFormNotes
         }
       });
 
@@ -179,6 +218,37 @@ const MedicalRecords = () => {
     }
   };
 
+  const uploadPendingFiles = async (recordId: string) => {
+    for (const pf of pendingFiles) {
+      const filePath = `${userId}/${recordId}/${Date.now()}_${pf.file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("medical-attachments")
+        .upload(filePath, pf.file);
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        continue;
+      }
+
+      await supabase
+        .from("medical_record_attachments")
+        .insert({
+          medical_record_id: recordId,
+          file_name: pf.file.name,
+          file_path: filePath,
+          file_type: pf.file.type,
+          file_size: pf.file.size,
+          uploaded_by: userId
+        });
+
+      // Revoke preview URL
+      if (pf.preview) {
+        URL.revokeObjectURL(pf.preview);
+      }
+    }
+  };
+
   const handleCreateRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -187,7 +257,12 @@ const MedicalRecords = () => {
       return;
     }
 
-    const { error } = await supabase
+    // Combine free-form notes with observations
+    const combinedObservations = freeFormNotes 
+      ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)
+      : formData.observations;
+
+    const { data: newRecord, error } = await supabase
       .from("medical_records")
       .insert({
         patient_id: formData.patient_id,
@@ -195,15 +270,22 @@ const MedicalRecords = () => {
         session_date: formData.session_date,
         session_number: formData.session_number,
         complaints: formData.complaints || null,
-        observations: formData.observations || null,
+        observations: combinedObservations || null,
         techniques_used: formData.techniques_used || null,
         evolution: formData.evolution || null,
         next_steps: formData.next_steps || null
-      });
+      })
+      .select()
+      .single();
 
     if (error) {
       toast.error("Erro ao criar prontuário");
       return;
+    }
+
+    // Upload pending files
+    if (pendingFiles.length > 0 && newRecord) {
+      await uploadPendingFiles(newRecord.id);
     }
 
     toast.success("Prontuário criado com sucesso!");
@@ -216,6 +298,10 @@ const MedicalRecords = () => {
     e.preventDefault();
     if (!editingRecord) return;
 
+    const combinedObservations = freeFormNotes 
+      ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)
+      : formData.observations;
+
     const { error } = await supabase
       .from("medical_records")
       .update({
@@ -223,7 +309,7 @@ const MedicalRecords = () => {
         session_date: formData.session_date,
         session_number: formData.session_number,
         complaints: formData.complaints || null,
-        observations: formData.observations || null,
+        observations: combinedObservations || null,
         techniques_used: formData.techniques_used || null,
         evolution: formData.evolution || null,
         next_steps: formData.next_steps || null
@@ -233,6 +319,11 @@ const MedicalRecords = () => {
     if (error) {
       toast.error("Erro ao atualizar prontuário");
       return;
+    }
+
+    // Upload any pending files
+    if (pendingFiles.length > 0) {
+      await uploadPendingFiles(editingRecord.id);
     }
 
     toast.success("Prontuário atualizado com sucesso!");
@@ -259,16 +350,30 @@ const MedicalRecords = () => {
   };
 
   const openEditDialog = (record: MedicalRecord) => {
+    // Extract free-form notes if present
+    const obsContent = record.observations || "";
+    const freeNotesMarker = "--- Anotações Livres ---";
+    const markerIndex = obsContent.indexOf(freeNotesMarker);
+    
+    let observations = obsContent;
+    let freeNotes = "";
+    
+    if (markerIndex !== -1) {
+      observations = obsContent.substring(0, markerIndex).trim();
+      freeNotes = obsContent.substring(markerIndex + freeNotesMarker.length).trim();
+    }
+
     setFormData({
       patient_id: record.patient_id,
       session_date: record.session_date,
       session_number: record.session_number || 1,
       complaints: record.complaints || "",
-      observations: record.observations || "",
+      observations: observations,
       techniques_used: record.techniques_used || "",
       evolution: record.evolution || "",
       next_steps: record.next_steps || ""
     });
+    setFreeFormNotes(freeNotes);
     setEditingRecord(record);
   };
 
@@ -283,6 +388,8 @@ const MedicalRecords = () => {
       evolution: "",
       next_steps: ""
     });
+    setFreeFormNotes("");
+    setPendingFiles([]);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,6 +435,39 @@ const MedicalRecords = () => {
     } finally {
       setUploadingFile(false);
     }
+  };
+
+  const handlePreviewAttachment = async (attachment: Attachment) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("medical-attachments")
+        .download(attachment.file_path);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      setPreviewFile({
+        name: attachment.file_name,
+        type: attachment.file_type,
+        size: attachment.file_size,
+        url,
+        createdAt: attachment.created_at
+      });
+      setPreviewOpen(true);
+    } catch (error) {
+      toast.error("Erro ao carregar arquivo");
+    }
+  };
+
+  const handlePreviewPendingFile = (pf: PendingFile) => {
+    const url = pf.preview || URL.createObjectURL(pf.file);
+    setPreviewFile({
+      name: pf.file.name,
+      type: pf.file.type,
+      size: pf.file.size,
+      url
+    });
+    setPreviewOpen(true);
   };
 
   const handleDownloadAttachment = async (attachment: Attachment) => {
@@ -398,33 +538,14 @@ const MedicalRecords = () => {
     };
   }, [records]);
 
-  // Timeline data for selected patient
-  const patientTimelineData = useMemo(() => {
-    if (selectedPatient === "all") return [];
-    return records
-      .filter(r => r.patient_id === selectedPatient)
-      .map(r => ({
-        id: r.id,
-        date: new Date(r.session_date),
-        sessionNumber: r.session_number || 1,
-        mood: "neutral" as const,
-        highlights: r.complaints ? [r.complaints.slice(0, 50) + "..."] : [],
-        techniques: r.techniques_used ? r.techniques_used.split(",").slice(0, 2) : [],
-      }));
-  }, [records, selectedPatient]);
-
-  const handleApplyTemplate = (template: any) => {
-    setFormData({
-      ...formData,
-      techniques_used: template.techniques.join(", "),
-    });
-    toast.success(`Template "${template.name}" aplicado!`);
-  };
-
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const handleStructuredChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   if (loading) {
@@ -435,8 +556,129 @@ const MedicalRecords = () => {
     );
   }
 
+  const RecordFormContent = ({ isEdit = false }: { isEdit?: boolean }) => (
+    <div className="space-y-6">
+      {/* Session Info Header */}
+      <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Info className="h-4 w-4" />
+          Informações da sessão são preenchidas automaticamente
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="patient" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Paciente *
+            </Label>
+            <Select 
+              value={formData.patient_id} 
+              onValueChange={(value) => setFormData({...formData, patient_id: value})}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o paciente" />
+              </SelectTrigger>
+              <SelectContent>
+                {patients.map(patient => (
+                  <SelectItem key={patient.id} value={patient.id}>
+                    {patient.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="session_date" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Data da Sessão
+            </Label>
+            <Input
+              id="session_date"
+              type="date"
+              value={formData.session_date}
+              onChange={(e) => setFormData({...formData, session_date: e.target.value})}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Hash className="h-4 w-4" />
+              Sessão Nº
+              <Badge variant="secondary" className="text-xs">Auto</Badge>
+            </Label>
+            <Input
+              type="number"
+              min="1"
+              value={formData.session_number}
+              onChange={(e) => setFormData({...formData, session_number: parseInt(e.target.value)})}
+              className="bg-muted/50"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* AI Generation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <span className="font-medium">Assistente de Escrita</span>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={generateWithAI}
+          disabled={generatingAI || !formData.patient_id}
+          className="gap-2"
+        >
+          <Sparkles className="h-4 w-4" />
+          {generatingAI ? "Gerando..." : "Gerar com IA"}
+        </Button>
+      </div>
+
+      <Separator />
+
+      {/* Free-Form Editor with Optional Structured Fields */}
+      <FreeFormEditor
+        value={freeFormNotes}
+        onChange={setFreeFormNotes}
+        structuredFields={{
+          complaints: formData.complaints,
+          observations: formData.observations,
+          techniques_used: formData.techniques_used,
+          evolution: formData.evolution,
+          next_steps: formData.next_steps
+        }}
+        onStructuredChange={handleStructuredChange}
+      />
+
+      <Separator />
+
+      {/* Attachments Section */}
+      <div className="space-y-3">
+        <Label className="flex items-center gap-2">
+          <Paperclip className="h-4 w-4" />
+          Anexos
+          {pendingFiles.length > 0 && (
+            <Badge variant="secondary">{pendingFiles.length}</Badge>
+          )}
+        </Label>
+        <AttachmentUploader
+          pendingFiles={pendingFiles}
+          onFilesChange={setPendingFiles}
+          onPreview={handlePreviewPendingFile}
+        />
+      </div>
+
+      <Button type="submit" className="w-full">
+        {isEdit ? "Salvar Alterações" : "Criar Prontuário"}
+      </Button>
+    </div>
+  );
+
   return (
-    <AppLayout title="Prontuários Inteligentes" description="Registros clínicos com IA e templates de sessão">
+    <AppLayout title="Prontuários Clínicos" description="Registros flexíveis com anexos e pré-visualização">
       {/* Stats Overview */}
       <StatsOverview
         stats={[
@@ -495,7 +737,10 @@ const MedicalRecords = () => {
             </SelectContent>
           </Select>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
@@ -504,150 +749,17 @@ const MedicalRecords = () => {
           </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
-                <span>Novo Registro de Sessão</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={generateWithAI}
-                  disabled={generatingAI || !formData.patient_id}
-                  className="gap-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  {generatingAI ? "Gerando..." : "Gerar com IA"}
-                </Button>
-              </DialogTitle>
+              <DialogTitle>Novo Registro de Sessão</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleCreateRecord} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="patient">Paciente *</Label>
-                  <Select value={formData.patient_id} onValueChange={(value) => setFormData({...formData, patient_id: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o paciente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {patients.map(patient => (
-                        <SelectItem key={patient.id} value={patient.id}>
-                          {patient.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="session_date">Data da Sessão *</Label>
-                  <Input
-                    id="session_date"
-                    type="date"
-                    value={formData.session_date}
-                    onChange={(e) => setFormData({...formData, session_date: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="session_number">Número da Sessão</Label>
-                <Input
-                  id="session_number"
-                  type="number"
-                  min="1"
-                  value={formData.session_number}
-                  onChange={(e) => setFormData({...formData, session_number: parseInt(e.target.value)})}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="complaints">Queixas Apresentadas</Label>
-                <Textarea
-                  id="complaints"
-                  value={formData.complaints}
-                  onChange={(e) => setFormData({...formData, complaints: e.target.value})}
-                  placeholder="Motivo da consulta e queixas do paciente"
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="observations">Observações Clínicas</Label>
-                <Textarea
-                  id="observations"
-                  value={formData.observations}
-                  onChange={(e) => setFormData({...formData, observations: e.target.value})}
-                  placeholder="Estado emocional, comportamento, relatos relevantes"
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="techniques_used">Técnicas Utilizadas</Label>
-                <Textarea
-                  id="techniques_used"
-                  value={formData.techniques_used}
-                  onChange={(e) => setFormData({...formData, techniques_used: e.target.value})}
-                  placeholder="Técnicas aplicadas, exercícios propostos, discussões"
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="evolution">Evolução do Tratamento</Label>
-                <Textarea
-                  id="evolution"
-                  value={formData.evolution}
-                  onChange={(e) => setFormData({...formData, evolution: e.target.value})}
-                  placeholder="Progressos observados e mudanças no quadro clínico"
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="next_steps">Próximos Passos</Label>
-                <Textarea
-                  id="next_steps"
-                  value={formData.next_steps}
-                  onChange={(e) => setFormData({...formData, next_steps: e.target.value})}
-                  placeholder="Plano para as próximas sessões e orientações"
-                  rows={2}
-                />
-              </div>
-
-              <Button type="submit" className="w-full">
-                Salvar Prontuário
-              </Button>
+            <form onSubmit={handleCreateRecord}>
+              <RecordFormContent />
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Buscar por paciente ou queixas..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-            <SelectTrigger className="w-full sm:w-[250px]">
-              <SelectValue placeholder="Filtrar por paciente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os pacientes</SelectItem>
-              {patients.map(patient => (
-                <SelectItem key={patient.id} value={patient.id}>
-                  {patient.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
+      {/* Records List */}
+      <div className="space-y-4">
         {filteredRecords.length === 0 ? (
           <div className="text-center py-12 bg-card border border-border rounded-lg">
             <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
@@ -656,45 +768,46 @@ const MedicalRecords = () => {
         ) : (
           <div className="grid gap-4">
             {filteredRecords.map(record => (
-              <div key={record.id} className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="space-y-1 cursor-pointer flex-1" onClick={() => openViewDialog(record)}>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-primary" />
-                      <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        <span>{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
+              <motion.div
+                key={record.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Card className="hover:border-primary/50 transition-colors">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="space-y-1 cursor-pointer flex-1" onClick={() => openViewDialog(record)}>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-primary" />
+                          <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                          </div>
+                          <Badge variant="outline">
+                            <Hash className="h-3 w-3 mr-1" />
+                            Sessão {record.session_number || 1}
+                          </Badge>
+                        </div>
                       </div>
-                      <span>Sessão #{record.session_number || 1}</span>
+                      <ActionMenu
+                        onEdit={() => openEditDialog(record)}
+                        onDelete={() => handleDeleteRecord(record.id)}
+                        deleteTitle="Excluir Prontuário"
+                        deleteDescription="Tem certeza que deseja excluir este prontuário? Todos os anexos também serão removidos."
+                      />
                     </div>
-                  </div>
-                  <ActionMenu
-                    onEdit={() => openEditDialog(record)}
-                    onDelete={() => handleDeleteRecord(record.id)}
-                    deleteTitle="Excluir Prontuário"
-                    deleteDescription="Tem certeza que deseja excluir este prontuário? Todos os anexos também serão removidos."
-                  />
-                </div>
 
-                <div className="cursor-pointer" onClick={() => openViewDialog(record)}>
-                  {record.complaints && (
-                    <div className="mb-3">
-                      <p className="text-sm font-medium text-foreground mb-1">Queixas:</p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{record.complaints}</p>
+                    <div className="cursor-pointer" onClick={() => openViewDialog(record)}>
+                      {record.observations && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
+                      )}
                     </div>
-                  )}
-
-                  {record.observations && (
-                    <div>
-                      <p className="text-sm font-medium text-foreground mb-1">Observações:</p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
             ))}
           </div>
         )}
@@ -708,7 +821,7 @@ const MedicalRecords = () => {
           </DialogHeader>
           {selectedRecord && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border">
+              <div className="grid grid-cols-3 gap-4 pb-4 border-b border-border">
                 <div>
                   <p className="text-sm text-muted-foreground">Paciente</p>
                   <p className="font-semibold">{selectedRecord.patients.full_name}</p>
@@ -723,17 +836,17 @@ const MedicalRecords = () => {
                 </div>
               </div>
 
+              {selectedRecord.observations && (
+                <div>
+                  <h4 className="font-semibold text-foreground mb-2">Anotações da Sessão</h4>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{selectedRecord.observations}</p>
+                </div>
+              )}
+
               {selectedRecord.complaints && (
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Queixas Apresentadas</h4>
                   <p className="text-muted-foreground">{selectedRecord.complaints}</p>
-                </div>
-              )}
-
-              {selectedRecord.observations && (
-                <div>
-                  <h4 className="font-semibold text-foreground mb-2">Observações Clínicas</h4>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{selectedRecord.observations}</p>
                 </div>
               )}
 
@@ -789,20 +902,32 @@ const MedicalRecords = () => {
                   <div className="space-y-2">
                     {attachments.map(attachment => (
                       <div key={attachment.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-3">
+                        <div 
+                          className="flex items-center gap-3 cursor-pointer flex-1"
+                          onClick={() => handlePreviewAttachment(attachment)}
+                        >
                           <FileText className="h-5 w-5 text-primary" />
                           <div>
-                            <p className="font-medium text-sm">{attachment.file_name}</p>
+                            <p className="font-medium text-sm hover:underline">{attachment.file_name}</p>
                             <p className="text-xs text-muted-foreground">
                               {formatFileSize(attachment.file_size)} • {format(new Date(attachment.created_at), "dd/MM/yyyy HH:mm")}
                             </p>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handlePreviewAttachment(attachment)}
+                            title="Visualizar"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDownloadAttachment(attachment)}
+                            title="Baixar"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -811,6 +936,7 @@ const MedicalRecords = () => {
                             size="icon"
                             className="text-destructive hover:text-destructive"
                             onClick={() => handleDeleteAttachment(attachment)}
+                            title="Excluir"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -826,118 +952,42 @@ const MedicalRecords = () => {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingRecord} onOpenChange={(open) => { if (!open) { setEditingRecord(null); resetForm(); } }}>
+      <Dialog open={!!editingRecord} onOpenChange={(open) => { 
+        if (!open) { 
+          setEditingRecord(null); 
+          resetForm(); 
+        } 
+      }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Editar Prontuário</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={generateWithAI}
-                disabled={generatingAI || !formData.patient_id}
-                className="gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                {generatingAI ? "Gerando..." : "Gerar com IA"}
-              </Button>
-            </DialogTitle>
+            <DialogTitle>Editar Prontuário</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleEditRecord} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Paciente *</Label>
-                <Select value={formData.patient_id} onValueChange={(value) => setFormData({...formData, patient_id: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o paciente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map(patient => (
-                      <SelectItem key={patient.id} value={patient.id}>
-                        {patient.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Data da Sessão *</Label>
-                <Input
-                  type="date"
-                  value={formData.session_date}
-                  onChange={(e) => setFormData({...formData, session_date: e.target.value})}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Número da Sessão</Label>
-              <Input
-                type="number"
-                min="1"
-                value={formData.session_number}
-                onChange={(e) => setFormData({...formData, session_number: parseInt(e.target.value)})}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Queixas Apresentadas</Label>
-              <Textarea
-                value={formData.complaints}
-                onChange={(e) => setFormData({...formData, complaints: e.target.value})}
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Observações Clínicas</Label>
-              <Textarea
-                value={formData.observations}
-                onChange={(e) => setFormData({...formData, observations: e.target.value})}
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Técnicas Utilizadas</Label>
-              <Textarea
-                value={formData.techniques_used}
-                onChange={(e) => setFormData({...formData, techniques_used: e.target.value})}
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Evolução do Tratamento</Label>
-              <Textarea
-                value={formData.evolution}
-                onChange={(e) => setFormData({...formData, evolution: e.target.value})}
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Próximos Passos</Label>
-              <Textarea
-                value={formData.next_steps}
-                onChange={(e) => setFormData({...formData, next_steps: e.target.value})}
-                rows={2}
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => { setEditingRecord(null); resetForm(); }}>
-                Cancelar
-              </Button>
-              <Button type="submit" className="flex-1">
-                Salvar Alterações
-              </Button>
-            </div>
+          <form onSubmit={handleEditRecord}>
+            <RecordFormContent isEdit />
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        open={previewOpen}
+        onOpenChange={(open) => {
+          setPreviewOpen(open);
+          if (!open && previewFile) {
+            URL.revokeObjectURL(previewFile.url);
+            setPreviewFile(null);
+          }
+        }}
+        file={previewFile}
+        onDownload={() => {
+          if (previewFile) {
+            const a = document.createElement("a");
+            a.href = previewFile.url;
+            a.download = previewFile.name;
+            a.click();
+          }
+        }}
+      />
     </AppLayout>
   );
 };
