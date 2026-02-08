@@ -28,7 +28,8 @@
    onStatusChange: (id: string, status: string) => void;
  }
  
- const timeSlots = Array.from({ length: 12 }, (_, i) => i + 8); // 8:00 to 19:00
+// Extended hours: 6:00 to 23:00 (18 hours) for flexible scheduling
+const timeSlots = Array.from({ length: 18 }, (_, i) => i + 6);
  
  export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusChange }: AppointmentTimelineProps) {
    const getStatusConfig = (status: string) => {

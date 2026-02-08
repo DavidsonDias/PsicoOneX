@@ -1,9 +1,9 @@
-import { Brain, Menu, Search, Bell, X } from "lucide-react";
+import { Brain, Menu, Search, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Users,
   Calendar,
@@ -16,7 +16,6 @@ import {
   Receipt,
   Shield,
   Settings,
-  Sparkles,
   ClipboardList,
   LogOut,
   MessageSquare,
@@ -25,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface MobileHeaderProps {
   isAdmin?: boolean;
@@ -52,8 +52,14 @@ const secondaryNavItems = [
 
 export function MobileHeader({ isAdmin, onOpenSearch, notifications = 0 }: MobileHeaderProps) {
   const [open, setOpen] = useState(false);
+  const [logoLoaded, setLogoLoaded] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Pre-load logo to avoid flickering
+  useEffect(() => {
+    setLogoLoaded(true);
+  }, []);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -103,27 +109,93 @@ export function MobileHeader({ isAdmin, onOpenSearch, notifications = 0 }: Mobil
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/95 backdrop-blur-md border-b border-border lg:hidden">
       <div className="flex items-center justify-between h-full px-4">
-        {/* Logo */}
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center shadow-md">
-            <Brain className="w-5 h-5 text-white" />
+        {/* Menu button on the left */}
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[300px] p-0">
+            <div className="flex flex-col h-full">
+              {/* Sheet Header */}
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center shadow-md">
+                    <Brain className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="font-bold text-lg text-gradient-primary">
+                    PsicoOne
+                  </span>
+                </div>
+              </div>
+
+              {/* Navigation */}
+              <nav className="flex-1 overflow-y-auto py-4 px-2">
+                <div className="space-y-1">
+                  {mainNavItems.map((item) => (
+                    <NavItem key={item.path} item={item} />
+                  ))}
+                </div>
+
+                <div className="my-4 mx-4 border-t border-border" />
+
+                <div className="space-y-1">
+                  {secondaryNavItems.map((item) => (
+                    <NavItem key={item.path} item={item} />
+                  ))}
+                </div>
+              </nav>
+
+              {/* Footer */}
+              <div className="border-t border-border p-2 space-y-1">
+                <button
+                  onClick={() => handleNavigate("/configuracoes")}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-muted"
+                >
+                  <Settings className="h-5 w-5" />
+                  <span className="font-medium text-sm">Configurações</span>
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span className="font-medium text-sm">Sair</span>
+                </button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Centered Logo */}
+        <div 
+          className={cn(
+            "absolute left-1/2 -translate-x-1/2 flex items-center gap-2 transition-opacity duration-200",
+            logoLoaded ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-md">
+            <Brain className="w-4 h-4 text-white" />
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-base text-gradient-primary">
-              PsicoOne
-            </span>
-            <span className="text-[9px] text-muted-foreground -mt-0.5">Enterprise</span>
-          </div>
+          <span className="font-bold text-base text-gradient-primary">
+            PsicoOne
+          </span>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={onOpenSearch}>
-            <Search className="h-5 w-5" />
+        {/* Right Actions: Search, Notifications, Theme Toggle */}
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" onClick={onOpenSearch} className="h-9 w-9">
+            <Search className="h-4 w-4" />
           </Button>
 
-          <Button variant="ghost" size="icon" className="relative" onClick={() => handleNavigate("/notificacoes")}>
-            <Bell className="h-5 w-5" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="relative h-9 w-9" 
+            onClick={() => handleNavigate("/notificacoes")}
+          >
+            <Bell className="h-4 w-4" />
             {notifications > 0 && (
               <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-white flex items-center justify-center">
                 {notifications > 9 ? "9+" : notifications}
@@ -131,66 +203,7 @@ export function MobileHeader({ isAdmin, onOpenSearch, notifications = 0 }: Mobil
             )}
           </Button>
 
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] p-0">
-              <div className="flex flex-col h-full">
-                {/* Sheet Header */}
-                <div className="flex items-center justify-between p-4 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center shadow-md">
-                      <Brain className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-bold text-base text-gradient-primary">
-                        PsicoOne
-                      </span>
-                      <span className="text-[9px] text-muted-foreground -mt-0.5">Enterprise</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto py-4 px-2">
-                  <div className="space-y-1">
-                    {mainNavItems.map((item) => (
-                      <NavItem key={item.path} item={item} />
-                    ))}
-                  </div>
-
-                  <div className="my-4 mx-4 border-t border-border" />
-
-                  <div className="space-y-1">
-                    {secondaryNavItems.map((item) => (
-                      <NavItem key={item.path} item={item} />
-                    ))}
-                  </div>
-                </nav>
-
-                {/* Footer */}
-                <div className="border-t border-border p-2 space-y-1">
-                  <button
-                    onClick={() => handleNavigate("/configuracoes")}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-muted"
-                  >
-                    <Settings className="h-5 w-5" />
-                    <span className="font-medium text-sm">Configurações</span>
-                  </button>
-                  <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <LogOut className="h-5 w-5" />
-                    <span className="font-medium text-sm">Sair</span>
-                  </button>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+          <ThemeToggle />
         </div>
       </div>
     </header>
