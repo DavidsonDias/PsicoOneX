@@ -439,6 +439,24 @@ const MedicalRecords = () => {
 
   const handlePreviewAttachment = async (attachment: Attachment) => {
     try {
+      // First try to get a signed URL for better performance
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from("medical-attachments")
+        .createSignedUrl(attachment.file_path, 3600); // 1 hour expiry
+
+      if (!signedError && signedData?.signedUrl) {
+        setPreviewFile({
+          name: attachment.file_name,
+          type: attachment.file_type,
+          size: attachment.file_size,
+          url: signedData.signedUrl,
+          createdAt: attachment.created_at
+        });
+        setPreviewOpen(true);
+        return;
+      }
+
+      // Fallback to download and create blob URL
       const { data, error } = await supabase.storage
         .from("medical-attachments")
         .download(attachment.file_path);
@@ -455,7 +473,8 @@ const MedicalRecords = () => {
       });
       setPreviewOpen(true);
     } catch (error) {
-      toast.error("Erro ao carregar arquivo");
+      console.error("Preview error:", error);
+      toast.error("Erro ao carregar arquivo. Tente baixar o arquivo.");
     }
   };
 
