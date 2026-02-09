@@ -438,21 +438,24 @@ const MedicalRecords = () => {
   };
 
   const handlePreviewAttachment = async (attachment: Attachment) => {
+    // Show loading state immediately
+    setPreviewFile({
+      name: attachment.file_name,
+      type: attachment.file_type,
+      size: attachment.file_size,
+      url: '', // Empty URL triggers loading state in modal
+      createdAt: attachment.created_at
+    });
+    setPreviewOpen(true);
+
     try {
-      // First try to get a signed URL for better performance
+      // Get a signed URL for secure preview
       const { data: signedData, error: signedError } = await supabase.storage
         .from("medical-attachments")
         .createSignedUrl(attachment.file_path, 3600); // 1 hour expiry
 
       if (!signedError && signedData?.signedUrl) {
-        setPreviewFile({
-          name: attachment.file_name,
-          type: attachment.file_type,
-          size: attachment.file_size,
-          url: signedData.signedUrl,
-          createdAt: attachment.created_at
-        });
-        setPreviewOpen(true);
+        setPreviewFile(prev => prev ? { ...prev, url: signedData.signedUrl } : null);
         return;
       }
 
@@ -464,16 +467,11 @@ const MedicalRecords = () => {
       if (error) throw error;
 
       const url = URL.createObjectURL(data);
-      setPreviewFile({
-        name: attachment.file_name,
-        type: attachment.file_type,
-        size: attachment.file_size,
-        url,
-        createdAt: attachment.created_at
-      });
-      setPreviewOpen(true);
+      setPreviewFile(prev => prev ? { ...prev, url } : null);
     } catch (error) {
       console.error("Preview error:", error);
+      setPreviewOpen(false);
+      setPreviewFile(null);
       toast.error("Erro ao carregar arquivo. Tente baixar o arquivo.");
     }
   };
