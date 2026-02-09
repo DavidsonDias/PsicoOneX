@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Image as ImageIcon, File, ZoomIn, ZoomOut, RotateCw, AlertCircle } from "lucide-react";
+import { Download, FileText, Image as ImageIcon, File, ZoomIn, ZoomOut, RotateCw, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -23,29 +23,24 @@ export function FilePreviewModal({ open, onOpenChange, file, onDownload }: FileP
   const [rotation, setRotation] = useState(0);
   const [imageLoading, setImageLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Reset state when file changes
+  // Reset state when file changes or modal opens
   useEffect(() => {
-    if (file?.url) {
+    if (open && file?.url) {
       setImageLoading(true);
       setLoadError(false);
-      setBlobUrl(file.url);
+      setZoom(1);
+      setRotation(0);
+      setRetryCount(0);
     }
-    return () => {
-      // Cleanup blob URL when component unmounts or file changes
-      if (blobUrl && blobUrl.startsWith('blob:')) {
-        // Don't revoke here as it may still be in use
-      }
-    };
-  }, [file?.url]);
+  }, [open, file?.url]);
 
   if (!file) return null;
 
   const isImage = file.type.startsWith("image/");
   const isPDF = file.type === "application/pdf";
   const isHEIC = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-  const isPreviewable = (isImage && !isHEIC) || isPDF;
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B";
@@ -57,16 +52,13 @@ export function FilePreviewModal({ open, onOpenChange, file, onDownload }: FileP
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
   const handleRotate = () => setRotation(prev => (prev + 90) % 360);
 
-  const resetView = () => {
-    setZoom(1);
-    setRotation(0);
-    setImageLoading(true);
-    setLoadError(false);
-  };
-
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      resetView();
+      setZoom(1);
+      setRotation(0);
+      setImageLoading(true);
+      setLoadError(false);
+      setRetryCount(0);
     }
     onOpenChange(newOpen);
   };
@@ -79,6 +71,20 @@ export function FilePreviewModal({ open, onOpenChange, file, onDownload }: FileP
   const handleImageError = () => {
     setImageLoading(false);
     setLoadError(true);
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    setImageLoading(true);
+    setLoadError(false);
+  };
+
+  // Add cache-busting parameter on retry
+  const getImageUrl = () => {
+    if (!file.url) return '';
+    if (retryCount === 0) return file.url;
+    const separator = file.url.includes('?') ? '&' : '?';
+    return `${file.url}${separator}_retry=${retryCount}`;
   };
 
   return (
@@ -133,7 +139,13 @@ export function FilePreviewModal({ open, onOpenChange, file, onDownload }: FileP
 
         {/* Content */}
         <div className="flex-1 overflow-auto bg-muted/20 flex items-center justify-center p-4 min-h-[400px]">
-          {isHEIC ? (
+          {/* Loading state when URL is empty */}
+          {!file.url ? (
+            <div className="flex flex-col items-center justify-center gap-3">
+              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+              <p className="text-sm text-muted-foreground">Carregando arquivo...</p>
+            </div>
+          ) : isHEIC ? (
             <div className="text-center py-12">
               <AlertCircle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
               <p className="text-lg font-medium mb-2">Formato HEIC não suportado</p>
@@ -147,10 +159,11 @@ export function FilePreviewModal({ open, onOpenChange, file, onDownload }: FileP
               </Button>
             </div>
           ) : isImage ? (
-            <div className="relative">
+            <div className="relative w-full h-full flex items-center justify-center">
               {imageLoading && !loadError && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <p className="text-sm text-muted-foreground">Carregando imagem...</p>
                 </div>
               )}
               {loadError ? (
@@ -160,20 +173,28 @@ export function FilePreviewModal({ open, onOpenChange, file, onDownload }: FileP
                   <p className="text-muted-foreground mb-4">
                     Não foi possível carregar a pré-visualização
                   </p>
-                  <Button onClick={onDownload} className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Baixar arquivo
-                  </Button>
+                  <div className="flex gap-2 justify-center">
+                    <Button variant="outline" onClick={handleRetry} className="gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      Tentar novamente
+                    </Button>
+                    <Button onClick={onDownload} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Baixar arquivo
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <img
-                  src={blobUrl || file.url}
+                  key={retryCount}
+                  src={getImageUrl()}
                   alt={file.name}
                   onLoad={handleImageLoad}
                   onError={handleImageError}
+                  crossOrigin="anonymous"
                   className={cn(
                     "max-w-full max-h-[60vh] object-contain transition-all duration-200 rounded-lg shadow-lg",
-                    imageLoading && "opacity-0"
+                    imageLoading && "opacity-0 absolute"
                   )}
                   style={{
                     transform: `scale(${zoom}) rotate(${rotation}deg)`,
@@ -183,23 +204,11 @@ export function FilePreviewModal({ open, onOpenChange, file, onDownload }: FileP
             </div>
           ) : isPDF ? (
             <div className="w-full h-[70vh] flex flex-col items-center justify-center">
-              <object
-                data={blobUrl || file.url}
-                type="application/pdf"
+              <iframe
+                src={`${file.url}#toolbar=1&navpanes=0&scrollbar=1`}
                 className="w-full h-full rounded-lg border border-border"
-              >
-                <div className="text-center py-12">
-                  <FileText className="h-16 w-16 text-destructive mx-auto mb-4" />
-                  <p className="text-lg font-medium mb-2">PDF Viewer</p>
-                  <p className="text-muted-foreground mb-4">
-                    Seu navegador não suporta visualização de PDF inline
-                  </p>
-                  <Button onClick={onDownload} className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Baixar PDF
-                  </Button>
-                </div>
-              </object>
+                title={file.name}
+              />
             </div>
           ) : (
             <div className="text-center py-12">
