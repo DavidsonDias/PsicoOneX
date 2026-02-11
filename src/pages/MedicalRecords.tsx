@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -18,6 +19,7 @@ import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatsOverview } from "@/components/ui/stats-overview";
 import { FreeFormEditor } from "@/components/medical-records/FreeFormEditor";
 import { AttachmentUploader } from "@/components/medical-records/AttachmentUploader";
@@ -67,7 +69,6 @@ interface PreviewFile {
 }
 
 const MedicalRecords = () => {
-  // Estados principais
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,48 +98,6 @@ const MedicalRecords = () => {
     next_steps: ""
   });
 
-  // ==================== HANDLERS MEMOIZADOS ====================
-  
-  // Handler para o campo livre de anotações
-  const handleFreeFormChange = useCallback((value: string) => {
-    setFreeFormNotes(value);
-  }, []);
-
-  // Handler para campos estruturados
-  const handleStructuredFieldChange = useCallback((field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }, []);
-
-  // Handler para preview de arquivos pendentes
-  const handlePreviewPendingFile = useCallback((pf: PendingFile) => {
-    const url = pf.preview || URL.createObjectURL(pf.file);
-    setPreviewFile({
-      name: pf.file.name,
-      type: pf.file.type,
-      size: pf.file.size,
-      url
-    });
-    setPreviewOpen(true);
-  }, []);
-
-  // Reset form memoizado
-  const resetForm = useCallback(() => {
-    setFormData({
-      patient_id: "",
-      session_date: format(new Date(), "yyyy-MM-dd"),
-      session_number: 1,
-      complaints: "",
-      observations: "",
-      techniques_used: "",
-      evolution: "",
-      next_steps: ""
-    });
-    setFreeFormNotes("");
-    setPendingFiles([]);
-  }, []);
-
-  // ==================== EFFECTS ====================
-
   useEffect(() => {
     checkAuthAndLoadData();
   }, []);
@@ -158,8 +117,6 @@ const MedicalRecords = () => {
       setFormData(prev => ({ ...prev, session_number: nextSession }));
     }
   }, [formData.patient_id, calculateNextSessionNumber, editingRecord]);
-
-  // ==================== DATA LOADING ====================
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -218,8 +175,6 @@ const MedicalRecords = () => {
     setAttachments(data || []);
   };
 
-  // ==================== AI GENERATION ====================
-
   const generateWithAI = async () => {
     if (!formData.patient_id) {
       toast.error("Selecione um paciente primeiro");
@@ -245,14 +200,14 @@ const MedicalRecords = () => {
 
       if (error) throw error;
 
-      setFormData(prev => ({
-        ...prev,
-        complaints: data.complaints || prev.complaints,
-        observations: data.observations || prev.observations,
-        techniques_used: data.techniques_used || prev.techniques_used,
-        evolution: data.evolution || prev.evolution,
-        next_steps: data.next_steps || prev.next_steps
-      }));
+      setFormData({
+        ...formData,
+        complaints: data.complaints || formData.complaints,
+        observations: data.observations || formData.observations,
+        techniques_used: data.techniques_used || formData.techniques_used,
+        evolution: data.evolution || formData.evolution,
+        next_steps: data.next_steps || formData.next_steps
+      });
 
       toast.success("Prontuário gerado com IA!");
     } catch (error) {
@@ -262,8 +217,6 @@ const MedicalRecords = () => {
       setGeneratingAI(false);
     }
   };
-
-  // ==================== FILE UPLOAD ====================
 
   const uploadPendingFiles = async (recordId: string) => {
     for (const pf of pendingFiles) {
@@ -296,8 +249,6 @@ const MedicalRecords = () => {
     }
   };
 
-  // ==================== CRUD OPERATIONS ====================
-
   const handleCreateRecord = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -308,10 +259,7 @@ const MedicalRecords = () => {
 
     // Combine free-form notes with observations
     const combinedObservations = freeFormNotes 
-      ? (formData.observations ? `${formData.observations}
-
---- Anotações Livres ---
-${freeFormNotes}` : freeFormNotes)
+      ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)
       : formData.observations;
 
     const { data: newRecord, error } = await supabase
@@ -351,10 +299,7 @@ ${freeFormNotes}` : freeFormNotes)
     if (!editingRecord) return;
 
     const combinedObservations = freeFormNotes 
-      ? (formData.observations ? `${formData.observations}
-
---- Anotações Livres ---
-${freeFormNotes}` : freeFormNotes)
+      ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)
       : formData.observations;
 
     const { error } = await supabase
@@ -432,7 +377,20 @@ ${freeFormNotes}` : freeFormNotes)
     setEditingRecord(record);
   };
 
-  // ==================== ATTACHMENT HANDLERS ====================
+  const resetForm = () => {
+    setFormData({
+      patient_id: "",
+      session_date: format(new Date(), "yyyy-MM-dd"),
+      session_number: 1,
+      complaints: "",
+      observations: "",
+      techniques_used: "",
+      evolution: "",
+      next_steps: ""
+    });
+    setFreeFormNotes("");
+    setPendingFiles([]);
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedRecord || !e.target.files?.[0]) return;
@@ -518,6 +476,17 @@ ${freeFormNotes}` : freeFormNotes)
     }
   };
 
+  const handlePreviewPendingFile = (pf: PendingFile) => {
+    const url = pf.preview || URL.createObjectURL(pf.file);
+    setPreviewFile({
+      name: pf.file.name,
+      type: pf.file.type,
+      size: pf.file.size,
+      url
+    });
+    setPreviewOpen(true);
+  };
+
   const handleDownloadAttachment = async (attachment: Attachment) => {
     try {
       const { data, error } = await supabase.storage
@@ -563,16 +532,12 @@ ${freeFormNotes}` : freeFormNotes)
     await loadAttachments(record.id);
   };
 
-  // ==================== COMPUTED VALUES ====================
-
-  const filteredRecords = useMemo(() => {
-    return records.filter(record => {
-      const matchesSearch = record.patients.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           record.complaints?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesPatient = selectedPatient === "all" || record.patient_id === selectedPatient;
-      return matchesSearch && matchesPatient;
-    });
-  }, [records, searchTerm, selectedPatient]);
+  const filteredRecords = records.filter(record => {
+    const matchesSearch = record.patients.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         record.complaints?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPatient = selectedPatient === "all" || record.patient_id === selectedPatient;
+    return matchesSearch && matchesPatient;
+  });
 
   // Stats calculations
   const recordStats = useMemo(() => {
@@ -590,15 +555,15 @@ ${freeFormNotes}` : freeFormNotes)
     };
   }, [records]);
 
-  // ==================== UTILITY FUNCTIONS ====================
-
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
-  // ==================== LOADING STATE ====================
+  const handleStructuredChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   if (loading) {
     return (
@@ -607,8 +572,6 @@ ${freeFormNotes}` : freeFormNotes)
       </div>
     );
   }
-
-  // ==================== FORM CONTENT COMPONENT ====================
 
   const RecordFormContent = ({ isEdit = false }: { isEdit?: boolean }) => (
     <div className="space-y-6">
@@ -627,7 +590,7 @@ ${freeFormNotes}` : freeFormNotes)
             </Label>
             <Select 
               value={formData.patient_id} 
-              onValueChange={(value) => setFormData(prev => ({...prev, patient_id: value}))}
+              onValueChange={(value) => setFormData({...formData, patient_id: value})}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o paciente" />
@@ -651,7 +614,7 @@ ${freeFormNotes}` : freeFormNotes)
               id="session_date"
               type="date"
               value={formData.session_date}
-              onChange={(e) => setFormData(prev => ({...prev, session_date: e.target.value}))}
+              onChange={(e) => setFormData({...formData, session_date: e.target.value})}
             />
           </div>
 
@@ -665,7 +628,7 @@ ${freeFormNotes}` : freeFormNotes)
               type="number"
               min="1"
               value={formData.session_number}
-              onChange={(e) => setFormData(prev => ({...prev, session_number: parseInt(e.target.value)}))}
+              onChange={(e) => setFormData({...formData, session_number: parseInt(e.target.value)})}
               className="bg-muted/50"
             />
           </div>
@@ -696,7 +659,7 @@ ${freeFormNotes}` : freeFormNotes)
       {/* Free-Form Editor with Optional Structured Fields */}
       <FreeFormEditor
         value={freeFormNotes}
-        onChange={handleFreeFormChange}
+        onChange={setFreeFormNotes}
         structuredFields={{
           complaints: formData.complaints,
           observations: formData.observations,
@@ -704,7 +667,7 @@ ${freeFormNotes}` : freeFormNotes)
           evolution: formData.evolution,
           next_steps: formData.next_steps
         }}
-        onStructuredChange={handleStructuredFieldChange}
+        onStructuredChange={handleStructuredChange}
       />
 
       <Separator />
@@ -730,8 +693,6 @@ ${freeFormNotes}` : freeFormNotes)
       </Button>
     </div>
   );
-
-  // ==================== MAIN RENDER ====================
 
   return (
     <AppLayout title="Prontuários Clínicos" description="Registros flexíveis com anexos e pré-visualização">
@@ -769,7 +730,6 @@ ${freeFormNotes}` : freeFormNotes)
         className="mb-6"
       />
 
-      {/* Header with Search and Filters */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative">
@@ -794,8 +754,6 @@ ${freeFormNotes}` : freeFormNotes)
             </SelectContent>
           </Select>
         </div>
-        
-        {/* Create Dialog */}
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) resetForm();
