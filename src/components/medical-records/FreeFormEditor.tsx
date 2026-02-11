@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,47 @@ interface FreeFormEditorProps {
   className?: string;
 }
 
+const suggestions = [
+  "Descreva o estado emocional do paciente",
+  "Registre técnicas aplicadas",
+  "Anote próximos passos",
+  "Documente evolução observada",
+];
+
+// Componente de campo estruturado memoizado para evitar re-renders
+const StructuredField = memo(({ 
+  label, 
+  value, 
+  placeholder, 
+  field, 
+  onChange 
+}: { 
+  label: string; 
+  value: string; 
+  placeholder: string; 
+  field: string; 
+  onChange: (field: string, value: string) => void;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(field, e.target.value);
+  }, [field, onChange]);
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm text-muted-foreground">{label}</Label>
+      <Textarea
+        value={value}
+        onChange={handleChange}
+        placeholder={placeholder}
+        rows={2}
+        className="text-sm"
+      />
+    </div>
+  );
+});
+
+StructuredField.displayName = "StructuredField";
+
 export function FreeFormEditor({
   value,
   onChange,
@@ -30,17 +71,18 @@ export function FreeFormEditor({
 }: FreeFormEditorProps) {
   const [showStructured, setShowStructured] = useState(false);
 
-  const suggestions = [
-    "Descreva o estado emocional do paciente",
-    "Registre técnicas aplicadas",
-    "Anote próximos passos",
-    "Documente evolução observada",
-  ];
+  // Memoiza a função de inserção de sugestão
+  const insertSuggestion = useCallback((text: string) => {
+    const newValue = value ? `${value}
 
-  const insertSuggestion = (text: string) => {
-    const newValue = value ? `${value}\n\n${text}: ` : `${text}: `;
+${text}: ` : `${text}: `;
     onChange(newValue);
-  };
+  }, [value, onChange]);
+
+  // Memoiza o handler do textarea principal
+  const handleMainTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -57,12 +99,12 @@ export function FreeFormEditor({
         </div>
         <Textarea
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleMainTextareaChange}
           placeholder="Escreva livremente suas anotações sobre a sessão. Você tem total liberdade para registrar da forma que preferir..."
           rows={8}
           className="min-h-[200px] resize-y text-base leading-relaxed"
         />
-        
+
         {/* Quick Suggestions */}
         <div className="flex flex-wrap gap-2">
           <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -108,60 +150,45 @@ export function FreeFormEditor({
               💡 Estes campos são totalmente opcionais. Use-os apenas se preferir organizar suas anotações de forma estruturada.
             </p>
 
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Queixas Apresentadas</Label>
-              <Textarea
-                value={structuredFields.complaints}
-                onChange={(e) => onStructuredChange("complaints", e.target.value)}
-                placeholder="Opcional: motivo da consulta e queixas do paciente"
-                rows={2}
-                className="text-sm"
-              />
-            </div>
+            <StructuredField
+              label="Queixas Apresentadas"
+              value={structuredFields.complaints}
+              placeholder="Opcional: motivo da consulta e queixas do paciente"
+              field="complaints"
+              onChange={onStructuredChange}
+            />
 
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Observações Clínicas</Label>
-              <Textarea
-                value={structuredFields.observations}
-                onChange={(e) => onStructuredChange("observations", e.target.value)}
-                placeholder="Opcional: estado emocional, comportamento, relatos relevantes"
-                rows={2}
-                className="text-sm"
-              />
-            </div>
+            <StructuredField
+              label="Observações Clínicas"
+              value={structuredFields.observations}
+              placeholder="Opcional: estado emocional, comportamento, relatos relevantes"
+              field="observations"
+              onChange={onStructuredChange}
+            />
 
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Técnicas Utilizadas</Label>
-              <Textarea
-                value={structuredFields.techniques_used}
-                onChange={(e) => onStructuredChange("techniques_used", e.target.value)}
-                placeholder="Opcional: técnicas aplicadas, exercícios propostos"
-                rows={2}
-                className="text-sm"
-              />
-            </div>
+            <StructuredField
+              label="Técnicas Utilizadas"
+              value={structuredFields.techniques_used}
+              placeholder="Opcional: técnicas aplicadas, exercícios propostos"
+              field="techniques_used"
+              onChange={onStructuredChange}
+            />
 
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Evolução do Tratamento</Label>
-              <Textarea
-                value={structuredFields.evolution}
-                onChange={(e) => onStructuredChange("evolution", e.target.value)}
-                placeholder="Opcional: progressos observados e mudanças no quadro"
-                rows={2}
-                className="text-sm"
-              />
-            </div>
+            <StructuredField
+              label="Evolução do Tratamento"
+              value={structuredFields.evolution}
+              placeholder="Opcional: progressos observados e mudanças no quadro"
+              field="evolution"
+              onChange={onStructuredChange}
+            />
 
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Próximos Passos</Label>
-              <Textarea
-                value={structuredFields.next_steps}
-                onChange={(e) => onStructuredChange("next_steps", e.target.value)}
-                placeholder="Opcional: plano para as próximas sessões"
-                rows={2}
-                className="text-sm"
-              />
-            </div>
+            <StructuredField
+              label="Próximos Passos"
+              value={structuredFields.next_steps}
+              placeholder="Opcional: plano para as próximas sessões"
+              field="next_steps"
+              onChange={onStructuredChange}
+            />
           </CollapsibleContent>
         </Collapsible>
       )}
