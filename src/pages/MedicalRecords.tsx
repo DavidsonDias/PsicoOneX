@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,18 +12,19 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { 
   Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, 
-  Download, Trash2, Upload, TrendingUp, Eye, Info, Hash
+  Download, Trash2, Upload, TrendingUp, Eye, Info, Hash,
+  SortAsc, SortDesc, UserPlus, CalendarDays
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatsOverview } from "@/components/ui/stats-overview";
 import { FreeFormEditor } from "@/components/medical-records/FreeFormEditor";
 import { AttachmentUploader } from "@/components/medical-records/AttachmentUploader";
 import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
+import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
 
 interface MedicalRecord {
   id: string;
@@ -68,6 +69,184 @@ interface PreviewFile {
   createdAt?: string;
 }
 
+// ===== Extracted RecordFormContent as a stable memoized component =====
+// This fixes the mobile keyboard focus loss bug by preventing re-mounts
+interface RecordFormContentProps {
+  formData: {
+    patient_id: string;
+    session_date: string;
+    session_number: number;
+    complaints: string;
+    observations: string;
+    techniques_used: string;
+    evolution: string;
+    next_steps: string;
+  };
+  setFormData: React.Dispatch<React.SetStateAction<RecordFormContentProps["formData"]>>;
+  freeFormNotes: string;
+  setFreeFormNotes: (v: string) => void;
+  patients: Patient[];
+  pendingFiles: PendingFile[];
+  setPendingFiles: React.Dispatch<React.SetStateAction<PendingFile[]>>;
+  onPreviewPendingFile: (pf: PendingFile) => void;
+  generatingAI: boolean;
+  onGenerateAI: () => void;
+  isEdit?: boolean;
+  onOpenQuickPatient: () => void;
+}
+
+const RecordFormContent = memo(function RecordFormContent({
+  formData,
+  setFormData,
+  freeFormNotes,
+  setFreeFormNotes,
+  patients,
+  pendingFiles,
+  setPendingFiles,
+  onPreviewPendingFile,
+  generatingAI,
+  onGenerateAI,
+  isEdit = false,
+  onOpenQuickPatient,
+}: RecordFormContentProps) {
+  const handleStructuredChange = useCallback((field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, [setFormData]);
+
+  return (
+    <div className="space-y-6">
+      {/* Session Info Header */}
+      <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Info className="h-4 w-4" />
+          Informações da sessão são preenchidas automaticamente
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="patient" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Paciente *
+            </Label>
+            <div className="flex gap-2">
+              <Select 
+                value={formData.patient_id} 
+                onValueChange={(value) => setFormData(prev => ({...prev, patient_id: value}))}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Selecione o paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patients.map(patient => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={onOpenQuickPatient}
+                title="Cadastrar paciente novo"
+              >
+                <UserPlus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="session_date" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Data da Sessão
+            </Label>
+            <Input
+              id="session_date"
+              type="date"
+              value={formData.session_date}
+              onChange={(e) => setFormData(prev => ({...prev, session_date: e.target.value}))}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Hash className="h-4 w-4" />
+              Sessão Nº
+              <Badge variant="secondary" className="text-xs">Auto</Badge>
+            </Label>
+            <Input
+              type="number"
+              min="1"
+              value={formData.session_number}
+              onChange={(e) => setFormData(prev => ({...prev, session_number: parseInt(e.target.value)}))}
+              className="bg-muted/50"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* AI Generation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <span className="font-medium">Assistente de Escrita</span>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onGenerateAI}
+          disabled={generatingAI || !formData.patient_id}
+          className="gap-2"
+        >
+          <Sparkles className="h-4 w-4" />
+          {generatingAI ? "Gerando..." : "Gerar com IA"}
+        </Button>
+      </div>
+
+      <Separator />
+
+      {/* Free-Form Editor with Optional Structured Fields */}
+      <FreeFormEditor
+        value={freeFormNotes}
+        onChange={setFreeFormNotes}
+        structuredFields={{
+          complaints: formData.complaints,
+          observations: formData.observations,
+          techniques_used: formData.techniques_used,
+          evolution: formData.evolution,
+          next_steps: formData.next_steps
+        }}
+        onStructuredChange={handleStructuredChange}
+      />
+
+      <Separator />
+
+      {/* Attachments Section */}
+      <div className="space-y-3">
+        <Label className="flex items-center gap-2">
+          <Paperclip className="h-4 w-4" />
+          Anexos
+          {pendingFiles.length > 0 && (
+            <Badge variant="secondary">{pendingFiles.length}</Badge>
+          )}
+        </Label>
+        <AttachmentUploader
+          pendingFiles={pendingFiles}
+          onFilesChange={setPendingFiles}
+          onPreview={onPreviewPendingFile}
+        />
+      </div>
+
+      <Button type="submit" className="w-full">
+        {isEdit ? "Salvar Alterações" : "Criar Prontuário"}
+      </Button>
+    </div>
+  );
+});
+
+// ===== Main Component =====
 const MedicalRecords = () => {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -86,6 +265,13 @@ const MedicalRecords = () => {
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [freeFormNotes, setFreeFormNotes] = useState("");
+  const [quickPatientOpen, setQuickPatientOpen] = useState(false);
+
+  // New filter states
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [sortBy, setSortBy] = useState<"date" | "session">("date");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const [formData, setFormData] = useState({
     patient_id: "",
@@ -120,9 +306,7 @@ const MedicalRecords = () => {
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return;
-    }
+    if (!session) return;
     setUserId(session.user.id);
     await Promise.all([loadRecords(session.user.id), loadPatients()]);
     setLoading(false);
@@ -131,12 +315,7 @@ const MedicalRecords = () => {
   const loadRecords = async (psychologistId: string) => {
     const { data, error } = await supabase
       .from("medical_records")
-      .select(`
-        *,
-        patients (
-          full_name
-        )
-      `)
+      .select(`*, patients (full_name)`)
       .eq("psychologist_id", psychologistId)
       .order("session_date", { ascending: false });
 
@@ -175,7 +354,7 @@ const MedicalRecords = () => {
     setAttachments(data || []);
   };
 
-  const generateWithAI = async () => {
+  const generateWithAI = useCallback(async () => {
     if (!formData.patient_id) {
       toast.error("Selecione um paciente primeiro");
       return;
@@ -200,14 +379,14 @@ const MedicalRecords = () => {
 
       if (error) throw error;
 
-      setFormData({
-        ...formData,
-        complaints: data.complaints || formData.complaints,
-        observations: data.observations || formData.observations,
-        techniques_used: data.techniques_used || formData.techniques_used,
-        evolution: data.evolution || formData.evolution,
-        next_steps: data.next_steps || formData.next_steps
-      });
+      setFormData(prev => ({
+        ...prev,
+        complaints: data.complaints || prev.complaints,
+        observations: data.observations || prev.observations,
+        techniques_used: data.techniques_used || prev.techniques_used,
+        evolution: data.evolution || prev.evolution,
+        next_steps: data.next_steps || prev.next_steps
+      }));
 
       toast.success("Prontuário gerado com IA!");
     } catch (error) {
@@ -216,7 +395,7 @@ const MedicalRecords = () => {
     } finally {
       setGeneratingAI(false);
     }
-  };
+  }, [formData, patients, freeFormNotes]);
 
   const uploadPendingFiles = async (recordId: string) => {
     for (const pf of pendingFiles) {
@@ -242,7 +421,6 @@ const MedicalRecords = () => {
           uploaded_by: userId
         });
 
-      // Revoke preview URL
       if (pf.preview) {
         URL.revokeObjectURL(pf.preview);
       }
@@ -257,7 +435,6 @@ const MedicalRecords = () => {
       return;
     }
 
-    // Combine free-form notes with observations
     const combinedObservations = freeFormNotes 
       ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)
       : formData.observations;
@@ -283,7 +460,6 @@ const MedicalRecords = () => {
       return;
     }
 
-    // Upload pending files
     if (pendingFiles.length > 0 && newRecord) {
       await uploadPendingFiles(newRecord.id);
     }
@@ -321,7 +497,6 @@ const MedicalRecords = () => {
       return;
     }
 
-    // Upload any pending files
     if (pendingFiles.length > 0) {
       await uploadPendingFiles(editingRecord.id);
     }
@@ -350,7 +525,6 @@ const MedicalRecords = () => {
   };
 
   const openEditDialog = (record: MedicalRecord) => {
-    // Extract free-form notes if present
     const obsContent = record.observations || "";
     const freeNotesMarker = "--- Anotações Livres ---";
     const markerIndex = obsContent.indexOf(freeNotesMarker);
@@ -396,7 +570,7 @@ const MedicalRecords = () => {
     if (!selectedRecord || !e.target.files?.[0]) return;
 
     const file = e.target.files[0];
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
 
     if (file.size > maxSize) {
       toast.error("Arquivo muito grande. Máximo 10MB.");
@@ -438,28 +612,25 @@ const MedicalRecords = () => {
   };
 
   const handlePreviewAttachment = async (attachment: Attachment) => {
-    // Show loading state immediately
     setPreviewFile({
       name: attachment.file_name,
       type: attachment.file_type,
       size: attachment.file_size,
-      url: '', // Empty URL triggers loading state in modal
+      url: '',
       createdAt: attachment.created_at
     });
     setPreviewOpen(true);
 
     try {
-      // Get a signed URL for secure preview
       const { data: signedData, error: signedError } = await supabase.storage
         .from("medical-attachments")
-        .createSignedUrl(attachment.file_path, 3600); // 1 hour expiry
+        .createSignedUrl(attachment.file_path, 3600);
 
       if (!signedError && signedData?.signedUrl) {
         setPreviewFile(prev => prev ? { ...prev, url: signedData.signedUrl } : null);
         return;
       }
 
-      // Fallback to download and create blob URL
       const { data, error } = await supabase.storage
         .from("medical-attachments")
         .download(attachment.file_path);
@@ -476,7 +647,7 @@ const MedicalRecords = () => {
     }
   };
 
-  const handlePreviewPendingFile = (pf: PendingFile) => {
+  const handlePreviewPendingFile = useCallback((pf: PendingFile) => {
     const url = pf.preview || URL.createObjectURL(pf.file);
     setPreviewFile({
       name: pf.file.name,
@@ -485,7 +656,7 @@ const MedicalRecords = () => {
       url
     });
     setPreviewOpen(true);
-  };
+  }, []);
 
   const handleDownloadAttachment = async (attachment: Attachment) => {
     try {
@@ -532,12 +703,39 @@ const MedicalRecords = () => {
     await loadAttachments(record.id);
   };
 
-  const filteredRecords = records.filter(record => {
-    const matchesSearch = record.patients.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         record.complaints?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPatient = selectedPatient === "all" || record.patient_id === selectedPatient;
-    return matchesSearch && matchesPatient;
-  });
+  // Enhanced filtering with date range and sorting
+  const filteredRecords = useMemo(() => {
+    let result = records.filter(record => {
+      const matchesSearch = record.patients.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           record.complaints?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPatient = selectedPatient === "all" || record.patient_id === selectedPatient;
+
+      // Date range filter
+      let matchesDate = true;
+      if (dateFrom) {
+        matchesDate = matchesDate && record.session_date >= dateFrom;
+      }
+      if (dateTo) {
+        matchesDate = matchesDate && record.session_date <= dateTo;
+      }
+
+      return matchesSearch && matchesPatient && matchesDate;
+    });
+
+    // Sort
+    result.sort((a, b) => {
+      if (sortBy === "date") {
+        const cmp = a.session_date.localeCompare(b.session_date);
+        return sortOrder === "asc" ? cmp : -cmp;
+      } else {
+        const aNum = a.session_number || 0;
+        const bNum = b.session_number || 0;
+        return sortOrder === "asc" ? aNum - bNum : bNum - aNum;
+      }
+    });
+
+    return result;
+  }, [records, searchTerm, selectedPatient, dateFrom, dateTo, sortBy, sortOrder]);
 
   // Stats calculations
   const recordStats = useMemo(() => {
@@ -561,9 +759,14 @@ const MedicalRecords = () => {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
-  const handleStructuredChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const handleQuickPatientCreated = useCallback((patient: { id: string; full_name: string }) => {
+    setPatients(prev => [...prev, patient].sort((a, b) => a.full_name.localeCompare(b.full_name)));
+    setFormData(prev => ({ ...prev, patient_id: patient.id }));
+  }, []);
+
+  const openQuickPatient = useCallback(() => {
+    setQuickPatientOpen(true);
+  }, []);
 
   if (loading) {
     return (
@@ -573,206 +776,125 @@ const MedicalRecords = () => {
     );
   }
 
-  const RecordFormContent = ({ isEdit = false }: { isEdit?: boolean }) => (
-    <div className="space-y-6">
-      {/* Session Info Header */}
-      <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Info className="h-4 w-4" />
-          Informações da sessão são preenchidas automaticamente
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="patient" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Paciente *
-            </Label>
-            <Select 
-              value={formData.patient_id} 
-              onValueChange={(value) => setFormData({...formData, patient_id: value})}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                {patients.map(patient => (
-                  <SelectItem key={patient.id} value={patient.id}>
-                    {patient.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="session_date" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Data da Sessão
-            </Label>
-            <Input
-              id="session_date"
-              type="date"
-              value={formData.session_date}
-              onChange={(e) => setFormData({...formData, session_date: e.target.value})}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Hash className="h-4 w-4" />
-              Sessão Nº
-              <Badge variant="secondary" className="text-xs">Auto</Badge>
-            </Label>
-            <Input
-              type="number"
-              min="1"
-              value={formData.session_number}
-              onChange={(e) => setFormData({...formData, session_number: parseInt(e.target.value)})}
-              className="bg-muted/50"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* AI Generation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <span className="font-medium">Assistente de Escrita</span>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={generateWithAI}
-          disabled={generatingAI || !formData.patient_id}
-          className="gap-2"
-        >
-          <Sparkles className="h-4 w-4" />
-          {generatingAI ? "Gerando..." : "Gerar com IA"}
-        </Button>
-      </div>
-
-      <Separator />
-
-      {/* Free-Form Editor with Optional Structured Fields */}
-      <FreeFormEditor
-        value={freeFormNotes}
-        onChange={setFreeFormNotes}
-        structuredFields={{
-          complaints: formData.complaints,
-          observations: formData.observations,
-          techniques_used: formData.techniques_used,
-          evolution: formData.evolution,
-          next_steps: formData.next_steps
-        }}
-        onStructuredChange={handleStructuredChange}
-      />
-
-      <Separator />
-
-      {/* Attachments Section */}
-      <div className="space-y-3">
-        <Label className="flex items-center gap-2">
-          <Paperclip className="h-4 w-4" />
-          Anexos
-          {pendingFiles.length > 0 && (
-            <Badge variant="secondary">{pendingFiles.length}</Badge>
-          )}
-        </Label>
-        <AttachmentUploader
-          pendingFiles={pendingFiles}
-          onFilesChange={setPendingFiles}
-          onPreview={handlePreviewPendingFile}
-        />
-      </div>
-
-      <Button type="submit" className="w-full">
-        {isEdit ? "Salvar Alterações" : "Criar Prontuário"}
-      </Button>
-    </div>
-  );
-
   return (
     <AppLayout title="Prontuários Clínicos" description="Registros flexíveis com anexos e pré-visualização">
       {/* Stats Overview */}
       <StatsOverview
         stats={[
-          {
-            label: "Total de Prontuários",
-            value: recordStats.total,
-            icon: FileText,
-            color: "blue",
-            change: 15,
-          },
-          {
-            label: "Registros este Mês",
-            value: recordStats.thisMonth,
-            icon: Calendar,
-            color: "purple",
-            change: 8,
-          },
-          {
-            label: "Pacientes Atendidos",
-            value: recordStats.uniquePatients,
-            icon: User,
-            color: "green",
-            change: 12,
-          },
-          {
-            label: "Média de Sessões",
-            value: recordStats.avgSessions,
-            icon: TrendingUp,
-            color: "amber",
-          },
+          { label: "Total de Prontuários", value: recordStats.total, icon: FileText, color: "blue", change: 15 },
+          { label: "Registros este Mês", value: recordStats.thisMonth, icon: Calendar, color: "purple", change: 8 },
+          { label: "Pacientes Atendidos", value: recordStats.uniquePatients, icon: User, color: "green", change: 12 },
+          { label: "Média de Sessões", value: recordStats.avgSessions, icon: TrendingUp, color: "amber" },
         ]}
         className="mb-6"
       />
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar prontuários..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-[250px]"
-            />
+      {/* Filters Bar */}
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar prontuários..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-[250px]"
+              />
+            </div>
+            <Select value={selectedPatient} onValueChange={setSelectedPatient}>
+              <SelectTrigger className="w-[180px]">
+                <User className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filtrar paciente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os pacientes</SelectItem>
+                {patients.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-            <SelectTrigger className="w-[180px]">
-              <User className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filtrar paciente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os pacientes</SelectItem>
-              {patients.map(p => (
-                <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Novo Prontuário
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Novo Registro de Sessão</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateRecord}>
+                <RecordFormContent
+                  formData={formData}
+                  setFormData={setFormData}
+                  freeFormNotes={freeFormNotes}
+                  setFreeFormNotes={setFreeFormNotes}
+                  patients={patients}
+                  pendingFiles={pendingFiles}
+                  setPendingFiles={setPendingFiles}
+                  onPreviewPendingFile={handlePreviewPendingFile}
+                  generatingAI={generatingAI}
+                  onGenerateAI={generateWithAI}
+                  onOpenQuickPatient={openQuickPatient}
+                />
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Prontuário
+
+        {/* Date range filters and sort */}
+        <div className="flex flex-wrap gap-3 items-center bg-card border border-border rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Período:</span>
+          </div>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-[150px] h-9"
+            placeholder="De"
+          />
+          <span className="text-muted-foreground text-sm">até</span>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-[150px] h-9"
+            placeholder="Até"
+          />
+          {(dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }}>
+              Limpar
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Novo Registro de Sessão</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateRecord}>
-              <RecordFormContent />
-            </form>
-          </DialogContent>
-        </Dialog>
+          )}
+          <Separator orientation="vertical" className="h-6 hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as "date" | "session")}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Ordenar por Data</SelectItem>
+                <SelectItem value="session">Ordenar por Sessão</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+            >
+              {sortOrder === "asc" ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Records List */}
@@ -783,50 +905,55 @@ const MedicalRecords = () => {
             <p className="text-muted-foreground">Nenhum prontuário encontrado</p>
           </div>
         ) : (
-          <div className="grid gap-4">
-            {filteredRecords.map(record => (
-              <motion.div
-                key={record.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <Card className="hover:border-primary/50 transition-colors">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="space-y-1 cursor-pointer flex-1" onClick={() => openViewDialog(record)}>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-primary" />
-                          <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
+          <>
+            <p className="text-sm text-muted-foreground">
+              {filteredRecords.length} prontuário{filteredRecords.length !== 1 ? "s" : ""} encontrado{filteredRecords.length !== 1 ? "s" : ""}
+            </p>
+            <div className="grid gap-4">
+              {filteredRecords.map(record => (
+                <motion.div
+                  key={record.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Card className="hover:border-primary/50 transition-colors">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="space-y-1 cursor-pointer flex-1" onClick={() => openViewDialog(record)}>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-primary" />
+                            <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
                           </div>
-                          <Badge variant="outline">
-                            <Hash className="h-3 w-3 mr-1" />
-                            Sessão {record.session_number || 1}
-                          </Badge>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                            </div>
+                            <Badge variant="outline">
+                              <Hash className="h-3 w-3 mr-1" />
+                              Sessão {record.session_number || 1}
+                            </Badge>
+                          </div>
                         </div>
+                        <ActionMenu
+                          onEdit={() => openEditDialog(record)}
+                          onDelete={() => handleDeleteRecord(record.id)}
+                          deleteTitle="Excluir Prontuário"
+                          deleteDescription="Tem certeza que deseja excluir este prontuário? Todos os anexos também serão removidos."
+                        />
                       </div>
-                      <ActionMenu
-                        onEdit={() => openEditDialog(record)}
-                        onDelete={() => handleDeleteRecord(record.id)}
-                        deleteTitle="Excluir Prontuário"
-                        deleteDescription="Tem certeza que deseja excluir este prontuário? Todos os anexos também serão removidos."
-                      />
-                    </div>
 
-                    <div className="cursor-pointer" onClick={() => openViewDialog(record)}>
-                      {record.observations && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+                      <div className="cursor-pointer" onClick={() => openViewDialog(record)}>
+                        {record.observations && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -932,20 +1059,10 @@ const MedicalRecords = () => {
                           </div>
                         </div>
                         <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handlePreviewAttachment(attachment)}
-                            title="Visualizar"
-                          >
+                          <Button variant="ghost" size="icon" onClick={() => handlePreviewAttachment(attachment)} title="Visualizar">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDownloadAttachment(attachment)}
-                            title="Baixar"
-                          >
+                          <Button variant="ghost" size="icon" onClick={() => handleDownloadAttachment(attachment)} title="Baixar">
                             <Download className="h-4 w-4" />
                           </Button>
                           <Button
@@ -980,10 +1097,30 @@ const MedicalRecords = () => {
             <DialogTitle>Editar Prontuário</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditRecord}>
-            <RecordFormContent isEdit />
+            <RecordFormContent
+              formData={formData}
+              setFormData={setFormData}
+              freeFormNotes={freeFormNotes}
+              setFreeFormNotes={setFreeFormNotes}
+              patients={patients}
+              pendingFiles={pendingFiles}
+              setPendingFiles={setPendingFiles}
+              onPreviewPendingFile={handlePreviewPendingFile}
+              generatingAI={generatingAI}
+              onGenerateAI={generateWithAI}
+              isEdit
+              onOpenQuickPatient={openQuickPatient}
+            />
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Quick Patient Form */}
+      <QuickPatientForm
+        open={quickPatientOpen}
+        onOpenChange={setQuickPatientOpen}
+        onPatientCreated={handleQuickPatientCreated}
+      />
 
       {/* File Preview Modal */}
       <FilePreviewModal
