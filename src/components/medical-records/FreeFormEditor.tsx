@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, useRef, memo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +62,36 @@ const StructuredField = memo(({
 
 StructuredField.displayName = "StructuredField";
 
-export function FreeFormEditor({
+// Memoized main textarea to prevent focus loss on mobile
+const MainTextarea = memo(({ 
+  value, 
+  onChange 
+}: { 
+  value: string; 
+  onChange: (value: string) => void;
+}) => {
+  // Use a ref to track the value internally to avoid re-renders
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
+  return (
+    <Textarea
+      ref={textareaRef}
+      value={value}
+      onChange={handleChange}
+      placeholder="Escreva livremente suas anotações sobre a sessão. Você tem total liberdade para registrar da forma que preferir..."
+      rows={8}
+      className="min-h-[200px] resize-y text-base leading-relaxed"
+    />
+  );
+});
+
+MainTextarea.displayName = "MainTextarea";
+
+export const FreeFormEditor = memo(function FreeFormEditor({
   value,
   onChange,
   structuredFields,
@@ -73,16 +102,8 @@ export function FreeFormEditor({
 
   // Memoiza a função de inserção de sugestão
   const insertSuggestion = useCallback((text: string) => {
-    const newValue = value ? `${value}
-
-${text}: ` : `${text}: `;
-    onChange(newValue);
+    onChange(value ? `${value}\n\n${text}: ` : `${text}: `);
   }, [value, onChange]);
-
-  // Memoiza o handler do textarea principal
-  const handleMainTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange(e.target.value);
-  }, [onChange]);
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -97,13 +118,7 @@ ${text}: ` : `${text}: `;
             </Badge>
           </Label>
         </div>
-        <Textarea
-          value={value}
-          onChange={handleMainTextareaChange}
-          placeholder="Escreva livremente suas anotações sobre a sessão. Você tem total liberdade para registrar da forma que preferir..."
-          rows={8}
-          className="min-h-[200px] resize-y text-base leading-relaxed"
-        />
+        <MainTextarea value={value} onChange={onChange} />
 
         {/* Quick Suggestions */}
         <div className="flex flex-wrap gap-2">
@@ -194,4 +209,4 @@ ${text}: ` : `${text}: `;
       )}
     </div>
   );
-}
+});
