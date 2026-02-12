@@ -4,13 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
  import { Card, CardContent } from "@/components/ui/card";
- import { Plus, Search, Users, LayoutGrid, List, UserPlus, TrendingUp, Clock, FileText } from "lucide-react";
+ import { Plus, Search, Users, LayoutGrid, List, UserPlus, TrendingUp, Clock, FileText, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PatientImportCSV } from "@/components/patients/PatientImportCSV";
  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
  import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
  import { StatsOverview } from "@/components/ui/stats-overview";
@@ -61,6 +62,7 @@ export default function Patients() {
    const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
    const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
    const [statusFilter, setStatusFilter] = useState<string>("all");
+   const [importOpen, setImportOpen] = useState(false);
 
   // States para campos com máscara
   const [phone, setPhone] = useState("");
@@ -148,7 +150,7 @@ export default function Patients() {
   const handleEditPatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingPatient) return;
-    
+
     const formData = new FormData(e.currentTarget);
 
     try {
@@ -276,16 +278,21 @@ export default function Patients() {
              </TabsList>
            </Tabs>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetCreateForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Novo Paciente
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
+            <Upload className="w-4 h-4" />
+            Importar CSV
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetCreateForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Novo Paciente
+              </Button>
+            </DialogTrigger>
            <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Cadastrar Novo Paciente</DialogTitle>
@@ -381,6 +388,7 @@ export default function Patients() {
             </ScrollArea>
           </DialogContent>
         </Dialog>
+       </div>
       </div>
 
       {/* Patients Grid */}
@@ -608,6 +616,14 @@ export default function Patients() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Import CSV Dialog */}
+      <PatientImportCSV
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImportComplete={loadPatients}
+        existingPatients={patients.map(p => ({ full_name: p.full_name, email: p.email, cpf: p.cpf }))}
+      />
     </AppLayout>
   );
 }
