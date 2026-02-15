@@ -32,5 +32,6 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON public.audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs(created_at DESC);
 
+
 -- Create index for recurrence
 CREATE INDEX IF NOT EXISTS idx_appointments_recurrence_parent ON public.appointments(recurrence_parent_id);
