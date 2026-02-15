@@ -1,7 +1,10 @@
-project_id = "jlnpehjlfwejwshvxwhs"
+project_id = "pnkhogpsadywdbgzqhfi"
 
 [functions.generate-medical-record]
 verify_jwt = false
 
 [functions.send-notification]
+verify_jwt = false
+
+[functions.ai-insights]
 verify_jwt = false
