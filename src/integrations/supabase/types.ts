@@ -25,8 +25,12 @@ export type Database = {
           notes: string | null
           patient_id: string
           psychologist_id: string
+          recurrence_end_date: string | null
+          recurrence_parent_id: string | null
+          recurrence_type: string | null
           reminder_sent: boolean | null
           scheduled_at: string
+          session_value: number | null
           status: string | null
           type: string | null
           updated_at: string | null
@@ -41,8 +45,12 @@ export type Database = {
           notes?: string | null
           patient_id: string
           psychologist_id: string
+          recurrence_end_date?: string | null
+          recurrence_parent_id?: string | null
+          recurrence_type?: string | null
           reminder_sent?: boolean | null
           scheduled_at: string
+          session_value?: number | null
           status?: string | null
           type?: string | null
           updated_at?: string | null
@@ -57,8 +65,12 @@ export type Database = {
           notes?: string | null
           patient_id?: string
           psychologist_id?: string
+          recurrence_end_date?: string | null
+          recurrence_parent_id?: string | null
+          recurrence_type?: string | null
           reminder_sent?: boolean | null
           scheduled_at?: string
+          session_value?: number | null
           status?: string | null
           type?: string | null
           updated_at?: string | null
@@ -76,6 +88,13 @@ export type Database = {
             columns: ["psychologist_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_recurrence_parent_id_fkey"
+            columns: ["recurrence_parent_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
         ]
@@ -123,7 +142,9 @@ export type Database = {
         Row: {
           amount: number
           appointment_id: string | null
+          attachment_url: string | null
           category: string | null
+          cost_center: string | null
           created_at: string | null
           deleted_at: string | null
           deleted_by: string | null
@@ -131,18 +152,25 @@ export type Database = {
           description: string | null
           due_date: string | null
           id: string
+          invoice_number: string | null
+          invoice_status: string | null
           paid_date: string | null
           patient_id: string | null
           payment_method: string | null
           psychologist_id: string
+          receipt_url: string | null
           status: string | null
+          tax_amount: number | null
+          tax_rate: number | null
           type: string
           updated_at: string | null
         }
         Insert: {
           amount: number
           appointment_id?: string | null
+          attachment_url?: string | null
           category?: string | null
+          cost_center?: string | null
           created_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
@@ -150,18 +178,25 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          invoice_number?: string | null
+          invoice_status?: string | null
           paid_date?: string | null
           patient_id?: string | null
           payment_method?: string | null
           psychologist_id: string
+          receipt_url?: string | null
           status?: string | null
+          tax_amount?: number | null
+          tax_rate?: number | null
           type: string
           updated_at?: string | null
         }
         Update: {
           amount?: number
           appointment_id?: string | null
+          attachment_url?: string | null
           category?: string | null
+          cost_center?: string | null
           created_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
@@ -169,11 +204,16 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          invoice_number?: string | null
+          invoice_status?: string | null
           paid_date?: string | null
           patient_id?: string | null
           payment_method?: string | null
           psychologist_id?: string
+          receipt_url?: string | null
           status?: string | null
+          tax_amount?: number | null
+          tax_rate?: number | null
           type?: string
           updated_at?: string | null
         }
