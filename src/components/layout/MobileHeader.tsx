@@ -28,6 +28,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface MobileHeaderProps {
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
   onOpenSearch?: () => void;
   notifications?: number;
 }
@@ -48,9 +49,10 @@ const secondaryNavItems = [
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
   { icon: MessageSquare, label: "Assistente IA", path: "/assistente-ia", badge: "IA" },
   { icon: Shield, label: "Usuários", path: "/admin/usuarios", adminOnly: true },
+  { icon: Shield, label: "Super Admin", path: "/super-admin", superAdminOnly: true },
 ];
 
-export function MobileHeader({ isAdmin, onOpenSearch, notifications = 0 }: MobileHeaderProps) {
+export function MobileHeader({ isAdmin, isSuperAdmin, onOpenSearch, notifications = 0 }: MobileHeaderProps) {
   const [open, setOpen] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
   const navigate = useNavigate();
@@ -73,8 +75,9 @@ export function MobileHeader({ isAdmin, onOpenSearch, notifications = 0 }: Mobil
     setOpen(false);
   };
 
-  const NavItem = ({ item }: { item: typeof mainNavItems[0] & { adminOnly?: boolean } }) => {
+  const NavItem = ({ item }: { item: typeof mainNavItems[0] & { adminOnly?: boolean; superAdminOnly?: boolean } }) => {
     if (item.adminOnly && !isAdmin) return null;
+    if (item.superAdminOnly && !isSuperAdmin) return null;
     const isActive = location.pathname === item.path;
     const Icon = item.icon;
 
