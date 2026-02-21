@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -22,12 +22,8 @@ export type Database = {
           notes: string | null
           patient_id: string
           psychologist_id: string
-          recurrence_end_date: string | null
-          recurrence_parent_id: string | null
-          recurrence_type: string | null
           reminder_sent: boolean | null
           scheduled_at: string
-          session_value: number | null
           status: string | null
           type: string | null
           updated_at: string | null
@@ -39,12 +35,8 @@ export type Database = {
           notes?: string | null
           patient_id: string
           psychologist_id: string
-          recurrence_end_date?: string | null
-          recurrence_parent_id?: string | null
-          recurrence_type?: string | null
           reminder_sent?: boolean | null
           scheduled_at: string
-          session_value?: number | null
           status?: string | null
           type?: string | null
           updated_at?: string | null
@@ -56,12 +48,8 @@ export type Database = {
           notes?: string | null
           patient_id?: string
           psychologist_id?: string
-          recurrence_end_date?: string | null
-          recurrence_parent_id?: string | null
-          recurrence_type?: string | null
           reminder_sent?: boolean | null
           scheduled_at?: string
-          session_value?: number | null
           status?: string | null
           type?: string | null
           updated_at?: string | null
@@ -81,44 +69,7 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "appointments_recurrence_parent_id_fkey"
-            columns: ["recurrence_parent_id"]
-            isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
         ]
-      }
-      audit_logs: {
-        Row: {
-          action: string
-          created_at: string
-          details: Json | null
-          entity_id: string | null
-          entity_type: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          action: string
-          created_at?: string
-          details?: Json | null
-          entity_id?: string | null
-          entity_type: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          action?: string
-          created_at?: string
-          details?: Json | null
-          entity_id?: string | null
-          entity_type?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       financial_transactions: {
         Row: {
