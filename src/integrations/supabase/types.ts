@@ -17,6 +17,9 @@ export type Database = {
       appointments: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          deleted_reason: string | null
           duration_minutes: number | null
           id: string
           notes: string | null
@@ -30,6 +33,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           duration_minutes?: number | null
           id?: string
           notes?: string | null
@@ -43,6 +49,9 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           duration_minutes?: number | null
           id?: string
           notes?: string | null
@@ -71,12 +80,54 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action_type: string
+          clinic_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          new_data: Json | null
+          old_data: Json | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          clinic_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          clinic_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       financial_transactions: {
         Row: {
           amount: number
           appointment_id: string | null
           category: string | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          deleted_reason: string | null
           description: string | null
           due_date: string | null
           id: string
@@ -93,6 +144,9 @@ export type Database = {
           appointment_id?: string | null
           category?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
@@ -109,6 +163,9 @@ export type Database = {
           appointment_id?: string | null
           category?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
@@ -190,6 +247,9 @@ export type Database = {
           appointment_id: string | null
           complaints: string | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          deleted_reason: string | null
           evolution: string | null
           id: string
           next_steps: string | null
@@ -205,6 +265,9 @@ export type Database = {
           appointment_id?: string | null
           complaints?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           evolution?: string | null
           id?: string
           next_steps?: string | null
@@ -220,6 +283,9 @@ export type Database = {
           appointment_id?: string | null
           complaints?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           evolution?: string | null
           id?: string
           next_steps?: string | null
@@ -261,6 +327,9 @@ export type Database = {
           birth_date: string | null
           cpf: string | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          deleted_reason: string | null
           email: string | null
           emergency_contact: string | null
           emergency_phone: string | null
@@ -277,6 +346,9 @@ export type Database = {
           birth_date?: string | null
           cpf?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           email?: string | null
           emergency_contact?: string | null
           emergency_phone?: string | null
@@ -293,6 +365,9 @@ export type Database = {
           birth_date?: string | null
           cpf?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           email?: string | null
           emergency_contact?: string | null
           emergency_phone?: string | null
@@ -384,6 +459,11 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      restore_deleted_record: {
+        Args: { _entity_id: string; _entity_type: string; _restored_by: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "psychologist" | "secretary" | "super_admin"
