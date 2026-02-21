@@ -22,6 +22,7 @@ import Documentos from "./pages/Documentos";
 import EscalasPsicologicas from "./pages/EscalasPsicologicas";
 import AssistenteIA from "./pages/AssistenteIA";
 import Notificacoes from "./pages/Notificacoes";
+import SuperAdmin from "./pages/SuperAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
                 <Route path="/escalas" element={<EscalasPsicologicas />} />
                 <Route path="/assistente-ia" element={<AssistenteIA />} />
                 <Route path="/notificacoes" element={<Notificacoes />} />
+                <Route path="/super-admin" element={<SuperAdmin />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

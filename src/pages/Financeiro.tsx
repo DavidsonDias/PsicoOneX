@@ -173,7 +173,7 @@ export default function Financeiro() {
     if (error) { toast.error("Erro ao criar transação"); return; }
 
     // Audit log
-    await supabase.from("audit_logs").insert({ user_id: user.id, action: "create", entity_type: "transaction", details: { type: txData.type, amount: txData.amount } });
+    await supabase.from("audit_logs").insert({ user_id: user.id, action_type: "create", entity_type: "transaction", new_data: { type: txData.type, amount: txData.amount } } as any);
 
     toast.success("Transação criada!");
     setDialogOpen(false);

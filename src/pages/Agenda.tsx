@@ -87,7 +87,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from("appointments")
       .select(`
-        id, patient_id, scheduled_at, status, notes, type, duration_minutes, session_value, recurrence_type, recurrence_end_date, recurrence_parent_id,
+        id, patient_id, scheduled_at, status, notes, type, duration_minutes,
         patients (full_name, phone)
       `)
       .eq("psychologist_id", psychologistId)
@@ -97,7 +97,7 @@ export default function Agenda() {
       toast.error("Erro ao carregar agendamentos");
       return;
     }
-    setAppointments(data || []);
+    setAppointments((data || []) as unknown as Appointment[]);
   };
 
   const loadPatients = async () => {
@@ -223,19 +223,15 @@ export default function Agenda() {
 
       const lastDate = recurrenceDates[recurrenceDates.length - 1]?.split("T")[0] || formData.date;
 
-      // Update parent with recurrence info
       await supabase.from("appointments").update({
-        recurrence_type: formData.recurrence_type,
-        recurrence_end_date: lastDate,
-      }).eq("id", mainAppointment.id);
+        notes: `recurrence:${formData.recurrence_type}`,
+      } as any).eq("id", mainAppointment.id);
 
       // Create child appointments
       for (const date of recurrenceDates) {
-        const childData = {
+        const childData: any = {
           ...appointmentBase,
           scheduled_at: date,
-          recurrence_parent_id: mainAppointment.id,
-          recurrence_type: formData.recurrence_type,
         };
         
         const { error: childError } = await supabase.from("appointments").insert(childData);
@@ -253,14 +249,13 @@ export default function Agenda() {
       toast.success("Agendamento criado com sucesso!");
     }
 
-    // Log audit
     await supabase.from("audit_logs").insert({
       user_id: userId,
-      action: "create",
+      action_type: "create",
       entity_type: "appointment",
       entity_id: mainAppointment?.id,
-      details: { recurrence: formData.recurrence_enabled, type: formData.type },
-    });
+      new_data: { recurrence: formData.recurrence_enabled, type: formData.type },
+    } as any);
 
     setDialogOpen(false);
     resetForm();
@@ -289,7 +284,7 @@ export default function Agenda() {
         duration_minutes: parseInt(formData.duration),
         status: formData.status,
         session_value: parseFloat(formData.session_value) || 200,
-      })
+      } as any)
       .eq("id", editingAppointment.id);
 
     if (error) {
@@ -299,10 +294,10 @@ export default function Agenda() {
 
     await supabase.from("audit_logs").insert({
       user_id: userId,
-      action: "update",
+      action_type: "update",
       entity_type: "appointment",
       entity_id: editingAppointment.id,
-    });
+    } as any);
 
     toast.success("Agendamento atualizado!");
     setEditingAppointment(null);
@@ -323,10 +318,10 @@ export default function Agenda() {
 
     await supabase.from("audit_logs").insert({
       user_id: userId,
-      action: "delete",
+      action_type: "delete",
       entity_type: "appointment",
       entity_id: appointmentId,
-    });
+    } as any);
 
     toast.success("Agendamento excluído!");
     await loadAppointments(userId);
@@ -360,11 +355,11 @@ export default function Agenda() {
 
     await supabase.from("audit_logs").insert({
       user_id: userId,
-      action: "status_change",
+      action_type: "status_change",
       entity_type: "appointment",
       entity_id: appointmentId,
-      details: { new_status: newStatus },
-    });
+      new_data: { new_status: newStatus },
+    } as any);
 
     toast.success("Status atualizado!");
     await loadAppointments(userId);
