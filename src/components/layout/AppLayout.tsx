@@ -18,7 +18,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, title, description }: AppLayoutProps) {
   const navigate = useNavigate();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isSuperAdmin } = useUserRole();
   const { collapsed } = useSidebar();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -97,12 +97,14 @@ export function AppLayout({ children, title, description }: AppLayoutProps) {
       {/* Desktop Sidebar */}
       <AppSidebar 
         isAdmin={isAdmin} 
+        isSuperAdmin={isSuperAdmin}
         onOpenCommandPalette={() => setCommandOpen(true)}
       />
 
       {/* Mobile Header */}
       <MobileHeader 
         isAdmin={isAdmin}
+        isSuperAdmin={isSuperAdmin}
         onOpenSearch={() => setCommandOpen(true)}
       />
       

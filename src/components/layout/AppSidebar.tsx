@@ -35,6 +35,7 @@ interface NavItem {
   path: string;
   badge?: string;
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
 }
 
 const mainNavItems: NavItem[] = [
@@ -53,15 +54,17 @@ const secondaryNavItems: NavItem[] = [
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
   { icon: MessageSquare, label: "Assistente IA", path: "/assistente-ia", badge: "IA" },
   { icon: Shield, label: "Usuários", path: "/admin/usuarios", adminOnly: true },
+  { icon: Shield, label: "Super Admin", path: "/super-admin", superAdminOnly: true },
 ];
 
 interface AppSidebarProps {
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
   onOpenCommandPalette?: () => void;
   notifications?: number;
 }
 
-export function AppSidebar({ isAdmin, onOpenCommandPalette, notifications = 0 }: AppSidebarProps) {
+export function AppSidebar({ isAdmin, isSuperAdmin, onOpenCommandPalette, notifications = 0 }: AppSidebarProps) {
   const { collapsed, toggleCollapsed } = useSidebar();
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,6 +77,7 @@ export function AppSidebar({ isAdmin, onOpenCommandPalette, notifications = 0 }:
 
   const NavItemComponent = ({ item }: { item: NavItem }) => {
     if (item.adminOnly && !isAdmin) return null;
+    if (item.superAdminOnly && !isSuperAdmin) return null;
     
     const isActive = location.pathname === item.path;
     const Icon = item.icon;
