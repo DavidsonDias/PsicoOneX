@@ -10,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign } from "lucide-react";
-import { format, isSameDay, startOfMonth, endOfMonth, addDays, addWeeks, addMonths } from "date-fns";
+import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2 } from "lucide-react";
+import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ import { DayOverview } from "@/components/agenda/DayOverview";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { StatsOverview } from "@/components/ui/stats-overview";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Appointment {
   id: string;
@@ -77,20 +78,17 @@ export default function Agenda() {
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    
     setUserId(session.user.id);
-    await Promise.all([loadAppointments(session.user.id), loadPatients()]);
+    await Promise.all([loadAppointments(session.user.id), loadPatients(session.user.id)]);
     setLoading(false);
   };
 
   const loadAppointments = async (psychologistId: string) => {
     const { data, error } = await supabase
       .from("appointments")
-      .select(`
-        id, patient_id, scheduled_at, status, notes, type, duration_minutes,
-        patients (full_name, phone)
-      `)
+      .select(`id, patient_id, scheduled_at, status, notes, type, duration_minutes, patients (full_name, phone)`)
       .eq("psychologist_id", psychologistId)
+      .is("deleted_at", null)
       .order("scheduled_at", { ascending: true });
 
     if (error) {
@@ -100,16 +98,17 @@ export default function Agenda() {
     setAppointments((data || []) as unknown as Appointment[]);
   };
 
-  const loadPatients = async () => {
+  const loadPatients = async (psychologistId: string) => {
     const { data } = await supabase
       .from("patients")
       .select("id, full_name, email")
+      .eq("psychologist_id", psychologistId)
       .eq("status", "active")
+      .is("deleted_at", null)
       .order("full_name");
     setPatients(data || []);
   };
 
-  // Check for time conflicts
   const checkConflicts = useCallback((date: string, time: string, duration: number, excludeId?: string) => {
     const newStart = new Date(`${date}T${time}:00`);
     const newEnd = new Date(newStart.getTime() + duration * 60000);
@@ -123,31 +122,22 @@ export default function Agenda() {
     });
   }, [appointments]);
 
-  // Generate recurrence dates
   const generateRecurrenceDates = (startDate: string, startTime: string, type: string, count: number) => {
     const dates: string[] = [];
     let current = new Date(`${startDate}T${startTime}:00`);
-
     for (let i = 1; i < count; i++) {
       switch (type) {
-        case "weekly":
-          current = addWeeks(current, 1);
-          break;
-        case "biweekly":
-          current = addWeeks(current, 2);
-          break;
-        case "monthly":
-          current = addMonths(current, 1);
-          break;
-        default:
-          current = addWeeks(current, 1);
+        case "weekly": current = addWeeks(new Date(`${startDate}T${startTime}:00`), i); break;
+        case "biweekly": current = addWeeks(new Date(`${startDate}T${startTime}:00`), i * 2); break;
+        case "monthly": current = addMonths(new Date(`${startDate}T${startTime}:00`), i); break;
+        default: current = addWeeks(new Date(`${startDate}T${startTime}:00`), i);
       }
       dates.push(current.toISOString());
     }
     return dates;
   };
 
-  const createFinancialTransaction = async (appointmentData: { patient_id: string; scheduled_at: string; session_value: number }) => {
+  const createFinancialTransaction = async (appointmentData: { patient_id: string; scheduled_at: string; session_value: number; appointment_id?: string }) => {
     try {
       await supabase.from("financial_transactions").insert({
         psychologist_id: userId,
@@ -159,7 +149,7 @@ export default function Agenda() {
         payment_method: "pix",
         status: "pending",
         due_date: appointmentData.scheduled_at.split("T")[0],
-        appointment_id: null,
+        appointment_id: appointmentData.appointment_id || null,
       });
     } catch (err) {
       console.error("Error creating financial transaction:", err);
@@ -168,24 +158,21 @@ export default function Agenda() {
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.patient_id) {
       toast.error("Selecione um paciente");
       return;
     }
 
-    // Check conflicts
     const conflicts = checkConflicts(formData.date, formData.time, parseInt(formData.duration));
     if (conflicts.length > 0) {
       toast.error(`Conflito de horário com ${conflicts[0].patients.full_name} às ${format(new Date(conflicts[0].scheduled_at), "HH:mm")}`);
       return;
     }
 
-    // Create ISO string properly for UTC storage
     const scheduledAt = new Date(`${formData.date}T${formData.time}:00`).toISOString();
     const sessionValue = parseFloat(formData.session_value) || 200;
 
-    const appointmentBase = {
+    const appointmentBase: any = {
       patient_id: formData.patient_id,
       psychologist_id: userId,
       scheduled_at: scheduledAt,
@@ -196,6 +183,10 @@ export default function Agenda() {
       session_value: sessionValue,
     };
 
+    if (formData.recurrence_enabled) {
+      appointmentBase.recurrence_type = formData.recurrence_type;
+    }
+
     const { data: mainAppointment, error } = await supabase
       .from("appointments")
       .insert(appointmentBase)
@@ -204,49 +195,48 @@ export default function Agenda() {
 
     if (error) {
       toast.error("Erro ao criar agendamento");
+      console.error(error);
       return;
     }
 
-    // Auto-create financial transaction (Agenda ↔ PsicoBank integration)
     await createFinancialTransaction({
       patient_id: formData.patient_id,
       scheduled_at: scheduledAt,
       session_value: sessionValue,
+      appointment_id: mainAppointment?.id,
     });
 
-    // Create recurrence if enabled
     if (formData.recurrence_enabled && mainAppointment) {
       const count = parseInt(formData.recurrence_count) || 4;
-      const recurrenceDates = generateRecurrenceDates(
-        formData.date, formData.time, formData.recurrence_type, count
-      );
+      const recurrenceDates = generateRecurrenceDates(formData.date, formData.time, formData.recurrence_type, count);
 
-      const lastDate = recurrenceDates[recurrenceDates.length - 1]?.split("T")[0] || formData.date;
-
-      await supabase.from("appointments").update({
-        notes: `recurrence:${formData.recurrence_type}`,
-      } as any).eq("id", mainAppointment.id);
-
-      // Create child appointments
       for (const date of recurrenceDates) {
+        const childConflicts = checkConflicts(
+          date.split("T")[0],
+          format(new Date(date), "HH:mm"),
+          parseInt(formData.duration)
+        );
+        if (childConflicts.length > 0) continue;
+
         const childData: any = {
           ...appointmentBase,
           scheduled_at: date,
+          recurrence_parent_id: mainAppointment.id,
         };
-        
-        const { error: childError } = await supabase.from("appointments").insert(childData);
-        if (!childError) {
+
+        const { data: childApt, error: childError } = await supabase.from("appointments").insert(childData).select().single();
+        if (!childError && childApt) {
           await createFinancialTransaction({
             patient_id: formData.patient_id,
             scheduled_at: date,
             session_value: sessionValue,
+            appointment_id: childApt.id,
           });
         }
       }
-
-      toast.success(`Série de ${count} agendamentos criada com sucesso!`);
+      toast.success(`Série de ${count} agendamentos criada!`);
     } else {
-      toast.success("Agendamento criado com sucesso!");
+      toast.success("Agendamento criado!");
     }
 
     await supabase.from("audit_logs").insert({
@@ -254,7 +244,7 @@ export default function Agenda() {
       action_type: "create",
       entity_type: "appointment",
       entity_id: mainAppointment?.id,
-      new_data: { recurrence: formData.recurrence_enabled, type: formData.type },
+      new_data: { recurrence: formData.recurrence_enabled, type: formData.type, value: sessionValue },
     } as any);
 
     setDialogOpen(false);
@@ -297,6 +287,8 @@ export default function Agenda() {
       action_type: "update",
       entity_type: "appointment",
       entity_id: editingAppointment.id,
+      old_data: { scheduled_at: editingAppointment.scheduled_at, status: editingAppointment.status },
+      new_data: { scheduled_at: scheduledAt, status: formData.status },
     } as any);
 
     toast.success("Agendamento atualizado!");
@@ -305,10 +297,15 @@ export default function Agenda() {
     await loadAppointments(userId);
   };
 
+  // Soft delete instead of hard delete
   const handleDeleteAppointment = async (appointmentId: string) => {
     const { error } = await supabase
       .from("appointments")
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId,
+        deleted_reason: "Excluído pelo usuário",
+      })
       .eq("id", appointmentId);
 
     if (error) {
@@ -318,7 +315,7 @@ export default function Agenda() {
 
     await supabase.from("audit_logs").insert({
       user_id: userId,
-      action_type: "delete",
+      action_type: "soft_delete",
       entity_type: "appointment",
       entity_id: appointmentId,
     } as any);
@@ -328,24 +325,26 @@ export default function Agenda() {
   };
 
   const handleStatusChange = async (appointmentId: string, newStatus: string) => {
-    const updateData: any = { status: newStatus };
-    
-    // If completed, also update financial transaction
-    if (newStatus === "completed") {
-      const apt = appointments.find(a => a.id === appointmentId);
-      if (apt) {
-        // Mark associated pending transaction as paid
-        await supabase.from("financial_transactions")
-          .update({ status: "paid", paid_date: new Date().toISOString().split("T")[0] })
-          .eq("patient_id", apt.patient_id)
-          .eq("status", "pending")
-          .eq("due_date", new Date(apt.scheduled_at).toISOString().split("T")[0]);
-      }
+    const apt = appointments.find(a => a.id === appointmentId);
+    const oldStatus = apt?.status;
+
+    if (newStatus === "completed" && apt) {
+      await supabase.from("financial_transactions")
+        .update({ status: "paid", paid_date: new Date().toISOString().split("T")[0] })
+        .eq("appointment_id", apt.id)
+        .eq("status", "pending");
+    }
+
+    if (newStatus === "cancelled" && apt) {
+      await supabase.from("financial_transactions")
+        .update({ status: "cancelled" })
+        .eq("appointment_id", apt.id)
+        .eq("status", "pending");
     }
 
     const { error } = await supabase
       .from("appointments")
-      .update(updateData)
+      .update({ status: newStatus } as any)
       .eq("id", appointmentId);
 
     if (error) {
@@ -358,7 +357,8 @@ export default function Agenda() {
       action_type: "status_change",
       entity_type: "appointment",
       entity_id: appointmentId,
-      new_data: { new_status: newStatus },
+      old_data: { status: oldStatus },
+      new_data: { status: newStatus },
     } as any);
 
     toast.success("Status atualizado!");
@@ -399,7 +399,7 @@ export default function Agenda() {
     setEditingAppointment(appointment);
   };
 
-  const filteredAppointments = appointments.filter(apt => 
+  const filteredAppointments = appointments.filter(apt =>
     isSameDay(new Date(apt.scheduled_at), selectedDate)
   );
 
@@ -439,7 +439,7 @@ export default function Agenda() {
     const online = monthAppointments.filter(a => a.type === "online");
     const presential = monthAppointments.filter(a => a.type === "presential");
     const totalRevenue = completed.reduce((sum, a) => sum + (a.session_value || 200), 0);
-    
+
     return {
       total: monthAppointments.length,
       completed: completed.length,
@@ -447,7 +447,7 @@ export default function Agenda() {
       noShow: noShow.length,
       online: online.length,
       presential: presential.length,
-      attendanceRate: monthAppointments.length > 0 
+      attendanceRate: monthAppointments.length > 0
         ? Math.round((completed.length / (monthAppointments.length - cancelled.length || 1)) * 100)
         : 0,
       revenue: totalRevenue,
@@ -457,8 +457,14 @@ export default function Agenda() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-pulse text-primary">Carregando...</div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          </div>
+          <div className="grid lg:grid-cols-[320px,1fr] gap-6">
+            <Skeleton className="h-80 rounded-xl" />
+            <Skeleton className="h-96 rounded-xl" />
+          </div>
         </div>
       </AppLayout>
     );
@@ -474,9 +480,7 @@ export default function Agenda() {
           </SelectTrigger>
           <SelectContent>
             {patients.map(patient => (
-              <SelectItem key={patient.id} value={patient.id}>
-                {patient.full_name}
-              </SelectItem>
+              <SelectItem key={patient.id} value={patient.id}>{patient.full_name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -500,6 +504,7 @@ export default function Agenda() {
               <SelectItem value="50">50 min</SelectItem>
               <SelectItem value="60">1 hora</SelectItem>
               <SelectItem value="90">1h 30min</SelectItem>
+              <SelectItem value="120">2 horas</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -543,7 +548,6 @@ export default function Agenda() {
         </div>
       </div>
 
-      {/* Recurrence Section */}
       {!editingAppointment && (
         <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
           <div className="flex items-center justify-between">
@@ -592,7 +596,6 @@ export default function Agenda() {
 
   return (
     <AppLayout title="Agenda Inteligente" description="Gerencie seus agendamentos com eficiência e insights em tempo real">
-      {/* Monthly Stats */}
       <StatsOverview
         stats={[
           { label: "Consultas do Mês", value: monthlyStats.total, icon: CalendarIcon, color: "blue", change: 12 },
@@ -603,7 +606,6 @@ export default function Agenda() {
         className="mb-6"
       />
 
-      {/* Strategic Indicators */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card className="p-3">
           <div className="text-xs text-muted-foreground mb-1">Online vs Presencial</div>
@@ -640,7 +642,7 @@ export default function Agenda() {
               Novo Agendamento
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <CalendarIcon className="h-5 w-5 text-primary" />
@@ -691,7 +693,7 @@ export default function Agenda() {
                 <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-30" />
                 <p className="text-lg font-medium mb-1">Nenhum agendamento</p>
                 <p className="text-sm text-muted-foreground">
-                  Não há consultas agendadas para {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
+                  Não há consultas para {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
                 </p>
               </div>
             ) : viewMode === "timeline" ? (
@@ -767,9 +769,8 @@ export default function Agenda() {
         </Card>
       </div>
 
-      {/* Edit Dialog */}
       <Dialog open={!!editingAppointment} onOpenChange={(open) => { if (!open) { setEditingAppointment(null); resetForm(); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Agendamento</DialogTitle>
           </DialogHeader>
@@ -779,4 +780,3 @@ export default function Agenda() {
     </AppLayout>
   );
 }
-
