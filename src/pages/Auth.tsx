@@ -9,6 +9,15 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+const getRedirectPath = async (userId: string): Promise<string> => {
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  const roles = data?.map(r => r.role) || [];
+  return roles.includes("super_admin") ? "/super-admin" : "/dashboard";
+};
+
 export default function Auth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -23,7 +32,7 @@ export default function Auth() {
     const fullName = formData.get("fullName") as string;
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -36,7 +45,8 @@ export default function Auth() {
       if (error) throw error;
 
       toast.success("Conta criada com sucesso! Redirecionando...");
-      setTimeout(() => navigate("/dashboard"), 1000);
+      const path = data.user ? await getRedirectPath(data.user.id) : "/dashboard";
+      setTimeout(() => navigate(path), 1000);
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar conta");
     } finally {
@@ -53,7 +63,7 @@ export default function Auth() {
     const password = formData.get("password") as string;
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -61,7 +71,8 @@ export default function Auth() {
       if (error) throw error;
 
       toast.success("Login realizado com sucesso!");
-      navigate("/dashboard");
+      const path = data.user ? await getRedirectPath(data.user.id) : "/dashboard";
+      navigate(path);
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
     } finally {
