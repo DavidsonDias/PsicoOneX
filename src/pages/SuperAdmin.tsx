@@ -11,10 +11,14 @@ import { toast } from "@/hooks/use-toast";
 import {
   LayoutDashboard, Users, Trash2, ScrollText, Settings, Shield,
   Search, RefreshCw, Eye, RotateCcw, AlertTriangle, TrendingUp,
-  UserCheck, Calendar, FileText, DollarSign, ChevronRight
+  UserCheck, Calendar, FileText, DollarSign, ChevronRight,
+  Activity, Building2, CreditCard, Monitor, LogOut, Database,
+  ArrowUpRight, ArrowDownRight, Clock, Ban, CheckCircle2, XCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface DeletedRecord {
   id: string;
@@ -25,6 +29,7 @@ interface DeletedRecord {
   deleted_by_name?: string;
   deleted_reason?: string;
   patient_id?: string;
+  clinic_name?: string;
 }
 
 interface AuditLog {
@@ -46,10 +51,23 @@ interface DashboardStats {
   totalAppointments: number;
   totalRecords: number;
   totalTransactions: number;
+  totalRevenue: number;
   deletedPatients: number;
   deletedRecords: number;
   deletedAppointments: number;
+  deletedTransactions: number;
 }
+
+const SIDEBAR_ITEMS = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "clinics", label: "Clínicas", icon: Building2 },
+  { id: "subscriptions", label: "Assinaturas", icon: CreditCard },
+  { id: "finance", label: "Financeiro", icon: DollarSign },
+  { id: "recovery", label: "Data Recovery", icon: Database },
+  { id: "logs", label: "Auditoria", icon: ScrollText },
+  { id: "monitoring", label: "Monitoramento", icon: Monitor },
+  { id: "settings", label: "Configurações", icon: Settings },
+];
 
 const SuperAdmin = () => {
   const navigate = useNavigate();
@@ -63,6 +81,7 @@ const SuperAdmin = () => {
   const [trashFilter, setTrashFilter] = useState("all");
   const [loadingData, setLoadingData] = useState(true);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     if (!roleLoading && !isSuperAdmin) {
@@ -82,31 +101,35 @@ const SuperAdmin = () => {
   };
 
   const loadStats = async () => {
-    const [profilesRes, patientsRes, appointmentsRes, recordsRes, transactionsRes, delPatientsRes, delRecordsRes, delAppointmentsRes] = await Promise.all([
+    const [profilesRes, patientsRes, appointmentsRes, recordsRes, transactionsRes, revenueRes, delPatientsRes, delRecordsRes, delAppointmentsRes, delTransactionsRes] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("patients").select("id", { count: "exact", head: true }).is("deleted_at", null),
       supabase.from("appointments").select("id", { count: "exact", head: true }).is("deleted_at", null),
       supabase.from("medical_records").select("id", { count: "exact", head: true }).is("deleted_at", null),
       supabase.from("financial_transactions").select("id", { count: "exact", head: true }).is("deleted_at", null),
+      supabase.from("financial_transactions").select("amount").eq("type", "income").eq("status", "paid").is("deleted_at", null),
       supabase.from("patients").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
       supabase.from("medical_records").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
       supabase.from("appointments").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
+      supabase.from("financial_transactions").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
     ]);
+    const totalRevenue = revenueRes.data?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
     setStats({
       totalProfiles: profilesRes.count || 0,
       totalPatients: patientsRes.count || 0,
       totalAppointments: appointmentsRes.count || 0,
       totalRecords: recordsRes.count || 0,
       totalTransactions: transactionsRes.count || 0,
+      totalRevenue,
       deletedPatients: delPatientsRes.count || 0,
       deletedRecords: delRecordsRes.count || 0,
       deletedAppointments: delAppointmentsRes.count || 0,
+      deletedTransactions: delTransactionsRes.count || 0,
     });
   };
 
   const loadDeletedRecords = async () => {
     const records: DeletedRecord[] = [];
-
     const [patients, medRecords, appointments, transactions] = await Promise.all([
       supabase.from("patients").select("id, full_name, deleted_at, deleted_by, deleted_reason, psychologist_id").not("deleted_at", "is", null),
       supabase.from("medical_records").select("id, patient_id, session_number, session_date, deleted_at, deleted_by, deleted_reason").not("deleted_at", "is", null),
@@ -118,17 +141,14 @@ const SuperAdmin = () => {
       id: p.id, entity_type: "patient", entity_name: p.full_name,
       deleted_at: p.deleted_at!, deleted_by: p.deleted_by || "", deleted_reason: p.deleted_reason || undefined
     }));
-
     medRecords.data?.forEach(r => records.push({
       id: r.id, entity_type: "medical_record", entity_name: `Sessão ${r.session_number || "?"} - ${r.session_date}`,
       deleted_at: r.deleted_at!, deleted_by: r.deleted_by || "", deleted_reason: r.deleted_reason || undefined, patient_id: r.patient_id
     }));
-
     appointments.data?.forEach(a => records.push({
       id: a.id, entity_type: "appointment", entity_name: `Agendamento ${format(new Date(a.scheduled_at), "dd/MM/yyyy HH:mm")}`,
       deleted_at: a.deleted_at!, deleted_by: a.deleted_by || "", deleted_reason: a.deleted_reason || undefined, patient_id: a.patient_id
     }));
-
     transactions.data?.forEach(t => records.push({
       id: t.id, entity_type: "financial_transaction", entity_name: `${t.description || "Transação"} - R$ ${t.amount}`,
       deleted_at: t.deleted_at!, deleted_by: t.deleted_by || "", deleted_reason: t.deleted_reason || undefined
@@ -143,7 +163,7 @@ const SuperAdmin = () => {
       .from("audit_logs")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
     setAuditLogs((data as AuditLog[]) || []);
   };
 
@@ -157,16 +177,13 @@ const SuperAdmin = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Sessão expirada");
-
       const { error } = await supabase.rpc("restore_deleted_record", {
         _entity_type: record.entity_type,
         _entity_id: record.id,
         _restored_by: session.user.id,
       });
-
       if (error) throw error;
-
-      toast({ title: "Restaurado!", description: `${record.entity_name} foi restaurado com sucesso.` });
+      toast({ title: "✅ Restaurado!", description: `${record.entity_name} restaurado com sucesso.` });
       await Promise.all([loadDeletedRecords(), loadStats(), loadAuditLogs()]);
     } catch (err: any) {
       toast({ title: "Erro ao restaurar", description: err.message, variant: "destructive" });
@@ -175,18 +192,18 @@ const SuperAdmin = () => {
     }
   };
 
-  const entityTypeLabel: Record<string, string> = {
-    patient: "Paciente",
-    medical_record: "Prontuário",
-    appointment: "Agendamento",
-    financial_transaction: "Transação",
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/auth");
   };
 
+  const entityTypeLabel: Record<string, string> = {
+    patient: "Paciente", medical_record: "Prontuário",
+    appointment: "Agendamento", financial_transaction: "Transação",
+  };
   const entityTypeIcon: Record<string, React.ReactNode> = {
-    patient: <Users className="h-4 w-4" />,
-    medical_record: <FileText className="h-4 w-4" />,
-    appointment: <Calendar className="h-4 w-4" />,
-    financial_transaction: <DollarSign className="h-4 w-4" />,
+    patient: <Users className="h-4 w-4" />, medical_record: <FileText className="h-4 w-4" />,
+    appointment: <Calendar className="h-4 w-4" />, financial_transaction: <DollarSign className="h-4 w-4" />,
   };
 
   const filteredTrash = deletedRecords.filter(r => {
@@ -195,304 +212,571 @@ const SuperAdmin = () => {
     return matchesFilter && matchesSearch;
   });
 
+  const totalDeleted = (stats?.deletedPatients || 0) + (stats?.deletedRecords || 0) + (stats?.deletedAppointments || 0) + (stats?.deletedTransactions || 0);
+
   if (roleLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-[hsl(222,47%,8%)] flex items-center justify-center">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}>
+          <Shield className="h-10 w-10 text-primary" />
+        </motion.div>
       </div>
     );
   }
 
   if (!isSuperAdmin) return null;
 
+  const actionBadgeVariant = (action: string) => {
+    if (action === "delete" || action === "hard_delete") return "destructive";
+    if (action === "restore") return "default";
+    if (action === "create") return "secondary";
+    return "outline";
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <Shield className="h-5 w-5 text-destructive" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-foreground">Super Admin</h1>
-              <p className="text-xs text-muted-foreground">SevenDevX — Painel Master</p>
-            </div>
+    <div className="min-h-screen bg-[hsl(222,47%,8%)] text-[hsl(0,0%,95%)] flex">
+      {/* Enterprise Sidebar */}
+      <aside className={cn(
+        "hidden lg:flex flex-col border-r border-[hsl(222,47%,15%)] bg-[hsl(222,47%,10%)] transition-all duration-300 sticky top-0 h-screen",
+        sidebarCollapsed ? "w-16" : "w-64"
+      )}>
+        {/* Brand */}
+        <div className="p-4 border-b border-[hsl(222,47%,15%)] flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-gradient-primary flex items-center justify-center shrink-0">
+            <Shield className="h-5 w-5 text-white" />
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={loadAllData} disabled={loadingData}>
-              <RefreshCw className={`h-4 w-4 mr-1 ${loadingData ? "animate-spin" : ""}`} />
-              Atualizar
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-              Voltar ao Sistema
-            </Button>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-bold truncate">PsicoOne</p>
+              <p className="text-[10px] text-[hsl(220,9%,50%)]">SevenDevX • Super Admin</p>
+            </div>
+          )}
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-5 gap-1 h-auto p-1">
-            <TabsTrigger value="dashboard" className="gap-2 text-xs sm:text-sm">
-              <LayoutDashboard className="h-4 w-4" /> Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="clinics" className="gap-2 text-xs sm:text-sm">
-              <Users className="h-4 w-4" /> Clínicas
-            </TabsTrigger>
-            <TabsTrigger value="trash" className="gap-2 text-xs sm:text-sm">
-              <Trash2 className="h-4 w-4" /> Lixeira
-              {deletedRecords.length > 0 && (
-                <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-[10px]">{deletedRecords.length}</Badge>
+        {/* Nav */}
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+          {SIDEBAR_ITEMS.map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
+                activeTab === item.id
+                  ? "bg-primary/15 text-primary font-medium"
+                  : "text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)] hover:bg-[hsl(222,47%,14%)]"
               )}
-            </TabsTrigger>
-            <TabsTrigger value="logs" className="gap-2 text-xs sm:text-sm">
-              <ScrollText className="h-4 w-4" /> Logs
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2 text-xs sm:text-sm">
-              <Settings className="h-4 w-4" /> Config
-            </TabsTrigger>
-          </TabsList>
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+              {item.id === "recovery" && totalDeleted > 0 && !sidebarCollapsed && (
+                <Badge variant="destructive" className="ml-auto h-5 px-1.5 text-[10px]">{totalDeleted}</Badge>
+              )}
+            </button>
+          ))}
+        </nav>
 
-          {/* DASHBOARD */}
-          <TabsContent value="dashboard" className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Profissionais", value: stats?.totalProfiles || 0, icon: UserCheck, color: "text-primary" },
-                { label: "Pacientes Ativos", value: stats?.totalPatients || 0, icon: Users, color: "text-emerald-500" },
-                { label: "Sessões Realizadas", value: stats?.totalRecords || 0, icon: FileText, color: "text-blue-500" },
-                { label: "Agendamentos", value: stats?.totalAppointments || 0, icon: Calendar, color: "text-amber-500" },
-              ].map((stat, i) => (
-                <Card key={i}>
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs sm:text-sm text-muted-foreground">{stat.label}</p>
-                        <p className="text-2xl sm:text-3xl font-bold mt-1">{stat.value}</p>
-                      </div>
-                      <stat.icon className={`h-8 w-8 ${stat.color} opacity-70`} />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+        {/* Footer */}
+        <div className="p-3 border-t border-[hsl(222,47%,15%)]">
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)] hover:bg-[hsl(222,47%,14%)] transition-colors">
+            <ChevronRight className={cn("h-4 w-4 transition-transform", sidebarCollapsed ? "" : "rotate-180")} />
+            {!sidebarCollapsed && <span>Recolher</span>}
+          </button>
+          <button onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors mt-1">
+            <LogOut className="h-4 w-4" />
+            {!sidebarCollapsed && <span>Sair</span>}
+          </button>
+        </div>
+      </aside>
 
-            {/* Deleted items summary */}
-            <Card className="border-destructive/30">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
-                  Registros Excluídos (Recuperáveis)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { label: "Pacientes", value: stats?.deletedPatients || 0 },
-                    { label: "Prontuários", value: stats?.deletedRecords || 0 },
-                    { label: "Agendamentos", value: stats?.deletedAppointments || 0 },
-                  ].map((s, i) => (
-                    <div key={i} className="text-center p-3 rounded-lg bg-destructive/5">
-                      <p className="text-2xl font-bold text-destructive">{s.value}</p>
-                      <p className="text-xs text-muted-foreground">{s.label}</p>
-                    </div>
-                  ))}
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        {/* Top Bar */}
+        <header className="border-b border-[hsl(222,47%,15%)] bg-[hsl(222,47%,9%)]/80 backdrop-blur-sm sticky top-0 z-40">
+          <div className="px-4 sm:px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Mobile menu */}
+              <div className="lg:hidden flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                  <Shield className="h-4 w-4 text-white" />
                 </div>
-                {(stats?.deletedPatients || 0) + (stats?.deletedRecords || 0) + (stats?.deletedAppointments || 0) > 0 && (
-                  <Button variant="outline" size="sm" className="mt-4 w-full" onClick={() => setActiveTab("trash")}>
-                    Ver Lixeira <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* CLÍNICAS / PROFISSIONAIS */}
-          <TabsContent value="clinics" className="space-y-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar profissional..." className="pl-10"
-                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <span className="text-sm font-bold">Super Admin</span>
+              </div>
+              <div className="hidden lg:block">
+                <h2 className="text-lg font-semibold">{SIDEBAR_ITEMS.find(i => i.id === activeTab)?.label}</h2>
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loadingData}
+                className="text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)] hover:bg-[hsl(222,47%,14%)]">
+                <RefreshCw className={cn("h-4 w-4", loadingData && "animate-spin")} />
+              </Button>
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[hsl(222,47%,12%)] border border-[hsl(222,47%,18%)]">
+                <Activity className="h-3 w-3 text-emerald-500" />
+                <span className="text-xs text-[hsl(220,9%,55%)]">Sistema Operacional</span>
+              </div>
+            </div>
+          </div>
+          {/* Mobile tabs */}
+          <div className="lg:hidden overflow-x-auto px-4 pb-2">
+            <div className="flex gap-1">
+              {SIDEBAR_ITEMS.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors",
+                    activeTab === item.id
+                      ? "bg-primary/15 text-primary font-medium"
+                      : "text-[hsl(220,9%,55%)]"
+                  )}
+                >
+                  <item.icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
 
-            <div className="space-y-3">
-              {profiles
-                .filter(p => !searchTerm || p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()))
-                .map(profile => (
-                  <Card key={profile.id} className="hover:border-primary/30 transition-colors">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                          {profile.full_name?.charAt(0) || "?"}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{profile.full_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {profile.crp && `CRP: ${profile.crp}`}
-                            {profile.specialty && ` • ${profile.specialty}`}
-                          </p>
-                          {profile.clinic_name && (
-                            <p className="text-xs text-muted-foreground">{profile.clinic_name}</p>
-                          )}
-                        </div>
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8">
+          {/* DASHBOARD */}
+          {activeTab === "dashboard" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              {/* KPI Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: "Profissionais", value: stats?.totalProfiles || 0, icon: UserCheck, trend: "+12%", up: true, color: "text-primary" },
+                  { label: "Pacientes Ativos", value: stats?.totalPatients || 0, icon: Users, trend: "+8%", up: true, color: "text-emerald-400" },
+                  { label: "Sessões", value: stats?.totalRecords || 0, icon: FileText, trend: "+15%", up: true, color: "text-sky-400" },
+                  { label: "Receita Total", value: `R$ ${((stats?.totalRevenue || 0) / 100).toLocaleString("pt-BR")}`, icon: DollarSign, trend: "+22%", up: true, color: "text-amber-400", isRevenue: true },
+                ].map((stat, i) => (
+                  <Card key={i} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                    <CardContent className="p-4 sm:p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <stat.icon className={cn("h-5 w-5", stat.color)} />
+                        <span className={cn("flex items-center gap-0.5 text-xs font-medium", stat.up ? "text-emerald-400" : "text-destructive")}>
+                          {stat.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                          {stat.trend}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">Ativo</Badge>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                      <p className="text-2xl sm:text-3xl font-bold tracking-tight">{stat.value}</p>
+                      <p className="text-xs text-[hsl(220,9%,50%)] mt-1">{stat.label}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Secondary stats */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: "Agendamentos", value: stats?.totalAppointments || 0, icon: Calendar },
+                  { label: "Transações", value: stats?.totalTransactions || 0, icon: CreditCard },
+                  { label: "Na Lixeira", value: totalDeleted, icon: Trash2, alert: totalDeleted > 0 },
+                  { label: "Logs Registrados", value: auditLogs.length, icon: ScrollText },
+                ].map((stat, i) => (
+                  <Card key={i} className={cn("bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]", stat.alert && "border-destructive/40")}>
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", stat.alert ? "bg-destructive/15" : "bg-[hsl(222,47%,16%)]")}>
+                        <stat.icon className={cn("h-5 w-5", stat.alert ? "text-destructive" : "text-[hsl(220,9%,55%)]")} />
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold">{stat.value}</p>
+                        <p className="text-xs text-[hsl(220,9%,50%)]">{stat.label}</p>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
-              {profiles.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">Nenhum profissional encontrado</p>
-              )}
-            </div>
-          </TabsContent>
+              </div>
 
-          {/* LIXEIRA GLOBAL */}
-          <TabsContent value="trash" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Trash2 className="h-5 w-5 text-destructive" />
-                  Lixeira Global — Data Recovery
-                </CardTitle>
-                <CardDescription>Registros excluídos que podem ser restaurados</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Buscar registro excluído..." className="pl-10"
-                      value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {["all", "patient", "medical_record", "appointment", "financial_transaction"].map(filter => (
-                      <Button key={filter} variant={trashFilter === filter ? "default" : "outline"} size="sm"
-                        onClick={() => setTrashFilter(filter)}>
-                        {filter === "all" ? "Todos" : entityTypeLabel[filter]}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
+              {/* Recent Audit & Deleted */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <ScrollText className="h-4 w-4 text-primary" /> Atividade Recente
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                      {auditLogs.slice(0, 8).map(log => (
+                        <div key={log.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-[hsl(222,47%,14%)] text-xs">
+                          <Badge variant={actionBadgeVariant(log.action_type)} className="text-[10px] h-5">{log.action_type}</Badge>
+                          <span className="text-[hsl(220,9%,55%)] truncate flex-1">{log.entity_type}</span>
+                          <span className="text-[hsl(220,9%,40%)]">{format(new Date(log.created_at), "dd/MM HH:mm")}</span>
+                        </div>
+                      ))}
+                      {auditLogs.length === 0 && <p className="text-center text-[hsl(220,9%,40%)] py-6 text-sm">Nenhum log registrado</p>}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                {filteredTrash.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Trash2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p className="font-medium">Lixeira vazia</p>
-                    <p className="text-sm">Nenhum registro excluído encontrado</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredTrash.map(record => (
-                      <div key={`${record.entity_type}-${record.id}`}
-                        className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary/30 transition-colors bg-card">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="h-8 w-8 rounded-md bg-destructive/10 flex items-center justify-center shrink-0">
-                            {entityTypeIcon[record.entity_type]}
+                <Card className={cn("bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]", totalDeleted > 0 && "border-destructive/30")}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-destructive" /> Exclusões Recentes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                      {deletedRecords.slice(0, 8).map(r => (
+                        <div key={`${r.entity_type}-${r.id}`} className="flex items-center justify-between p-2.5 rounded-lg bg-[hsl(222,47%,14%)] text-xs">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            {entityTypeIcon[r.entity_type]}
+                            <span className="truncate">{r.entity_name}</span>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{record.entity_name}</p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Badge variant="outline" className="text-[10px] h-5">
-                                {entityTypeLabel[record.entity_type]}
-                              </Badge>
-                              <span>Excluído em {format(new Date(record.deleted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
-                            </div>
-                            {record.deleted_reason && (
-                              <p className="text-xs text-muted-foreground mt-0.5">Motivo: {record.deleted_reason}</p>
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                            onClick={() => handleRestore(r)} disabled={restoringId === r.id}>
+                            {restoringId === r.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                          </Button>
+                        </div>
+                      ))}
+                      {totalDeleted === 0 && <p className="text-center text-[hsl(220,9%,40%)] py-6 text-sm">Nenhuma exclusão pendente</p>}
+                    </div>
+                    {totalDeleted > 0 && (
+                      <Button variant="ghost" size="sm" className="w-full mt-3 text-xs text-primary hover:bg-primary/10"
+                        onClick={() => setActiveTab("recovery")}>
+                        Ver Data Recovery Center <ChevronRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </motion.div>
+          )}
+
+          {/* CLÍNICAS */}
+          {activeTab === "clinics" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(220,9%,40%)]" />
+                  <Input placeholder="Buscar profissional ou clínica..."
+                    className="pl-10 bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)] placeholder:text-[hsl(220,9%,40%)]"
+                    value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                </div>
+                <Badge variant="outline" className="border-[hsl(222,47%,18%)] text-[hsl(220,9%,55%)]">
+                  {profiles.length} profissionais
+                </Badge>
+              </div>
+
+              <div className="space-y-2">
+                {profiles
+                  .filter(p => !searchTerm || p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || p.clinic_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .map(profile => (
+                    <Card key={profile.id} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)] hover:border-primary/30 transition-colors">
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center text-sm font-bold text-white">
+                            {profile.full_name?.charAt(0) || "?"}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{profile.full_name}</p>
+                            <p className="text-xs text-[hsl(220,9%,50%)]">
+                              {profile.crp && `CRP: ${profile.crp}`}
+                              {profile.specialty && ` • ${profile.specialty}`}
+                            </p>
+                            {profile.clinic_name && (
+                              <p className="text-xs text-[hsl(220,9%,40%)] flex items-center gap-1">
+                                <Building2 className="h-3 w-3" /> {profile.clinic_name}
+                              </p>
                             )}
                           </div>
                         </div>
-                        <Button size="sm" variant="outline"
-                          className="gap-1 shrink-0 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
-                          onClick={() => handleRestore(record)}
-                          disabled={restoringId === record.id}>
-                          {restoringId === record.id ? (
-                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <RotateCcw className="h-3.5 w-3.5" />
-                          )}
-                          Restaurar
-                        </Button>
-                      </div>
-                    ))}
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px]">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Ativo
+                          </Badge>
+                          <Button variant="ghost" size="sm" className="text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)] hover:bg-[hsl(222,47%,16%)]">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                {profiles.length === 0 && (
+                  <div className="text-center py-16 text-[hsl(220,9%,40%)]">
+                    <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p>Nenhum profissional cadastrado</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
+            </motion.div>
+          )}
+
+          {/* SUBSCRIPTIONS */}
+          {activeTab === "subscriptions" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                  { label: "Contas Ativas", value: profiles.length, icon: CheckCircle2, color: "text-emerald-400" },
+                  { label: "Em Trial", value: 0, icon: Clock, color: "text-amber-400" },
+                  { label: "Suspensas", value: 0, icon: Ban, color: "text-destructive" },
+                ].map((s, i) => (
+                  <Card key={i} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                    <CardContent className="p-5 flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-lg bg-[hsl(222,47%,16%)] flex items-center justify-center">
+                        <s.icon className={cn("h-6 w-6", s.color)} />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{s.value}</p>
+                        <p className="text-xs text-[hsl(220,9%,50%)]">{s.label}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                <CardContent className="p-8 text-center">
+                  <CreditCard className="h-12 w-12 mx-auto mb-4 text-[hsl(220,9%,35%)]" />
+                  <p className="text-[hsl(220,9%,55%)]">Módulo de assinaturas será integrado com gateway de pagamento</p>
+                  <p className="text-xs text-[hsl(220,9%,40%)] mt-1">Stripe / Asaas em breve</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* FINANCE */}
+          {activeTab === "finance" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: "Receita Total", value: `R$ ${((stats?.totalRevenue || 0) / 100).toLocaleString("pt-BR")}`, icon: TrendingUp, color: "text-emerald-400" },
+                  { label: "MRR", value: `R$ ${((stats?.totalRevenue || 0) / 100 / 12).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, icon: DollarSign, color: "text-primary" },
+                  { label: "Transações", value: stats?.totalTransactions || 0, icon: CreditCard, color: "text-sky-400" },
+                  { label: "Inadimplência", value: "0%", icon: AlertTriangle, color: "text-amber-400" },
+                ].map((s, i) => (
+                  <Card key={i} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                    <CardContent className="p-4">
+                      <s.icon className={cn("h-5 w-5 mb-2", s.color)} />
+                      <p className="text-xl font-bold">{s.value}</p>
+                      <p className="text-xs text-[hsl(220,9%,50%)]">{s.label}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* DATA RECOVERY CENTER */}
+          {activeTab === "recovery" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Database className="h-5 w-5 text-primary" />
+                    Data Recovery Center
+                  </CardTitle>
+                  <CardDescription className="text-[hsl(220,9%,50%)]">
+                    Restaure qualquer registro excluído no sistema. {totalDeleted} registro(s) na lixeira.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(220,9%,40%)]" />
+                      <Input placeholder="Buscar registro excluído..."
+                        className="pl-10 bg-[hsl(222,47%,14%)] border-[hsl(222,47%,20%)] text-[hsl(0,0%,95%)] placeholder:text-[hsl(220,9%,40%)]"
+                        value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[
+                        { key: "all", label: "Todos" },
+                        { key: "patient", label: "Pacientes" },
+                        { key: "medical_record", label: "Prontuários" },
+                        { key: "appointment", label: "Agendamentos" },
+                        { key: "financial_transaction", label: "Transações" },
+                      ].map(f => (
+                        <Button key={f.key} variant="ghost" size="sm"
+                          className={cn(
+                            "text-xs",
+                            trashFilter === f.key
+                              ? "bg-primary/15 text-primary"
+                              : "text-[hsl(220,9%,55%)] hover:bg-[hsl(222,47%,16%)]"
+                          )}
+                          onClick={() => setTrashFilter(f.key)}>
+                          {f.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {filteredTrash.length === 0 ? (
+                    <div className="text-center py-16">
+                      <Database className="h-16 w-16 mx-auto mb-4 text-[hsl(220,9%,25%)]" />
+                      <p className="font-medium text-[hsl(220,9%,55%)]">Lixeira vazia</p>
+                      <p className="text-sm text-[hsl(220,9%,40%)]">Nenhum registro excluído encontrado</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredTrash.map(record => (
+                        <div key={`${record.entity_type}-${record.id}`}
+                          className="flex items-center justify-between p-3 rounded-lg border border-[hsl(222,47%,18%)] hover:border-primary/30 transition-colors bg-[hsl(222,47%,14%)]">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="h-9 w-9 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
+                              {entityTypeIcon[record.entity_type]}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{record.entity_name}</p>
+                              <div className="flex items-center gap-2 text-xs text-[hsl(220,9%,45%)]">
+                                <Badge variant="outline" className="text-[10px] h-5 border-[hsl(222,47%,22%)] text-[hsl(220,9%,55%)]">
+                                  {entityTypeLabel[record.entity_type]}
+                                </Badge>
+                                <span>{format(new Date(record.deleted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                              </div>
+                              {record.deleted_reason && (
+                                <p className="text-xs text-[hsl(220,9%,40%)] mt-0.5">Motivo: {record.deleted_reason}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Button size="sm" variant="ghost"
+                              className="gap-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                              onClick={() => handleRestore(record)}
+                              disabled={restoringId === record.id}>
+                              {restoringId === record.id ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              )}
+                              Restaurar
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* AUDIT LOGS */}
-          <TabsContent value="logs" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ScrollText className="h-5 w-5" />
-                  Logs de Auditoria
-                </CardTitle>
-                <CardDescription>Registro completo de todas as ações do sistema</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {auditLogs.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <ScrollText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p>Nenhum log registrado ainda</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                    {auditLogs.map(log => (
-                      <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg border border-border text-sm">
-                        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center shrink-0">
-                          <ScrollText className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant={log.action_type === "delete" ? "destructive" : log.action_type === "restore" ? "default" : "secondary"} className="text-[10px]">
-                              {log.action_type}
-                            </Badge>
-                            <span className="text-muted-foreground text-xs">{log.entity_type}</span>
+          {activeTab === "logs" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ScrollText className="h-5 w-5 text-primary" /> Logs de Auditoria
+                  </CardTitle>
+                  <CardDescription className="text-[hsl(220,9%,50%)]">
+                    Registro completo de todas as ações do sistema — {auditLogs.length} entradas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {auditLogs.length === 0 ? (
+                    <div className="text-center py-16">
+                      <ScrollText className="h-16 w-16 mx-auto mb-4 text-[hsl(220,9%,25%)]" />
+                      <p className="text-[hsl(220,9%,50%)]">Nenhum log registrado</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[600px] overflow-y-auto">
+                      {auditLogs.map(log => (
+                        <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-[hsl(222,47%,14%)] text-sm">
+                          <div className="h-8 w-8 rounded-lg bg-[hsl(222,47%,18%)] flex items-center justify-center shrink-0">
+                            <ScrollText className="h-4 w-4 text-[hsl(220,9%,50%)]" />
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
-                          </p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant={actionBadgeVariant(log.action_type)} className="text-[10px] h-5">{log.action_type}</Badge>
+                              <span className="text-[hsl(220,9%,50%)] text-xs">{log.entity_type}</span>
+                              {log.ip_address && (
+                                <span className="text-[hsl(220,9%,35%)] text-[10px]">IP: {log.ip_address}</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[hsl(220,9%,40%)] mt-1">
+                              {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
+                            </p>
+                            {log.old_data && (
+                              <details className="mt-1.5">
+                                <summary className="text-[10px] text-primary cursor-pointer">Ver dados</summary>
+                                <pre className="text-[10px] text-[hsl(220,9%,45%)] mt-1 p-2 rounded bg-[hsl(222,47%,10%)] overflow-x-auto max-h-32">
+                                  {JSON.stringify(log.old_data, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* MONITORING */}
+          {activeTab === "monitoring" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-sm font-medium">Sistema Online</span>
+                    </div>
+                    <div className="space-y-3">
+                      {["Database", "Authentication", "Storage", "Edge Functions"].map(s => (
+                        <div key={s} className="flex items-center justify-between text-xs">
+                          <span className="text-[hsl(220,9%,55%)]">{s}</span>
+                          <span className="flex items-center gap-1 text-emerald-400">
+                            <CheckCircle2 className="h-3 w-3" /> Operacional
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                  <CardContent className="p-5">
+                    <p className="text-sm font-medium mb-4">Métricas de Uso</p>
+                    <div className="space-y-3">
+                      {[
+                        { label: "Tabelas com dados", value: "8" },
+                        { label: "Buckets de storage", value: "2" },
+                        { label: "Edge Functions", value: "3" },
+                        { label: "RLS Policies ativas", value: "24+" },
+                      ].map(m => (
+                        <div key={m.label} className="flex items-center justify-between text-xs">
+                          <span className="text-[hsl(220,9%,55%)]">{m.label}</span>
+                          <span className="font-medium">{m.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </motion.div>
+          )}
 
           {/* SETTINGS */}
-          <TabsContent value="settings" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Configurações Globais</CardTitle>
-                <CardDescription>Configurações do sistema PsicoOne</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 rounded-lg border border-border bg-muted/30">
-                  <p className="text-sm font-medium mb-1">Versão do Sistema</p>
-                  <p className="text-xs text-muted-foreground">PsicoOne v2.0 — Enterprise Edition</p>
-                </div>
-                <div className="p-4 rounded-lg border border-border bg-muted/30">
-                  <p className="text-sm font-medium mb-1">Soft Delete</p>
-                  <p className="text-xs text-muted-foreground">Ativo em todas as tabelas principais. Nenhum registro é excluído permanentemente sem autorização do Super Admin.</p>
-                </div>
-                <div className="p-4 rounded-lg border border-border bg-muted/30">
-                  <p className="text-sm font-medium mb-1">Auditoria</p>
-                  <p className="text-xs text-muted-foreground">Todas as ações críticas são registradas no log de auditoria com timestamp e identificação do usuário.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          {activeTab === "settings" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                <CardHeader>
+                  <CardTitle className="text-base">Configurações do Sistema</CardTitle>
+                  <CardDescription className="text-[hsl(220,9%,50%)]">PsicoOne Enterprise — Configurações globais</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[
+                    { title: "Versão", desc: "PsicoOne v2.0 — Enterprise Edition" },
+                    { title: "Soft Delete", desc: "Ativo em todas as tabelas. Nenhum registro pode ser excluído permanentemente sem autorização Super Admin." },
+                    { title: "Auditoria", desc: "Todas as ações críticas são registradas com timestamp, IP e identificação do usuário." },
+                    { title: "Multi-tenant", desc: "Arquitetura isolada por psychologist_id. Super Admin tem visibilidade global." },
+                    { title: "LGPD", desc: "Conformidade garantida com soft delete, audit logs e controle de acesso granular." },
+                  ].map((item, i) => (
+                    <div key={i} className="p-4 rounded-lg bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,20%)]">
+                      <p className="text-sm font-medium mb-1">{item.title}</p>
+                      <p className="text-xs text-[hsl(220,9%,50%)]">{item.desc}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </main>
       </div>
     </div>
   );

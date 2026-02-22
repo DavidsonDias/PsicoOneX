@@ -50,6 +50,18 @@ export function AppLayout({ children, title, description }: AppLayoutProps) {
         return;
       }
 
+      // Check if super_admin trying to access clinic pages — redirect to /super-admin
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", session.user.id);
+      
+      const isSuperAdminUser = roles?.some(r => r.role === "super_admin");
+      if (isSuperAdminUser && !window.location.pathname.startsWith("/super-admin")) {
+        navigate("/super-admin");
+        return;
+      }
+
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
