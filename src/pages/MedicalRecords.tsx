@@ -288,7 +288,7 @@ const MedicalRecords = () => {
     checkAuthAndLoadData();
   }, []);
 
-  // Auto-calculate session number when patient changes
+  // Auto-calculate session number when patient changes (only for NEW records)
   const calculateNextSessionNumber = useCallback((patientId: string) => {
     if (!patientId) return 1;
     const patientRecords = records.filter(r => r.patient_id === patientId);
@@ -296,7 +296,7 @@ const MedicalRecords = () => {
     return maxSession + 1;
   }, [records]);
 
-  // Update session number when patient is selected
+  // Update session number when patient is selected — ONLY for new records, not editing
   useEffect(() => {
     if (formData.patient_id && !editingRecord) {
       const nextSession = calculateNextSessionNumber(formData.patient_id);
@@ -317,6 +317,7 @@ const MedicalRecords = () => {
       .from("medical_records")
       .select(`*, patients (full_name)`)
       .eq("psychologist_id", psychologistId)
+      .is("deleted_at", null)
       .order("session_date", { ascending: false });
 
     if (error) {
@@ -508,15 +509,28 @@ const MedicalRecords = () => {
   };
 
   const handleDeleteRecord = async (recordId: string) => {
+    // Soft delete — never hard delete clinical data
     const { error } = await supabase
       .from("medical_records")
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId,
+        deleted_reason: "Excluído pelo usuário",
+      })
       .eq("id", recordId);
 
     if (error) {
       toast.error("Erro ao excluir prontuário");
       return;
     }
+
+    // Audit log
+    await supabase.from("audit_logs").insert({
+      user_id: userId,
+      action_type: "soft_delete",
+      entity_type: "medical_record",
+      entity_id: recordId,
+    } as any);
 
     toast.success("Prontuário excluído com sucesso!");
     setViewDialogOpen(false);
@@ -537,6 +551,9 @@ const MedicalRecords = () => {
       freeNotes = obsContent.substring(markerIndex + freeNotesMarker.length).trim();
     }
 
+    // CRITICAL: Set editingRecord FIRST so that the useEffect for session_number
+    // doesn't overwrite the loaded value
+    setEditingRecord(record);
     setFormData({
       patient_id: record.patient_id,
       session_date: record.session_date,
@@ -548,7 +565,7 @@ const MedicalRecords = () => {
       next_steps: record.next_steps || ""
     });
     setFreeFormNotes(freeNotes);
-    setEditingRecord(record);
+    setPendingFiles([]);
   };
 
   const resetForm = () => {

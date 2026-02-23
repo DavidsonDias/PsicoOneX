@@ -110,6 +110,8 @@ export default function Agenda() {
   };
 
   const checkConflicts = useCallback((date: string, time: string, duration: number, excludeId?: string) => {
+    // Build start/end using local time components to avoid UTC shifts
+    const [hours, minutes] = time.split(":").map(Number);
     const newStart = new Date(`${date}T${time}:00`);
     const newEnd = new Date(newStart.getTime() + duration * 60000);
 
@@ -124,15 +126,19 @@ export default function Agenda() {
 
   const generateRecurrenceDates = (startDate: string, startTime: string, type: string, count: number) => {
     const dates: string[] = [];
-    let current = new Date(`${startDate}T${startTime}:00`);
+    const baseDate = new Date(`${startDate}T${startTime}:00`);
     for (let i = 1; i < count; i++) {
+      let nextDate: Date;
       switch (type) {
-        case "weekly": current = addWeeks(new Date(`${startDate}T${startTime}:00`), i); break;
-        case "biweekly": current = addWeeks(new Date(`${startDate}T${startTime}:00`), i * 2); break;
-        case "monthly": current = addMonths(new Date(`${startDate}T${startTime}:00`), i); break;
-        default: current = addWeeks(new Date(`${startDate}T${startTime}:00`), i);
+        case "weekly": nextDate = addWeeks(baseDate, i); break;
+        case "biweekly": nextDate = addWeeks(baseDate, i * 2); break;
+        case "monthly": nextDate = addMonths(baseDate, i); break;
+        default: nextDate = addWeeks(baseDate, i);
       }
-      dates.push(current.toISOString());
+      // Preserve local time by formatting back to local ISO string
+      const localDate = format(nextDate, "yyyy-MM-dd");
+      const localISO = new Date(`${localDate}T${startTime}:00`).toISOString();
+      dates.push(localISO);
     }
     return dates;
   };
