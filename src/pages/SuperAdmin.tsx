@@ -79,6 +79,7 @@ const SuperAdmin = () => {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [trashFilter, setTrashFilter] = useState("all");
+  const [trashDateFilter, setTrashDateFilter] = useState("");
   const [loadingData, setLoadingData] = useState(true);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -209,7 +210,9 @@ const SuperAdmin = () => {
   const filteredTrash = deletedRecords.filter(r => {
     const matchesFilter = trashFilter === "all" || r.entity_type === trashFilter;
     const matchesSearch = !searchTerm || r.entity_name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
+    // Date filter — match by deleted_at date
+    const matchesDate = !trashDateFilter || (r.deleted_at && format(new Date(r.deleted_at), "yyyy-MM-dd") === trashDateFilter);
+    return matchesFilter && matchesSearch && matchesDate;
   });
 
   const totalDeleted = (stats?.deletedPatients || 0) + (stats?.deletedRecords || 0) + (stats?.deletedAppointments || 0) + (stats?.deletedTransactions || 0);
@@ -581,27 +584,59 @@ const SuperAdmin = () => {
                         className="pl-10 bg-[hsl(222,47%,14%)] border-[hsl(222,47%,20%)] text-[hsl(0,0%,95%)] placeholder:text-[hsl(220,9%,40%)]"
                         value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                     </div>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {[
-                        { key: "all", label: "Todos" },
-                        { key: "patient", label: "Pacientes" },
-                        { key: "medical_record", label: "Prontuários" },
-                        { key: "appointment", label: "Agendamentos" },
-                        { key: "financial_transaction", label: "Transações" },
-                      ].map(f => (
-                        <Button key={f.key} variant="ghost" size="sm"
-                          className={cn(
-                            "text-xs",
-                            trashFilter === f.key
-                              ? "bg-primary/15 text-primary"
-                              : "text-[hsl(220,9%,55%)] hover:bg-[hsl(222,47%,16%)]"
-                          )}
-                          onClick={() => setTrashFilter(f.key)}>
-                          {f.label}
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-[hsl(220,9%,40%)] shrink-0" />
+                      <Input 
+                        type="date" 
+                        value={trashDateFilter} 
+                        onChange={e => setTrashDateFilter(e.target.value)}
+                        className="w-[160px] bg-[hsl(222,47%,14%)] border-[hsl(222,47%,20%)] text-[hsl(0,0%,95%)]"
+                        placeholder="Filtrar por data"
+                      />
+                      {trashDateFilter && (
+                        <Button variant="ghost" size="sm" onClick={() => setTrashDateFilter("")}
+                          className="text-xs text-[hsl(220,9%,55%)] hover:bg-[hsl(222,47%,16%)] px-2">
+                          <XCircle className="h-3.5 w-3.5" />
                         </Button>
-                      ))}
+                      )}
                     </div>
                   </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[
+                      { key: "all", label: "Todos" },
+                      { key: "patient", label: "Pacientes" },
+                      { key: "medical_record", label: "Prontuários" },
+                      { key: "appointment", label: "Agendamentos" },
+                      { key: "financial_transaction", label: "Transações" },
+                    ].map(f => (
+                      <Button key={f.key} variant="ghost" size="sm"
+                        className={cn(
+                          "text-xs",
+                          trashFilter === f.key
+                            ? "bg-primary/15 text-primary"
+                            : "text-[hsl(220,9%,55%)] hover:bg-[hsl(222,47%,16%)]"
+                        )}
+                        onClick={() => setTrashFilter(f.key)}>
+                        {f.label}
+                      </Button>
+                    ))}
+                  </div>
+
+                  {/* Info about hard-deleted data */}
+                  {trashDateFilter && filteredTrash.length === 0 && (
+                    <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-amber-300">Nenhum registro encontrado para {format(new Date(trashDateFilter + "T12:00:00"), "dd/MM/yyyy")}</p>
+                          <p className="text-xs text-[hsl(220,9%,50%)] mt-1">
+                            Registros excluídos antes da implementação do Soft Delete (antes de 21/02/2026) foram removidos permanentemente e não podem ser recuperados. 
+                            A partir dessa data, todas as exclusões são recuperáveis.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {filteredTrash.length === 0 ? (
                     <div className="text-center py-16">
