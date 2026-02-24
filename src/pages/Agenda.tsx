@@ -57,6 +57,7 @@ export default function Agenda() {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [userId, setUserId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"timeline" | "list">("timeline");
+  const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState({
     patient_id: "",
     date: format(new Date(), "yyyy-MM-dd"),
@@ -164,10 +165,12 @@ export default function Agenda() {
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (creating) return; // Prevent double-submit
     if (!formData.patient_id) {
       toast.error("Selecione um paciente");
       return;
     }
+    setCreating(true);
 
     const conflicts = checkConflicts(formData.date, formData.time, parseInt(formData.duration));
     if (conflicts.length > 0) {
@@ -202,6 +205,7 @@ export default function Agenda() {
     if (error) {
       toast.error("Erro ao criar agendamento");
       console.error(error);
+      setCreating(false);
       return;
     }
 
@@ -254,6 +258,7 @@ export default function Agenda() {
     } as any);
 
     setDialogOpen(false);
+    setCreating(false);
     resetForm();
     await loadAppointments(userId);
   };
@@ -596,7 +601,7 @@ export default function Agenda() {
         <Label>Observações</Label>
         <Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} placeholder="Informações adicionais" rows={3} />
       </div>
-      <Button type="submit" className="w-full">{submitLabel}</Button>
+      <Button type="submit" className="w-full" disabled={creating}>{creating ? "Criando..." : submitLabel}</Button>
     </form>
   );
 
