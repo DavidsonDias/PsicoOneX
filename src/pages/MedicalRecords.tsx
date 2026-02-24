@@ -551,6 +551,10 @@ const MedicalRecords = () => {
       freeNotes = obsContent.substring(markerIndex + freeNotesMarker.length).trim();
     }
 
+    // Close any open dialogs first
+    setDialogOpen(false);
+    setViewDialogOpen(false);
+    
     // CRITICAL: Set editingRecord FIRST so that the useEffect for session_number
     // doesn't overwrite the loaded value
     setEditingRecord(record);
