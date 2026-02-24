@@ -354,7 +354,7 @@ const SuperAdmin = () => {
                   { label: "Profissionais", value: stats?.totalProfiles || 0, icon: UserCheck, trend: "+12%", up: true, color: "text-primary" },
                   { label: "Pacientes Ativos", value: stats?.totalPatients || 0, icon: Users, trend: "+8%", up: true, color: "text-emerald-400" },
                   { label: "Sessões", value: stats?.totalRecords || 0, icon: FileText, trend: "+15%", up: true, color: "text-sky-400" },
-                  { label: "Receita Total", value: `R$ ${((stats?.totalRevenue || 0) / 100).toLocaleString("pt-BR")}`, icon: DollarSign, trend: "+22%", up: true, color: "text-amber-400", isRevenue: true },
+                  { label: "Receita Total", value: `R$ ${(stats?.totalRevenue || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: DollarSign, trend: "+22%", up: true, color: "text-amber-400", isRevenue: true },
                 ].map((stat, i) => (
                   <Card key={i} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
                     <CardContent className="p-4 sm:p-5">
