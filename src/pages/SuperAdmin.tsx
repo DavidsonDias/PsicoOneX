@@ -56,6 +56,13 @@ interface DashboardStats {
   deletedRecords: number;
   deletedAppointments: number;
   deletedTransactions: number;
+  // Advanced metrics
+  trialsActive: number;
+  trialsExpiringSoon: number;
+  activeSubscriptions: number;
+  expiredSubscriptions: number;
+  conversionRate: number;
+  churnRate: number;
 }
 
 const SIDEBAR_ITEMS = [
@@ -103,7 +110,7 @@ const SuperAdmin = () => {
   };
 
   const loadStats = async () => {
-    const [profilesRes, patientsRes, appointmentsRes, recordsRes, transactionsRes, revenueRes, delPatientsRes, delRecordsRes, delAppointmentsRes, delTransactionsRes] = await Promise.all([
+    const [profilesRes, patientsRes, appointmentsRes, recordsRes, transactionsRes, revenueRes, delPatientsRes, delRecordsRes, delAppointmentsRes, delTransactionsRes, subsRes] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("patients").select("id", { count: "exact", head: true }).is("deleted_at", null),
       supabase.from("appointments").select("id", { count: "exact", head: true }).is("deleted_at", null),
@@ -114,8 +121,29 @@ const SuperAdmin = () => {
       supabase.from("medical_records").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
       supabase.from("appointments").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
       supabase.from("financial_transactions").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
+      supabase.from("subscriptions").select("status, plan"),
     ]);
     const totalRevenue = revenueRes.data?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+    
+    const allSubs = subsRes.data || [];
+    const trialsActive = allSubs.filter(s => s.status === "trial").length;
+    const activeSubscriptions = allSubs.filter(s => s.status === "active").length;
+    const expiredSubscriptions = allSubs.filter(s => ["expired", "blocked", "suspended", "cancelled"].includes(s.status)).length;
+    const totalConverted = allSubs.filter(s => s.status === "active" && s.plan !== "trial").length;
+    const totalEverTried = allSubs.length;
+    const conversionRate = totalEverTried > 0 ? Math.round((totalConverted / totalEverTried) * 100) : 0;
+    const churnRate = totalEverTried > 0 ? Math.round((expiredSubscriptions / totalEverTried) * 100) : 0;
+    
+    const now = new Date();
+    const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const { data: expiringSoonData } = await supabase
+      .from("subscriptions")
+      .select("id")
+      .eq("status", "trial")
+      .gt("trial_end_date", now.toISOString())
+      .lt("trial_end_date", in48h.toISOString());
+    const trialsExpiringSoon = expiringSoonData?.length || 0;
+
     setStats({
       totalProfiles: profilesRes.count || 0,
       totalPatients: patientsRes.count || 0,
@@ -127,6 +155,12 @@ const SuperAdmin = () => {
       deletedRecords: delRecordsRes.count || 0,
       deletedAppointments: delAppointmentsRes.count || 0,
       deletedTransactions: delTransactionsRes.count || 0,
+      trialsActive,
+      trialsExpiringSoon,
+      activeSubscriptions,
+      expiredSubscriptions,
+      conversionRate,
+      churnRate,
     });
   };
 
@@ -392,18 +426,20 @@ const SuperAdmin = () => {
                 ))}
               </div>
 
-              {/* Secondary stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Subscription & Conversion Metrics */}
+              <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
                 {[
-                  { label: "Agendamentos", value: stats?.totalAppointments || 0, icon: Calendar },
-                  { label: "Transações", value: stats?.totalTransactions || 0, icon: CreditCard },
+                  { label: "Trials Ativos", value: stats?.trialsActive || 0, icon: Clock, color: "text-amber-400" },
+                  { label: "Expirando 48h", value: stats?.trialsExpiringSoon || 0, icon: AlertTriangle, color: "text-orange-400", alert: (stats?.trialsExpiringSoon || 0) > 0 },
+                  { label: "Assinaturas Ativas", value: stats?.activeSubscriptions || 0, icon: CheckCircle2, color: "text-emerald-400" },
+                  { label: "Conversão Trial→Pago", value: `${stats?.conversionRate || 0}%`, icon: TrendingUp, color: "text-primary" },
+                  { label: "Churn Rate", value: `${stats?.churnRate || 0}%`, icon: ArrowDownRight, color: "text-destructive" },
                   { label: "Na Lixeira", value: totalDeleted, icon: Trash2, alert: totalDeleted > 0 },
-                  { label: "Logs Registrados", value: auditLogs.length, icon: ScrollText },
                 ].map((stat, i) => (
                   <Card key={i} className={cn("bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]", stat.alert && "border-destructive/40")}>
                     <CardContent className="p-4 flex items-center gap-3">
                       <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", stat.alert ? "bg-destructive/15" : "bg-[hsl(222,47%,16%)]")}>
-                        <stat.icon className={cn("h-5 w-5", stat.alert ? "text-destructive" : "text-[hsl(220,9%,55%)]")} />
+                        <stat.icon className={cn("h-5 w-5", stat.alert ? "text-destructive" : stat.color || "text-[hsl(220,9%,55%)]")} />
                       </div>
                       <div>
                         <p className="text-xl font-bold">{stat.value}</p>
@@ -645,12 +681,16 @@ const SuperAdmin = () => {
           {activeTab === "finance" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { label: "Receita Total", value: `R$ ${(stats?.totalRevenue || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: "text-emerald-400" },
-                  { label: "MRR", value: `R$ ${((stats?.totalRevenue || 0) / 12).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, icon: DollarSign, color: "text-primary" },
-                  { label: "Transações", value: stats?.totalTransactions || 0, icon: CreditCard, color: "text-sky-400" },
-                  { label: "Inadimplência", value: "0%", icon: AlertTriangle, color: "text-amber-400" },
-                ].map((s, i) => (
+                {(() => {
+                  const mrr = stats?.totalRevenue || 0; // TODO: calculate from subscription revenue when Stripe is active
+                  const arr = mrr * 12;
+                  return [
+                    { label: "Receita Total", value: `R$ ${(stats?.totalRevenue || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: "text-emerald-400" },
+                    { label: "MRR Estimado", value: `R$ ${mrr.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, icon: DollarSign, color: "text-primary" },
+                    { label: "ARR Projetado", value: `R$ ${arr.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, icon: TrendingUp, color: "text-sky-400" },
+                    { label: "Conversão", value: `${stats?.conversionRate || 0}%`, icon: UserCheck, color: "text-amber-400" },
+                  ];
+                })().map((s, i) => (
                   <Card key={i} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
                     <CardContent className="p-4">
                       <s.icon className={cn("h-5 w-5 mb-2", s.color)} />
@@ -660,6 +700,30 @@ const SuperAdmin = () => {
                   </Card>
                 ))}
               </div>
+              
+              {/* Subscription breakdown */}
+              <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-primary" /> Distribuição de Planos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {["trial", "basic", "pro", "enterprise"].map(plan => {
+                      const count = subscriptions.filter(s => s.plan === plan).length;
+                      const labels: Record<string, string> = { trial: "Trial", basic: "Básico", pro: "Pro", enterprise: "Enterprise" };
+                      const colors: Record<string, string> = { trial: "text-amber-400", basic: "text-sky-400", pro: "text-primary", enterprise: "text-emerald-400" };
+                      return (
+                        <div key={plan} className="p-3 rounded-lg bg-[hsl(222,47%,14%)] text-center">
+                          <p className={cn("text-2xl font-bold", colors[plan])}>{count}</p>
+                          <p className="text-xs text-[hsl(220,9%,50%)]">{labels[plan]}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             </motion.div>
           )}
 
