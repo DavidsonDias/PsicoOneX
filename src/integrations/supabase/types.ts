@@ -465,6 +465,51 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          blocked_at: string | null
+          blocked_reason: string | null
+          created_at: string
+          id: string
+          plan: Database["public"]["Enums"]["plan_type"]
+          plan_expires_at: string | null
+          plan_started_at: string | null
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_end_date: string | null
+          trial_start_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blocked_at?: string | null
+          blocked_reason?: string | null
+          created_at?: string
+          id?: string
+          plan?: Database["public"]["Enums"]["plan_type"]
+          plan_expires_at?: string | null
+          plan_started_at?: string | null
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_end_date?: string | null
+          trial_start_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blocked_at?: string | null
+          blocked_reason?: string | null
+          created_at?: string
+          id?: string
+          plan?: Database["public"]["Enums"]["plan_type"]
+          plan_expires_at?: string | null
+          plan_started_at?: string | null
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_end_date?: string | null
+          trial_start_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -491,6 +536,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_trial_end: { Args: { start_date: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -499,6 +545,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_subscription_active: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       restore_deleted_record: {
         Args: { _entity_id: string; _entity_type: string; _restored_by: string }
@@ -507,6 +554,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "psychologist" | "secretary" | "super_admin"
+      plan_type: "trial" | "basic" | "pro" | "enterprise"
+      subscription_status:
+        | "active"
+        | "trial"
+        | "expired"
+        | "blocked"
+        | "suspended"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -635,6 +690,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "psychologist", "secretary", "super_admin"],
+      plan_type: ["trial", "basic", "pro", "enterprise"],
+      subscription_status: [
+        "active",
+        "trial",
+        "expired",
+        "blocked",
+        "suspended",
+        "cancelled",
+      ],
     },
   },
 } as const
