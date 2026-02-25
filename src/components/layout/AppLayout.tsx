@@ -1,14 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useSubscription } from "@/hooks/useSubscription";
 import { AppSidebar } from "./AppSidebar";
 import { MobileHeader } from "./MobileHeader";
 import { CommandPalette } from "./CommandPalette";
+import { SubscriptionBanner } from "@/components/subscription/SubscriptionBanner";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
+
+// Context to expose canWrite to child components
+const WritePermissionContext = createContext<boolean>(true);
+export const useCanWrite = () => useContext(WritePermissionContext);
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -19,6 +25,7 @@ interface AppLayoutProps {
 export function AppLayout({ children, title, description }: AppLayoutProps) {
   const navigate = useNavigate();
   const { isAdmin, isSuperAdmin } = useUserRole();
+  const { canWrite } = useSubscription();
   const { collapsed } = useSidebar();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -134,12 +141,15 @@ export function AppLayout({ children, title, description }: AppLayoutProps) {
         )}
       >
         <div className="container mx-auto px-4 sm:px-6 py-6 lg:py-8 max-w-7xl">
+          {/* Subscription Banner */}
+          <SubscriptionBanner />
+
           {/* Page Header */}
           {(title || description) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 lg:mb-8"
+              className="mb-6 lg:mb-8 mt-2"
             >
               {title && (
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{title}</h1>
@@ -156,7 +166,9 @@ export function AppLayout({ children, title, description }: AppLayoutProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            {children}
+            <WritePermissionContext.Provider value={canWrite}>
+              {children}
+            </WritePermissionContext.Provider>
           </motion.div>
         </div>
       </main>

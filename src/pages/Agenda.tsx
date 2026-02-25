@@ -175,6 +175,7 @@ export default function Agenda() {
     const conflicts = checkConflicts(formData.date, formData.time, parseInt(formData.duration));
     if (conflicts.length > 0) {
       toast.error(`Conflito de horário com ${conflicts[0].patients.full_name} às ${format(new Date(conflicts[0].scheduled_at), "HH:mm")}`);
+      setCreating(false);
       return;
     }
 
