@@ -77,6 +77,7 @@ const SuperAdmin = () => {
   const [deletedRecords, setDeletedRecords] = useState<DeletedRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [trashFilter, setTrashFilter] = useState("all");
   const [trashDateFilter, setTrashDateFilter] = useState("");
@@ -97,7 +98,7 @@ const SuperAdmin = () => {
 
   const loadAllData = async () => {
     setLoadingData(true);
-    await Promise.all([loadStats(), loadDeletedRecords(), loadAuditLogs(), loadProfiles()]);
+    await Promise.all([loadStats(), loadDeletedRecords(), loadAuditLogs(), loadProfiles(), loadSubscriptions()]);
     setLoadingData(false);
   };
 
@@ -171,6 +172,25 @@ const SuperAdmin = () => {
   const loadProfiles = async () => {
     const { data } = await supabase.from("profiles").select("*");
     setProfiles(data || []);
+  };
+
+  const loadSubscriptions = async () => {
+    const { data } = await supabase.from("subscriptions").select("*");
+    setSubscriptions(data || []);
+  };
+
+  const handleUpdateSubscription = async (userId: string, updates: Record<string, any>) => {
+    const { error } = await supabase
+      .from("subscriptions")
+      .update(updates)
+      .eq("user_id", userId);
+    
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "✅ Atualizado", description: "Assinatura atualizada com sucesso." });
+    await loadSubscriptions();
   };
 
   const handleRestore = async (record: DeletedRecord) => {
@@ -512,17 +532,16 @@ const SuperAdmin = () => {
           {/* SUBSCRIPTIONS */}
           {activeTab === "subscriptions" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 {[
-                  { label: "Contas Ativas", value: profiles.length, icon: CheckCircle2, color: "text-emerald-400" },
-                  { label: "Em Trial", value: 0, icon: Clock, color: "text-amber-400" },
-                  { label: "Suspensas", value: 0, icon: Ban, color: "text-destructive" },
+                  { label: "Total", value: subscriptions.length, icon: Users, color: "text-primary" },
+                  { label: "Em Trial", value: subscriptions.filter(s => s.status === "trial").length, icon: Clock, color: "text-amber-400" },
+                  { label: "Ativas", value: subscriptions.filter(s => s.status === "active").length, icon: CheckCircle2, color: "text-emerald-400" },
+                  { label: "Expiradas/Bloqueadas", value: subscriptions.filter(s => ["expired", "blocked", "suspended", "cancelled"].includes(s.status)).length, icon: Ban, color: "text-destructive" },
                 ].map((s, i) => (
                   <Card key={i} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
-                    <CardContent className="p-5 flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-lg bg-[hsl(222,47%,16%)] flex items-center justify-center">
-                        <s.icon className={cn("h-6 w-6", s.color)} />
-                      </div>
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <s.icon className={cn("h-5 w-5", s.color)} />
                       <div>
                         <p className="text-2xl font-bold">{s.value}</p>
                         <p className="text-xs text-[hsl(220,9%,50%)]">{s.label}</p>
@@ -531,11 +550,92 @@ const SuperAdmin = () => {
                   </Card>
                 ))}
               </div>
+
               <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
-                <CardContent className="p-8 text-center">
-                  <CreditCard className="h-12 w-12 mx-auto mb-4 text-[hsl(220,9%,35%)]" />
-                  <p className="text-[hsl(220,9%,55%)]">Módulo de assinaturas será integrado com gateway de pagamento</p>
-                  <p className="text-xs text-[hsl(220,9%,40%)] mt-1">Stripe / Asaas em breve</p>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-primary" /> Gestão de Assinaturas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {subscriptions.map(sub => {
+                      const profile = profiles.find(p => p.id === sub.user_id);
+                      const statusColors: Record<string, string> = {
+                        trial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+                        active: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+                        expired: "bg-destructive/15 text-destructive border-destructive/30",
+                        blocked: "bg-destructive/15 text-destructive border-destructive/30",
+                        suspended: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+                        cancelled: "bg-[hsl(220,9%,30%)]/15 text-[hsl(220,9%,50%)] border-[hsl(220,9%,30%)]",
+                      };
+                      const planLabels: Record<string, string> = { trial: "Trial", basic: "Básico", pro: "Pro", enterprise: "Enterprise" };
+                      const trialEnd = sub.trial_end_date ? new Date(sub.trial_end_date) : null;
+                      const isTrialExpired = trialEnd && trialEnd < new Date();
+
+                      return (
+                        <div key={sub.id} className="flex items-center justify-between p-3 rounded-lg bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,18%)]">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-full bg-gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
+                              {profile?.full_name?.charAt(0) || "?"}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{profile?.full_name || "Desconhecido"}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <Badge className={cn("text-[10px] h-5", statusColors[sub.status] || "")}>
+                                  {sub.status}
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px] h-5 border-[hsl(222,47%,22%)] text-[hsl(220,9%,55%)]">
+                                  {planLabels[sub.plan] || sub.plan}
+                                </Badge>
+                                {sub.status === "trial" && trialEnd && (
+                                  <span className="text-[10px] text-[hsl(220,9%,45%)]">
+                                    Expira: {format(trialEnd, "dd/MM/yyyy")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {sub.status === "trial" && (
+                              <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
+                                onClick={() => handleUpdateSubscription(sub.user_id, { plan: "pro", status: "active", plan_started_at: new Date().toISOString() })}>
+                                Ativar Pro
+                              </Button>
+                            )}
+                            {sub.status === "trial" && (
+                              <Button variant="ghost" size="sm" className="text-xs text-amber-400 hover:bg-amber-500/10 h-7"
+                                onClick={() => {
+                                  const newEnd = new Date();
+                                  newEnd.setDate(newEnd.getDate() + 10);
+                                  handleUpdateSubscription(sub.user_id, { trial_end_date: newEnd.toISOString() });
+                                }}>
+                                +7 dias
+                              </Button>
+                            )}
+                            {(sub.status === "expired" || sub.status === "blocked") && (
+                              <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
+                                onClick={() => handleUpdateSubscription(sub.user_id, { status: "active", plan: "basic", blocked_at: null, blocked_reason: null })}>
+                                Reativar
+                              </Button>
+                            )}
+                            {sub.status !== "blocked" && sub.status !== "cancelled" && (
+                              <Button variant="ghost" size="sm" className="text-xs text-destructive hover:bg-destructive/10 h-7"
+                                onClick={() => handleUpdateSubscription(sub.user_id, { status: "blocked", blocked_at: new Date().toISOString(), blocked_reason: "Bloqueado pelo Super Admin" })}>
+                                Bloquear
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {subscriptions.length === 0 && (
+                      <div className="text-center py-12 text-[hsl(220,9%,40%)]">
+                        <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>Nenhuma assinatura encontrada</p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -546,8 +646,8 @@ const SuperAdmin = () => {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Receita Total", value: `R$ ${((stats?.totalRevenue || 0) / 100).toLocaleString("pt-BR")}`, icon: TrendingUp, color: "text-emerald-400" },
-                  { label: "MRR", value: `R$ ${((stats?.totalRevenue || 0) / 100 / 12).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, icon: DollarSign, color: "text-primary" },
+                  { label: "Receita Total", value: `R$ ${(stats?.totalRevenue || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: "text-emerald-400" },
+                  { label: "MRR", value: `R$ ${((stats?.totalRevenue || 0) / 12).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, icon: DollarSign, color: "text-primary" },
                   { label: "Transações", value: stats?.totalTransactions || 0, icon: CreditCard, color: "text-sky-400" },
                   { label: "Inadimplência", value: "0%", icon: AlertTriangle, color: "text-amber-400" },
                 ].map((s, i) => (

@@ -20,6 +20,7 @@ import {
   Search,
   LogOut,
   MessageSquare,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface NavItem {
   icon: React.ElementType;
@@ -66,6 +68,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isAdmin, isSuperAdmin, onOpenCommandPalette, notifications = 0 }: AppSidebarProps) {
   const { collapsed, toggleCollapsed } = useSidebar();
+  const { planLabel, isTrial, trialDaysRemaining, isExpired } = useSubscription();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -272,6 +275,25 @@ export function AppSidebar({ isAdmin, isSuperAdmin, onOpenCommandPalette, notifi
           </TooltipTrigger>
           {collapsed && <TooltipContent side="right">Configurações</TooltipContent>}
         </Tooltip>
+
+        {/* Plan Status */}
+        {!collapsed && (
+          <div className={cn(
+            "px-3 py-2 rounded-lg text-xs",
+            isExpired ? "bg-destructive/10 text-destructive" : isTrial ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-primary/10 text-primary"
+          )}>
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="font-medium">Plano {planLabel}</span>
+            </div>
+            {isTrial && (
+              <p className="text-[10px] mt-0.5 opacity-80">{trialDaysRemaining} dias restantes</p>
+            )}
+            {isExpired && (
+              <p className="text-[10px] mt-0.5 opacity-80">Expirado — Ative um plano</p>
+            )}
+          </div>
+        )}
 
         {/* Sign Out */}
         <Tooltip delayDuration={0}>
