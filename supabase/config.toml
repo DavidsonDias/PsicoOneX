@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.ai-insights]
 verify_jwt = false
+
+[functions.expire-trials]
+verify_jwt = false
