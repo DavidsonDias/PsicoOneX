@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useNotifications } from "@/hooks/useNotifications";
 import { AppSidebar } from "./AppSidebar";
 import { MobileHeader } from "./MobileHeader";
 import { CommandPalette } from "./CommandPalette";
@@ -26,6 +27,7 @@ export function AppLayout({ children, title, description }: AppLayoutProps) {
   const navigate = useNavigate();
   const { isAdmin, isSuperAdmin } = useUserRole();
   const { canWrite } = useSubscription();
+  const { unreadCount } = useNotifications();
   const { collapsed } = useSidebar();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -118,6 +120,7 @@ export function AppLayout({ children, title, description }: AppLayoutProps) {
         isAdmin={isAdmin} 
         isSuperAdmin={isSuperAdmin}
         onOpenCommandPalette={() => setCommandOpen(true)}
+        notifications={unreadCount}
       />
 
       {/* Mobile Header */}
@@ -125,6 +128,7 @@ export function AppLayout({ children, title, description }: AppLayoutProps) {
         isAdmin={isAdmin}
         isSuperAdmin={isSuperAdmin}
         onOpenSearch={() => setCommandOpen(true)}
+        notifications={unreadCount}
       />
       
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />

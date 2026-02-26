@@ -23,6 +23,7 @@ import EscalasPsicologicas from "./pages/EscalasPsicologicas";
 import AssistenteIA from "./pages/AssistenteIA";
 import Notificacoes from "./pages/Notificacoes";
 import SuperAdmin from "./pages/SuperAdmin";
+import Lixeira from "./pages/Lixeira";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
                 <Route path="/assistente-ia" element={<AssistenteIA />} />
                 <Route path="/notificacoes" element={<Notificacoes />} />
                 <Route path="/super-admin" element={<SuperAdmin />} />
+                <Route path="/lixeira" element={<Lixeira />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

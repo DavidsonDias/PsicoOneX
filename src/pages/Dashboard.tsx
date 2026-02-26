@@ -18,8 +18,9 @@ import { ProgressRing } from "@/components/ui/progress-ring";
 import { InsightsPanel } from "@/components/dashboard/InsightsPanel";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
-import { NotificationCenter, Notification } from "@/components/notifications/NotificationCenter";
-import { format } from "date-fns";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { useNotifications } from "@/hooks/useNotifications";
+import { format, differenceInHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface TodayAppointment {
@@ -44,7 +45,7 @@ export default function Dashboard() {
   const [allAppointments, setAllAppointments] = useState<TodayAppointment[]>([]);
   const [pendingPayments, setPendingPayments] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { notifications, markAsRead, markAllAsRead, createNotification } = useNotifications();
 
   // Mock chart data
   const [chartData] = useState([
@@ -133,62 +134,35 @@ export default function Dashboard() {
 
       setAllAppointments((allData as any) || []);
 
-      // Generate mock notifications
-      generateNotifications(pending, todayData?.length || 0);
+      // Generate proximity alerts for upcoming appointments
+      const now = new Date();
+      for (const apt of (todayData as any) || []) {
+        const aptTime = new Date(apt.scheduled_at);
+        const hoursUntil = differenceInHours(aptTime, now);
+        if (hoursUntil > 0 && hoursUntil <= 2 && apt.status !== "completed" && apt.status !== "cancelled") {
+          createNotification({
+            type: "alert",
+            title: "Consulta em breve!",
+            message: `${apt.patients?.full_name} às ${format(aptTime, "HH:mm")} — em ${hoursUntil}h`,
+            action_path: "/agenda",
+            action_label: "Ver agenda",
+          });
+        }
+      }
+
+      if (pending > 0) {
+        createNotification({
+          type: "payment",
+          title: "Pagamentos pendentes",
+          message: `Você tem R$ ${pending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a receber`,
+          action_path: "/financeiro",
+          action_label: "Ver",
+        });
+      }
 
     } catch (error) {
       console.error("Error loading dashboard:", error);
     }
-  };
-
-  const generateNotifications = (pending: number, todayCount: number) => {
-    const notifs: Notification[] = [];
-    
-    if (pending > 0) {
-      notifs.push({
-        id: "1",
-        type: "payment",
-        title: "Pagamentos pendentes",
-        message: `Você tem R$ ${pending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a receber`,
-        timestamp: new Date(Date.now() - 1000 * 60 * 30),
-        read: false,
-        action: { label: "Ver", path: "/financeiro" },
-      });
-    }
-
-    if (todayCount > 0) {
-      notifs.push({
-        id: "2",
-        type: "appointment",
-        title: "Agenda do dia",
-        message: `Você tem ${todayCount} consulta${todayCount > 1 ? "s" : ""} hoje`,
-        timestamp: new Date(Date.now() - 1000 * 60 * 60),
-        read: false,
-        action: { label: "Ver agenda", path: "/agenda" },
-      });
-    }
-
-    notifs.push({
-      id: "3",
-      type: "system",
-      title: "Novo recurso disponível",
-      message: "Experimente o Assistente IA para otimizar sua prática clínica",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      read: true,
-      action: { label: "Explorar", path: "/assistente-ia" },
-    });
-
-    setNotifications(notifs);
-  };
-
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
-  };
-
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const quickActions = [
@@ -233,8 +207,8 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <NotificationCenter
             notifications={notifications}
-            onMarkAsRead={handleMarkAsRead}
-            onMarkAllAsRead={handleMarkAllAsRead}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
             onNavigate={navigate}
           />
           <Button variant="outline" size="sm" onClick={() => navigate("/agenda")} className="gap-2">

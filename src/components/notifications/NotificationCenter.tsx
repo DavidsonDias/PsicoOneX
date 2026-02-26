@@ -1,39 +1,25 @@
-import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Bell, X, Check, Clock, Calendar, DollarSign, 
-  User, AlertTriangle, Sparkles, Settings
+  Bell, Clock, Calendar, DollarSign, 
+  User, AlertTriangle, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-
-export interface Notification {
-  id: string;
-  type: "appointment" | "payment" | "patient" | "system" | "alert";
-  title: string;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-  action?: {
-    label: string;
-    path: string;
-  };
-}
+import { AppNotification } from "@/hooks/useNotifications";
 
 interface NotificationCenterProps {
-  notifications: Notification[];
+  notifications: AppNotification[];
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
   onNavigate: (path: string) => void;
 }
 
-const typeIcons = {
+const typeIcons: Record<string, React.ElementType> = {
   appointment: Calendar,
   payment: DollarSign,
   patient: User,
@@ -41,7 +27,7 @@ const typeIcons = {
   alert: AlertTriangle,
 };
 
-const typeColors = {
+const typeColors: Record<string, string> = {
   appointment: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   payment: "bg-green-500/10 text-green-500 border-green-500/20",
   patient: "bg-purple-500/10 text-purple-500 border-purple-500/20",
@@ -84,12 +70,7 @@ export function NotificationCenter({
               )}
             </SheetTitle>
             {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onMarkAllAsRead}
-                className="text-xs"
-              >
+              <Button variant="ghost" size="sm" onClick={onMarkAllAsRead} className="text-xs">
                 Marcar todas como lidas
               </Button>
             )}
@@ -102,13 +83,12 @@ export function NotificationCenter({
               {notifications.length === 0 ? (
                 <div className="text-center py-12">
                   <Bell className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground">
-                    Nenhuma notificação
-                  </p>
+                  <p className="text-muted-foreground">Nenhuma notificação</p>
                 </div>
               ) : (
                 notifications.map((notification, index) => {
-                  const IconComponent = typeIcons[notification.type];
+                  const IconComponent = typeIcons[notification.type] || Bell;
+                  const colorClass = typeColors[notification.type] || typeColors.system;
                   return (
                     <motion.div
                       key={notification.id}
@@ -118,50 +98,33 @@ export function NotificationCenter({
                       transition={{ delay: index * 0.05 }}
                       className={cn(
                         "p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md",
-                        notification.read
-                          ? "bg-background border-border"
-                          : "bg-primary/5 border-primary/20",
-                        typeColors[notification.type]
+                        notification.read ? "bg-background border-border" : "bg-primary/5 border-primary/20"
                       )}
                       onClick={() => {
                         if (!notification.read) onMarkAsRead(notification.id);
-                        if (notification.action) onNavigate(notification.action.path);
+                        if (notification.action_path) onNavigate(notification.action_path);
                       }}
                     >
                       <div className="flex gap-3">
-                        <div className={cn(
-                          "p-2 rounded-lg border shrink-0",
-                          typeColors[notification.type]
-                        )}>
+                        <div className={cn("p-2 rounded-lg border shrink-0", colorClass)}>
                           <IconComponent className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-semibold text-sm">
-                              {notification.title}
-                            </h4>
+                            <h4 className="font-semibold text-sm">{notification.title}</h4>
                             {!notification.read && (
                               <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1" />
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {notification.message}
-                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">{notification.message}</p>
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {formatDistanceToNow(notification.timestamp, {
-                                addSuffix: true,
-                                locale: ptBR,
-                              })}
+                              {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: ptBR })}
                             </span>
-                            {notification.action && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                              >
-                                {notification.action.label}
+                            {notification.action_label && (
+                              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                                {notification.action_label}
                               </Button>
                             )}
                           </div>
