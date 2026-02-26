@@ -9,7 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter, Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText, Paperclip } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter, Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText, Paperclip, Download } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format, subMonths, startOfMonth, endOfMonth, isAfter } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
@@ -21,6 +27,7 @@ import { FinancialProjections } from "@/components/financial/FinancialProjection
 import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
 
 interface Transaction {
   id: string;
@@ -598,6 +605,45 @@ export default function Financeiro() {
             </SelectContent>
           </Select>
         </div>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2"><Download className="h-4 w-4" />Exportar</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                const data = filteredTransactions.map(t => ({
+                  descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
+                  valor: t.amount, status: t.payment_status, paciente: t.patient_name || "-",
+                  categoria: t.category, vencimento: t.due_date, pagamento: t.paid_date || "-",
+                }));
+                const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
+                exportToCSV(data, "financeiro", h);
+                toast.success("CSV exportado!");
+              }}>CSV</DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                const data = filteredTransactions.map(t => ({
+                  descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
+                  valor: t.amount, status: t.payment_status, paciente: t.patient_name || "-",
+                  categoria: t.category, vencimento: t.due_date, pagamento: t.paid_date || "-",
+                }));
+                const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
+                exportToExcel(data, "financeiro", "Financeiro", h);
+                toast.success("Excel exportado!");
+              }}>Excel (.xlsx)</DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                const data = filteredTransactions.map(t => ({
+                  descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
+                  valor: `R$ ${Number(t.amount).toFixed(2)}`, status: t.payment_status,
+                  paciente: t.patient_name || "-", categoria: t.category,
+                  vencimento: t.due_date, pagamento: t.paid_date || "-",
+                }));
+                const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
+                exportToPDF(data, "financeiro", "Relatório Financeiro", h);
+                toast.success("PDF exportado!");
+              }}>PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2"><Plus className="h-4 w-4" />Nova Transação</Button>
@@ -607,6 +653,7 @@ export default function Financeiro() {
             <TransactionForm onSubmit={handleCreateTransaction} />
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Transactions List */}

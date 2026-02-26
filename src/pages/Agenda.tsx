@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2 } from "lucide-react";
+import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download } from "lucide-react";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -23,6 +23,13 @@ import { ActionMenu } from "@/components/ui/action-menu";
 import { StatsOverview } from "@/components/ui/stats-overview";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Appointment {
   id: string;
@@ -58,6 +65,7 @@ export default function Agenda() {
   const [userId, setUserId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"timeline" | "list">("timeline");
   const [creating, setCreating] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [formData, setFormData] = useState({
     patient_id: "",
     date: format(new Date(), "yyyy-MM-dd"),
@@ -411,9 +419,28 @@ export default function Agenda() {
     setEditingAppointment(appointment);
   };
 
-  const filteredAppointments = appointments.filter(apt =>
-    isSameDay(new Date(apt.scheduled_at), selectedDate)
-  );
+  const filteredAppointments = appointments.filter(apt => {
+    if (!isSameDay(new Date(apt.scheduled_at), selectedDate)) return false;
+    if (statusFilter !== "all" && apt.status !== statusFilter) return false;
+    return true;
+  });
+
+  const handleExportAgenda = (fmt: "csv" | "xlsx" | "pdf") => {
+    const data = filteredAppointments.map(a => ({
+      paciente: a.patients.full_name,
+      data: format(new Date(a.scheduled_at), "dd/MM/yyyy"),
+      horario: format(new Date(a.scheduled_at), "HH:mm"),
+      status: a.status,
+      tipo: a.type === "online" ? "Online" : "Presencial",
+      duracao: `${a.duration_minutes || 50}min`,
+      observacoes: a.notes || "",
+    }));
+    const headers = { paciente: "Paciente", data: "Data", horario: "Horário", status: "Status", tipo: "Tipo", duracao: "Duração", observacoes: "Observações" };
+    if (fmt === "csv") exportToCSV(data, "agenda", headers);
+    else if (fmt === "xlsx") exportToExcel(data, "agenda", "Agenda", headers);
+    else exportToPDF(data, "agenda", "Agenda - Agendamentos", headers);
+    toast.success("Exportado!");
+  };
 
   const stats = {
     total: filteredAppointments.length,
@@ -646,8 +673,38 @@ export default function Agenda() {
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <QuickStats stats={stats} />
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <div className="flex flex-wrap items-center gap-3">
+          <QuickStats stats={stats} />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[150px] h-9">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="scheduled">Agendado</SelectItem>
+              <SelectItem value="confirmed">Confirmado</SelectItem>
+              <SelectItem value="completed">Realizado</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+              <SelectItem value="rescheduled">Remarcado</SelectItem>
+              <SelectItem value="no_show">Não compareceu</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => handleExportAgenda("csv")} className="cursor-pointer">CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportAgenda("xlsx")} className="cursor-pointer">Excel</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportAgenda("pdf")} className="cursor-pointer">PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
@@ -664,6 +721,7 @@ export default function Agenda() {
             <AppointmentForm onSubmit={handleCreateAppointment} submitLabel="Criar Agendamento" />
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-[320px,1fr] gap-6">
@@ -766,7 +824,8 @@ export default function Agenda() {
                           <SelectItem value="confirmed">Confirmado</SelectItem>
                           <SelectItem value="completed">Realizado</SelectItem>
                           <SelectItem value="cancelled">Cancelado</SelectItem>
-                          <SelectItem value="no_show">Faltou</SelectItem>
+                          <SelectItem value="rescheduled">Remarcado</SelectItem>
+                          <SelectItem value="no_show">Não compareceu</SelectItem>
                         </SelectContent>
                       </Select>
                       {appointment.notes && (
