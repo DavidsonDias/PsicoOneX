@@ -21,6 +21,7 @@ import {
   LogOut,
   MessageSquare,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ const secondaryNavItems: NavItem[] = [
   { icon: Video, label: "Teleatendimento", path: "/teleatendimento" },
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
   { icon: MessageSquare, label: "Assistente IA", path: "/assistente-ia", badge: "IA" },
+  { icon: Trash2, label: "Lixeira", path: "/lixeira" },
   { icon: Shield, label: "Usuários", path: "/admin/usuarios", adminOnly: true },
   { icon: Shield, label: "Super Admin", path: "/super-admin", superAdminOnly: true },
 ];
