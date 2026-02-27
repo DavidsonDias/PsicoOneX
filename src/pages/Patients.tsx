@@ -318,6 +318,25 @@ export default function Patients() {
     }
   };
 
+  const handleToggleStatus = async (patientId: string, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === "active" ? "inactive" : "active";
+      const { error } = await supabase.from("patients").update({ status: newStatus }).eq("id", patientId);
+      if (error) throw error;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await supabase.from("audit_logs").insert({
+          user_id: session.user.id, action_type: "status_change", entity_type: "patient", entity_id: patientId,
+          old_data: { status: currentStatus }, new_data: { status: newStatus },
+        } as any);
+      }
+      toast.success(newStatus === "active" ? "Paciente reativado!" : "Paciente inativado!");
+      loadPatients();
+    } catch {
+      toast.error("Erro ao alterar status");
+    }
+  };
+
   // Bulk delete
   const handleBulkDelete = async () => {
     try {
@@ -576,6 +595,7 @@ export default function Patients() {
                   onEdit={() => setEditingPatient(patient)}
                   onDelete={() => handleDeletePatient(patient.id)}
                   onClick={() => setSelectedPatient(patient)}
+                  onToggleStatus={() => handleToggleStatus(patient.id, patient.status)}
                 />
               </div>
             ))}

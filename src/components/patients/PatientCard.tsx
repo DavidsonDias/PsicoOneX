@@ -26,15 +26,16 @@
    };
  }
  
- interface PatientCardProps {
-   patient: Patient;
-   index: number;
-   onEdit: () => void;
-   onDelete: () => void;
-   onClick?: () => void;
- }
+interface PatientCardProps {
+  patient: Patient;
+  index: number;
+  onEdit: () => void;
+  onDelete: () => void;
+  onClick?: () => void;
+  onToggleStatus?: () => void;
+}
  
- export function PatientCard({ patient, index, onEdit, onDelete, onClick }: PatientCardProps) {
+ export function PatientCard({ patient, index, onEdit, onDelete, onClick, onToggleStatus }: PatientCardProps) {
    const initials = patient.full_name
      .split(" ")
      .map((n) => n[0])
@@ -108,13 +109,16 @@
              </div>
            )}
            
-           <div className="flex items-center justify-between pt-3 border-t border-border">
-             <Badge
-               variant={patient.status === "active" ? "default" : "secondary"}
-               className="capitalize"
-             >
-               {patient.status === "active" ? "Ativo" : patient.status === "inactive" ? "Inativo" : patient.status}
-             </Badge>
+            <div className="flex items-center justify-between pt-3 border-t border-border">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={patient.status === "active" ? "default" : "secondary"}
+                  className="capitalize cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); onToggleStatus?.(); }}
+                >
+                  {patient.status === "active" ? "Ativo" : "Inativo"}
+                </Badge>
+              </div>
              
              {patient._count && (
                <div className="flex items-center gap-3 text-xs text-muted-foreground">
