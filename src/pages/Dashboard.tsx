@@ -47,15 +47,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const { notifications, markAsRead, markAllAsRead, createNotification } = useNotifications();
 
-  // Mock chart data
-  const [chartData] = useState([
-    { name: "Jan", receitas: 4500, despesas: 1200 },
-    { name: "Fev", receitas: 5200, despesas: 1400 },
-    { name: "Mar", receitas: 4800, despesas: 1100 },
-    { name: "Abr", receitas: 6100, despesas: 1600 },
-    { name: "Mai", receitas: 5800, despesas: 1300 },
-    { name: "Jun", receitas: 7200, despesas: 1800 },
-  ]);
+  const [chartData, setChartData] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -84,15 +76,16 @@ export default function Dashboard() {
         supabase.from("appointments").select("*", { count: "exact", head: true }),
         supabase.from("medical_records").select("*", { count: "exact", head: true }),
         supabase.from("financial_transactions")
-          .select("amount, status")
-          .eq("type", "income"),
+          .select("amount, status, type, due_date")
+          .eq("psychologist_id", session.user.id),
       ]);
 
-      const paidRevenue = transactionsRes.data?.filter(t => t.status === "paid")
-        .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      const incomeTransactions = transactionsRes.data?.filter(t => t.type === "income") || [];
+      const paidRevenue = incomeTransactions.filter(t => t.status === "paid")
+        .reduce((sum, t) => sum + Number(t.amount), 0);
       
-      const pending = transactionsRes.data?.filter(t => t.status === "pending")
-        .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      const pending = incomeTransactions.filter(t => t.status === "pending")
+        .reduce((sum, t) => sum + Number(t.amount), 0);
 
       setPendingPayments(pending);
 
@@ -102,6 +95,26 @@ export default function Dashboard() {
         records: recordsRes.count || 0,
         revenue: paidRevenue,
       });
+
+      // Build real chart data from transactions (last 6 months)
+      const allTxs = transactionsRes.data || [];
+      const months = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const ms = new Date(d.getFullYear(), d.getMonth(), 1);
+        const me = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        const monthTxs = allTxs.filter(t => {
+          const td = new Date(t.due_date);
+          return td >= ms && td <= me;
+        });
+        months.push({
+          name: ms.toLocaleDateString("pt-BR", { month: "short" }),
+          receitas: monthTxs.filter(t => t.type === "income" && t.status === "paid").reduce((s, t) => s + Number(t.amount), 0),
+          despesas: monthTxs.filter(t => t.type === "expense" && t.status === "paid").reduce((s, t) => s + Number(t.amount), 0),
+        });
+      }
+      setChartData(months);
 
       // Load today's appointments
       const today = new Date().toISOString().split('T')[0];
@@ -224,30 +237,22 @@ export default function Dashboard() {
           icon={Users}
           title="Pacientes Ativos"
           value={stats.patients}
-          change={{ value: 12, period: "vs. mês anterior" }}
-          sparkline={[10, 15, 12, 18, 20, 22, stats.patients]}
           variant="gradient"
         />
         <MetricCard
           icon={Calendar}
           title="Sessões Este Mês"
           value={stats.appointments}
-          change={{ value: 8, period: "total" }}
-          sparkline={[5, 8, 10, 7, 12, 15, stats.appointments]}
         />
         <MetricCard
           icon={FileText}
           title="Prontuários"
           value={stats.records}
-          change={{ value: 5, period: "novos" }}
-          sparkline={[2, 4, 3, 6, 5, 8, stats.records]}
         />
         <MetricCard
           icon={DollarSign}
           title="Receita"
           value={`R$ ${stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`}
-          change={{ value: 15, period: "vs. anterior" }}
-          sparkline={[3000, 4500, 4000, 5200, 4800, 6000, stats.revenue]}
           variant="gradient"
         />
       </div>

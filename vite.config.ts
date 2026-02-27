@@ -32,6 +32,7 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
       manifest: false, // Using external manifest.json
       workbox: {
+        navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         runtimeCaching: [
