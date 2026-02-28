@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { HelmetProvider } from "react-helmet-async";
+import { useAuthRedirect } from "./hooks/useAuthRedirect";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -29,6 +30,11 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function AuthRedirectHandler() {
+  useAuthRedirect();
+  return null;
+}
+
 const App = () => (
   <HelmetProvider>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
@@ -38,6 +44,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <AuthRedirectHandler />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
