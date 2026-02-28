@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,17 +26,6 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
-
-  // Handle OAuth redirect (tokens in URL hash after Google login)
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        const path = await getRedirectPath(session.user.id);
-        navigate(path, { replace: true });
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate]);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
