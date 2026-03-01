@@ -18,29 +18,40 @@ export function useAuthRedirect() {
     const hash = window.location.hash;
     if (!hash.includes("access_token")) return;
 
-    // Clear the hash immediately
-    window.history.replaceState(null, "", window.location.pathname);
-
     const handleRedirect = async () => {
-      // Try to get session directly (token may already be processed)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const path = await getRedirectPath(session.user.id);
-        navigate(path, { replace: true });
-        return;
-      }
+      // Let Supabase process the hash tokens first via setSession or internal detection
+      // Poll for session since Supabase processes the hash asynchronously
+      let attempts = 0;
+      const tryRedirect = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // Clear the hash AFTER Supabase processed it
+          window.history.replaceState(null, "", window.location.pathname);
+          const path = await getRedirectPath(session.user.id);
+          navigate(path, { replace: true });
+          return;
+        }
+        attempts++;
+        if (attempts < 20) {
+          setTimeout(tryRedirect, 500);
+        }
+      };
 
-      // Fallback: listen for auth state change
+      // Also listen for auth state change as primary mechanism
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === "SIGNED_IN" && session?.user) {
+        if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user) {
+          window.history.replaceState(null, "", window.location.pathname);
           const path = await getRedirectPath(session.user.id);
           navigate(path, { replace: true });
           subscription.unsubscribe();
         }
       });
 
-      // Cleanup after 10s timeout
-      setTimeout(() => subscription.unsubscribe(), 10000);
+      // Start polling as backup
+      tryRedirect();
+
+      // Cleanup after 15s
+      setTimeout(() => subscription.unsubscribe(), 15000);
     };
 
     handleRedirect();
