@@ -155,7 +155,7 @@ export type Database = {
           invoice_number: string | null
           invoice_status: string | null
           paid_date: string | null
-          patient_id: string | null
+          patient_id: string
           payment_method: string | null
           psychologist_id: string
           receipt_url: string | null
@@ -181,7 +181,7 @@ export type Database = {
           invoice_number?: string | null
           invoice_status?: string | null
           paid_date?: string | null
-          patient_id?: string | null
+          patient_id: string
           payment_method?: string | null
           psychologist_id: string
           receipt_url?: string | null
@@ -207,7 +207,7 @@ export type Database = {
           invoice_number?: string | null
           invoice_status?: string | null
           paid_date?: string | null
-          patient_id?: string | null
+          patient_id?: string
           payment_method?: string | null
           psychologist_id?: string
           receipt_url?: string | null
@@ -406,6 +406,7 @@ export type Database = {
           birth_date: string | null
           cpf: string | null
           created_at: string | null
+          default_session_value: number | null
           deleted_at: string | null
           deleted_by: string | null
           deleted_reason: string | null
@@ -415,9 +416,11 @@ export type Database = {
           full_name: string
           id: string
           notes: string | null
+          payment_day: number | null
           phone: string | null
           psychologist_id: string
           status: string | null
+          treatment_start_date: string | null
           updated_at: string | null
         }
         Insert: {
@@ -425,6 +428,7 @@ export type Database = {
           birth_date?: string | null
           cpf?: string | null
           created_at?: string | null
+          default_session_value?: number | null
           deleted_at?: string | null
           deleted_by?: string | null
           deleted_reason?: string | null
@@ -434,9 +438,11 @@ export type Database = {
           full_name: string
           id?: string
           notes?: string | null
+          payment_day?: number | null
           phone?: string | null
           psychologist_id: string
           status?: string | null
+          treatment_start_date?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -444,6 +450,7 @@ export type Database = {
           birth_date?: string | null
           cpf?: string | null
           created_at?: string | null
+          default_session_value?: number | null
           deleted_at?: string | null
           deleted_by?: string | null
           deleted_reason?: string | null
@@ -453,9 +460,11 @@ export type Database = {
           full_name?: string
           id?: string
           notes?: string | null
+          payment_day?: number | null
           phone?: string | null
           psychologist_id?: string
           status?: string | null
+          treatment_start_date?: string | null
           updated_at?: string | null
         }
         Relationships: [
