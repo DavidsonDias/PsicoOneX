@@ -26,6 +26,7 @@ import AssistenteIA from "./pages/AssistenteIA";
 import Notificacoes from "./pages/Notificacoes";
 import SuperAdmin from "./pages/SuperAdmin";
 import Lixeira from "./pages/Lixeira";
+import PatientProfile from "./pages/PatientProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,7 +51,8 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/pacientes" element={<Patients />} />
+              <Route path="/pacientes" element={<Patients />} />
+              <Route path="/pacientes/:id" element={<PatientProfile />} />
                 <Route path="/agenda" element={<Agenda />} />
                 <Route path="/prontuarios" element={<MedicalRecords />} />
                 <Route path="/financeiro" element={<Financeiro />} />
