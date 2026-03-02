@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,7 @@ const PATIENT_EXPORT_HEADERS = {
 };
 
 export default function Patients() {
+  const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -594,7 +596,7 @@ export default function Patients() {
                   index={index}
                   onEdit={() => setEditingPatient(patient)}
                   onDelete={() => handleDeletePatient(patient.id)}
-                  onClick={() => setSelectedPatient(patient)}
+                  onClick={() => navigate(`/pacientes/${patient.id}`)}
                   onToggleStatus={() => handleToggleStatus(patient.id, patient.status)}
                 />
               </div>
@@ -648,8 +650,8 @@ export default function Patients() {
                 render: (p) => <Badge variant={p.status === "active" ? "default" : "secondary"}>{p.status === "active" ? "Ativo" : "Inativo"}</Badge>,
               },
             ]}
-            actions={(p) => <Button variant="ghost" size="sm" onClick={() => setSelectedPatient(p as Patient)}>Ver</Button>}
-            onRowClick={(p) => setSelectedPatient(p as Patient)}
+            actions={(p) => <Button variant="ghost" size="sm" onClick={() => navigate(`/pacientes/${(p as Patient).id}`)}>Ver</Button>}
+            onRowClick={(p) => navigate(`/pacientes/${(p as Patient).id}`)}
           />
         </div>
       )}
