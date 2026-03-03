@@ -13,8 +13,9 @@ import { toast } from "sonner";
 import { 
   Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, 
   Download, Trash2, Upload, TrendingUp, Eye, Info, Hash,
-  SortAsc, SortDesc, UserPlus, CalendarDays
+  SortAsc, SortDesc, UserPlus, CalendarDays, ExternalLink
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
@@ -248,6 +249,7 @@ const RecordFormContent = memo(function RecordFormContent({
 
 // ===== Main Component =====
 const MedicalRecords = () => {
+  const navigate = useNavigate();
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -948,6 +950,13 @@ const MedicalRecords = () => {
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4 text-primary" />
                             <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
+                            <button
+                              className="text-primary hover:text-primary/80 transition-colors"
+                              onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${record.patient_id}`); }}
+                              title="Ver perfil completo"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </button>
                           </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-1">

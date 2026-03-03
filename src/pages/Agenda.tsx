@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download } from "lucide-react";
+import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download, ExternalLink, AlertTriangle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -56,6 +57,7 @@ interface Patient {
 }
 
 export default function Agenda() {
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -787,7 +789,12 @@ export default function Agenda() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-primary" />
-                          <span className="font-medium">{appointment.patients.full_name}</span>
+                          <button 
+                            className="font-medium text-primary hover:underline"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${appointment.patient_id}`); }}
+                          >
+                            {appointment.patients.full_name}
+                          </button>
                           {appointment.recurrence_type && (
                             <Badge variant="outline" className="text-xs gap-1">
                               <Repeat className="h-3 w-3" />
