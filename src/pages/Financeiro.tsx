@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter, Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText, Paperclip, Download } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter, Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText, Paperclip, Download, User, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,7 +75,9 @@ export default function Financeiro() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterPatient, setFilterPatient] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -289,6 +292,7 @@ export default function Financeiro() {
   const filteredTransactions = transactions.filter(t => {
     if (filterType !== "all" && t.type !== filterType) return false;
     if (filterStatus !== "all" && t.payment_status !== filterStatus) return false;
+    if (filterPatient !== "all" && t.patient_id !== filterPatient) return false;
     if (searchTerm && !t.description?.toLowerCase().includes(searchTerm.toLowerCase()) && !t.patient_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
@@ -604,6 +608,16 @@ export default function Financeiro() {
               <SelectItem value="cancelled">Cancelado</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={filterPatient} onValueChange={setFilterPatient}>
+            <SelectTrigger className="w-[180px]">
+              <User className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Filtrar paciente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos pacientes</SelectItem>
+              {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
@@ -683,7 +697,18 @@ export default function Financeiro() {
                     <div>
                       <p className="font-medium">{transaction.description}</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{transaction.patient_name || transaction.category}</span>
+                        {transaction.patient_id && transaction.patient_name ? (
+                          <button 
+                            className="flex items-center gap-1 text-primary hover:underline"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${transaction.patient_id}`); }}
+                          >
+                            <User className="h-3 w-3" />
+                            {transaction.patient_name}
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        ) : (
+                          <span>{transaction.category}</span>
+                        )}
                         <span>•</span>
                         <span>{transaction.due_date && format(new Date(transaction.due_date), "dd/MM/yyyy")}</span>
                         {transaction.cost_center && (

@@ -13,11 +13,12 @@ import {
   Search, RefreshCw, Eye, RotateCcw, AlertTriangle, TrendingUp,
   UserCheck, Calendar, FileText, DollarSign, ChevronRight,
   Activity, Building2, CreditCard, Monitor, LogOut, Database,
-  ArrowUpRight, ArrowDownRight, Clock, Ban, CheckCircle2, XCircle
+  ArrowUpRight, ArrowDownRight, Clock, Ban, CheckCircle2, XCircle,
+  Menu, X
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface DeletedRecord {
@@ -91,6 +92,7 @@ const SuperAdmin = () => {
   const [loadingData, setLoadingData] = useState(true);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!roleLoading && !isSuperAdmin) {
@@ -290,61 +292,100 @@ const SuperAdmin = () => {
     return "outline";
   };
 
-  return (
-    <div className="min-h-screen bg-[hsl(222,47%,8%)] text-[hsl(0,0%,95%)] flex">
-      {/* Enterprise Sidebar */}
-      <aside className={cn(
-        "hidden lg:flex flex-col border-r border-[hsl(222,47%,15%)] bg-[hsl(222,47%,10%)] transition-all duration-300 sticky top-0 h-screen",
-        sidebarCollapsed ? "w-16" : "w-64"
-      )}>
-        {/* Brand */}
-        <div className="p-4 border-b border-[hsl(222,47%,15%)] flex items-center gap-3">
+  const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
+    <>
+      {/* Brand */}
+      <div className="p-4 border-b border-[hsl(222,47%,15%)] flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-lg bg-gradient-primary flex items-center justify-center shrink-0">
             <Shield className="h-5 w-5 text-white" />
           </div>
-          {!sidebarCollapsed && (
+          {(!sidebarCollapsed || isMobile) && (
             <div className="min-w-0">
               <p className="text-sm font-bold truncate">PsicoOne</p>
               <p className="text-[10px] text-[hsl(220,9%,50%)]">SevenDevX • Super Admin</p>
             </div>
           )}
         </div>
+        {isMobile && (
+          <button onClick={() => setMobileSidebarOpen(false)} className="text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)]">
+            <X className="h-5 w-5" />
+          </button>
+        )}
+      </div>
 
-        {/* Nav */}
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {SIDEBAR_ITEMS.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
-                activeTab === item.id
-                  ? "bg-primary/15 text-primary font-medium"
-                  : "text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)] hover:bg-[hsl(222,47%,14%)]"
-              )}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-              {item.id === "recovery" && totalDeleted > 0 && !sidebarCollapsed && (
-                <Badge variant="destructive" className="ml-auto h-5 px-1.5 text-[10px]">{totalDeleted}</Badge>
-              )}
-            </button>
-          ))}
-        </nav>
+      {/* Nav */}
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+        {SIDEBAR_ITEMS.map(item => (
+          <button
+            key={item.id}
+            onClick={() => { setActiveTab(item.id); if (isMobile) setMobileSidebarOpen(false); }}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
+              activeTab === item.id
+                ? "bg-primary/15 text-primary font-medium"
+                : "text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)] hover:bg-[hsl(222,47%,14%)]"
+            )}
+          >
+            <item.icon className="h-4 w-4 shrink-0" />
+            {(!sidebarCollapsed || isMobile) && <span className="truncate">{item.label}</span>}
+            {item.id === "recovery" && totalDeleted > 0 && (!sidebarCollapsed || isMobile) && (
+              <Badge variant="destructive" className="ml-auto h-5 px-1.5 text-[10px]">{totalDeleted}</Badge>
+            )}
+          </button>
+        ))}
+      </nav>
 
-        {/* Footer */}
-        <div className="p-3 border-t border-[hsl(222,47%,15%)]">
+      {/* Footer */}
+      <div className="p-3 border-t border-[hsl(222,47%,15%)]">
+        {!isMobile && (
           <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)] hover:bg-[hsl(222,47%,14%)] transition-colors">
             <ChevronRight className={cn("h-4 w-4 transition-transform", sidebarCollapsed ? "" : "rotate-180")} />
             {!sidebarCollapsed && <span>Recolher</span>}
           </button>
-          <button onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors mt-1">
-            <LogOut className="h-4 w-4" />
-            {!sidebarCollapsed && <span>Sair</span>}
-          </button>
-        </div>
+        )}
+        <button onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors mt-1">
+          <LogOut className="h-4 w-4" />
+          {(!sidebarCollapsed || isMobile) && <span>Sair</span>}
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-[hsl(222,47%,8%)] text-[hsl(0,0%,95%)] flex">
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {mobileSidebarOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 lg:hidden"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            <motion.aside
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="fixed inset-y-0 left-0 w-72 flex flex-col border-r border-[hsl(222,47%,15%)] bg-[hsl(222,47%,10%)] z-50 lg:hidden"
+            >
+              <SidebarContent isMobile />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Sidebar */}
+      <aside className={cn(
+        "hidden lg:flex flex-col border-r border-[hsl(222,47%,15%)] bg-[hsl(222,47%,10%)] transition-all duration-300 sticky top-0 h-screen",
+        sidebarCollapsed ? "w-16" : "w-64"
+      )}>
+        <SidebarContent />
       </aside>
 
       {/* Main Content */}
@@ -353,7 +394,13 @@ const SuperAdmin = () => {
         <header className="border-b border-[hsl(222,47%,15%)] bg-[hsl(222,47%,9%)]/80 backdrop-blur-sm sticky top-0 z-40">
           <div className="px-4 sm:px-8 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Mobile menu */}
+              {/* Mobile hamburger */}
+              <button
+                className="lg:hidden p-2 rounded-lg text-[hsl(220,9%,55%)] hover:text-[hsl(0,0%,90%)] hover:bg-[hsl(222,47%,14%)] transition-colors"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </button>
               <div className="lg:hidden flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-gradient-primary flex items-center justify-center">
                   <Shield className="h-4 w-4 text-white" />
@@ -373,26 +420,6 @@ const SuperAdmin = () => {
                 <Activity className="h-3 w-3 text-emerald-500" />
                 <span className="text-xs text-[hsl(220,9%,55%)]">Sistema Operacional</span>
               </div>
-            </div>
-          </div>
-          {/* Mobile tabs */}
-          <div className="lg:hidden overflow-x-auto px-4 pb-2">
-            <div className="flex gap-1">
-              {SIDEBAR_ITEMS.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors",
-                    activeTab === item.id
-                      ? "bg-primary/15 text-primary font-medium"
-                      : "text-[hsl(220,9%,55%)]"
-                  )}
-                >
-                  <item.icon className="h-3.5 w-3.5" />
-                  {item.label}
-                </button>
-              ))}
             </div>
           </div>
         </header>
