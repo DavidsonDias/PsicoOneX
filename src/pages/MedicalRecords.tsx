@@ -247,6 +247,78 @@ const RecordFormContent = memo(function RecordFormContent({
   );
 });
 
+// ===== Patient Record Folder (collapsible grouping) =====
+interface PatientRecordFolderProps {
+  patientId: string;
+  patientName: string;
+  records: MedicalRecord[];
+  onView: (r: MedicalRecord) => void;
+  onEdit: (r: MedicalRecord) => void;
+  onDelete: (id: string) => void;
+  onNavigate: () => void;
+}
+
+function PatientRecordFolder({ patientId, patientName, records, onView, onEdit, onDelete, onNavigate }: PatientRecordFolderProps) {
+  const [open, setOpen] = useState(true);
+  return (
+    <Card className="overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <User className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold">{patientName}</h3>
+            <p className="text-xs text-muted-foreground">{records.length} prontuário(s)</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={(e) => { e.stopPropagation(); onNavigate(); }}>
+            <ExternalLink className="h-3 w-3" /> Perfil
+          </Button>
+          <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <SortDesc className="h-4 w-4 text-muted-foreground" />
+          </motion.div>
+        </div>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 space-y-2 border-t">
+              {records.map(record => (
+                <div key={record.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => onView(record)}>
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Sessão {record.session_number || "—"}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                      </div>
+                      {record.observations && <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{record.observations}</p>}
+                    </div>
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ActionMenu onEdit={() => onEdit(record)} onDelete={() => onDelete(record.id)} deleteTitle="Excluir" deleteDescription="Excluir este prontuário?" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
+
 // ===== Main Component =====
 const MedicalRecords = () => {
   const navigate = useNavigate();
