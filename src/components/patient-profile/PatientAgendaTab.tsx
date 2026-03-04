@@ -3,13 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Calendar, Clock, Video, MapPin, Plus } from "lucide-react";
+import { Calendar, Clock, Video, MapPin, Plus, Sparkles } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useNavigate } from "react-router-dom";
 
 interface Appointment {
   id: string;
@@ -24,6 +27,7 @@ interface Appointment {
 interface Props {
   patientId: string;
   patientName: string;
+  defaultSessionValue?: number | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -35,14 +39,20 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
   no_show: { label: "Não compareceu", variant: "destructive" },
 };
 
-export function PatientAgendaTab({ patientId, patientName }: Props) {
-  const navigate = useNavigate();
+export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }: Props) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    date: format(new Date(), "yyyy-MM-dd"),
+    time: "09:00",
+    duration: "50",
+    type: "presential",
+    session_value: defaultSessionValue?.toString() || "200",
+  });
 
-  useEffect(() => {
-    loadAppointments();
-  }, [patientId]);
+  useEffect(() => { loadAppointments(); }, [patientId]);
 
   const loadAppointments = async () => {
     const { data, error } = await supabase
@@ -51,10 +61,33 @@ export function PatientAgendaTab({ patientId, patientName }: Props) {
       .eq("patient_id", patientId)
       .is("deleted_at", null)
       .order("scheduled_at", { ascending: false });
-
     if (error) { toast.error("Erro ao carregar agenda"); return; }
     setAppointments(data || []);
     setLoading(false);
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast.error("Sessão expirada"); setSaving(false); return; }
+
+    const scheduledAt = `${formData.date}T${formData.time}:00`;
+
+    const { error } = await supabase.from("appointments").insert({
+      patient_id: patientId,
+      psychologist_id: session.user.id,
+      scheduled_at: scheduledAt,
+      duration_minutes: parseInt(formData.duration),
+      type: formData.type,
+      session_value: parseFloat(formData.session_value),
+      status: "scheduled",
+    });
+    setSaving(false);
+    if (error) { toast.error("Erro ao agendar"); return; }
+    toast.success("Sessão agendada!");
+    setCreateOpen(false);
+    loadAppointments();
   };
 
   if (loading) {
@@ -104,7 +137,7 @@ export function PatientAgendaTab({ patientId, patientName }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{appointments.length} sessão(ões) total</p>
-        <Button className="gap-2" onClick={() => navigate("/agenda")}>
+        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Novo Agendamento</span>
         </Button>
@@ -132,6 +165,63 @@ export function PatientAgendaTab({ patientId, patientName }: Props) {
           <p>Nenhum agendamento encontrado</p>
         </div>
       )}
+
+      {/* Create Appointment Dialog — patient auto-filled */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Agendamento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="bg-muted/30 rounded-lg p-3 flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Paciente</p>
+                <p className="font-medium text-sm">{patientName}</p>
+              </div>
+              <Badge variant="secondary" className="ml-auto text-xs">Contexto automático</Badge>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Data</Label>
+                <Input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Horário</Label>
+                <Input type="time" value={formData.time} onChange={(e) => setFormData(prev => ({ ...prev, time: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Duração (min)</Label>
+                <Input type="number" value={formData.duration} onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={formData.type} onValueChange={(v) => setFormData(prev => ({ ...prev, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="presential">Presencial</SelectItem>
+                    <SelectItem value="online">Online</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Valor (R$)</Label>
+                <Input type="number" step="0.01" value={formData.session_value} onChange={(e) => setFormData(prev => ({ ...prev, session_value: e.target.value }))} />
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving ? "Agendando..." : "Agendar Sessão"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
