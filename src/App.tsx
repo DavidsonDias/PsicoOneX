@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { PatientProvider } from "@/contexts/PatientContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { HelmetProvider } from "react-helmet-async";
 import { useAuthRedirect } from "./hooks/useAuthRedirect";
