@@ -247,6 +247,78 @@ const RecordFormContent = memo(function RecordFormContent({
   );
 });
 
+// ===== Patient Record Folder (collapsible grouping) =====
+interface PatientRecordFolderProps {
+  patientId: string;
+  patientName: string;
+  records: MedicalRecord[];
+  onView: (r: MedicalRecord) => void;
+  onEdit: (r: MedicalRecord) => void;
+  onDelete: (id: string) => void;
+  onNavigate: () => void;
+}
+
+function PatientRecordFolder({ patientId, patientName, records, onView, onEdit, onDelete, onNavigate }: PatientRecordFolderProps) {
+  const [open, setOpen] = useState(true);
+  return (
+    <Card className="overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <User className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold">{patientName}</h3>
+            <p className="text-xs text-muted-foreground">{records.length} prontuário(s)</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={(e) => { e.stopPropagation(); onNavigate(); }}>
+            <ExternalLink className="h-3 w-3" /> Perfil
+          </Button>
+          <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <SortDesc className="h-4 w-4 text-muted-foreground" />
+          </motion.div>
+        </div>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 space-y-2 border-t">
+              {records.map(record => (
+                <div key={record.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => onView(record)}>
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Sessão {record.session_number || "—"}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                      </div>
+                      {record.observations && <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{record.observations}</p>}
+                    </div>
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ActionMenu onEdit={() => onEdit(record)} onDelete={() => onDelete(record.id)} deleteTitle="Excluir" deleteDescription="Excluir este prontuário?" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
+
 // ===== Main Component =====
 const MedicalRecords = () => {
   const navigate = useNavigate();
@@ -924,68 +996,73 @@ const MedicalRecords = () => {
         </div>
       </div>
 
-      {/* Records List */}
+      {/* Records List — grouped by patient */}
       <div className="space-y-4">
         {filteredRecords.length === 0 ? (
           <div className="text-center py-12 bg-card border border-border rounded-lg">
             <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
             <p className="text-muted-foreground">Nenhum prontuário encontrado</p>
           </div>
-        ) : (
+        ) : selectedPatient !== "all" ? (
+          // Flat list when a specific patient is filtered
           <>
             <p className="text-sm text-muted-foreground">
               {filteredRecords.length} prontuário{filteredRecords.length !== 1 ? "s" : ""} encontrado{filteredRecords.length !== 1 ? "s" : ""}
             </p>
             <div className="grid gap-4">
               {filteredRecords.map(record => (
-                <motion.div
-                  key={record.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
+                <motion.div key={record.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                   <Card className="hover:border-primary/50 transition-colors">
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="space-y-1 cursor-pointer flex-1" onClick={() => openViewDialog(record)}>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-primary" />
-                            <h3 className="font-semibold text-lg text-foreground">{record.patients.full_name}</h3>
-                            <button
-                              className="text-primary hover:text-primary/80 transition-colors"
-                              onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${record.patient_id}`); }}
-                              title="Ver perfil completo"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </button>
-                          </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               <span>{format(new Date(record.session_date), "dd/MM/yyyy", { locale: ptBR })}</span>
                             </div>
-                            <Badge variant="outline">
-                              <Hash className="h-3 w-3 mr-1" />
-                              Sessão {record.session_number || 1}
-                            </Badge>
+                            <Badge variant="outline"><Hash className="h-3 w-3 mr-1" />Sessão {record.session_number || 1}</Badge>
                           </div>
                         </div>
-                        <ActionMenu
-                          onEdit={() => openEditDialog(record)}
-                          onDelete={() => handleDeleteRecord(record.id)}
-                          deleteTitle="Excluir Prontuário"
-                          deleteDescription="Tem certeza que deseja excluir este prontuário? Todos os anexos também serão removidos."
-                        />
+                        <ActionMenu onEdit={() => openEditDialog(record)} onDelete={() => handleDeleteRecord(record.id)} deleteTitle="Excluir Prontuário" deleteDescription="Tem certeza que deseja excluir este prontuário?" />
                       </div>
-
                       <div className="cursor-pointer" onClick={() => openViewDialog(record)}>
-                        {record.observations && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>
-                        )}
+                        {record.observations && <p className="text-sm text-muted-foreground line-clamp-2">{record.observations}</p>}
                       </div>
                     </CardContent>
                   </Card>
                 </motion.div>
               ))}
+            </div>
+          </>
+        ) : (
+          // Grouped by patient (collapsible folders)
+          <>
+            <p className="text-sm text-muted-foreground">
+              {filteredRecords.length} prontuário{filteredRecords.length !== 1 ? "s" : ""} • {Object.keys(
+                filteredRecords.reduce((acc, r) => { acc[r.patient_id] = true; return acc; }, {} as Record<string, boolean>)
+              ).length} paciente(s)
+            </p>
+            <div className="space-y-3">
+              {(() => {
+                const grouped: Record<string, { name: string; records: typeof filteredRecords }> = {};
+                filteredRecords.forEach(r => {
+                  if (!grouped[r.patient_id]) grouped[r.patient_id] = { name: r.patients.full_name, records: [] };
+                  grouped[r.patient_id].records.push(r);
+                });
+                return Object.entries(grouped).map(([patientId, group]) => (
+                  <PatientRecordFolder
+                    key={patientId}
+                    patientId={patientId}
+                    patientName={group.name}
+                    records={group.records}
+                    onView={openViewDialog}
+                    onEdit={openEditDialog}
+                    onDelete={handleDeleteRecord}
+                    onNavigate={() => navigate(`/pacientes/${patientId}`)}
+                  />
+                ));
+              })()}
             </div>
           </>
         )}

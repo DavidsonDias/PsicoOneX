@@ -1,13 +1,17 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { DollarSign, TrendingUp, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { DollarSign, AlertTriangle, CheckCircle, Clock, Plus, Sparkles } from "lucide-react";
 import { format, isAfter } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 
 interface Transaction {
@@ -25,6 +29,7 @@ interface Transaction {
 interface Props {
   patientId: string;
   patientName: string;
+  defaultSessionValue?: number | null;
 }
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -39,14 +44,21 @@ const PAYMENT_LABELS: Record<string, string> = {
   cash: "Dinheiro", bank_transfer: "Transferência", convenio: "Convênio", link: "Link",
 };
 
-export function PatientFinancialTab({ patientId, patientName }: Props) {
+export function PatientFinancialTab({ patientId, patientName, defaultSessionValue }: Props) {
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    amount: defaultSessionValue?.toString() || "200",
+    description: "Sessão de psicoterapia",
+    due_date: format(new Date(), "yyyy-MM-dd"),
+    payment_method: "pix",
+    type: "income" as string,
+  });
 
-  useEffect(() => {
-    loadTransactions();
-  }, [patientId]);
+  useEffect(() => { loadTransactions(); }, [patientId]);
 
   const loadTransactions = async () => {
     const { data, error } = await supabase
@@ -55,7 +67,6 @@ export function PatientFinancialTab({ patientId, patientName }: Props) {
       .eq("patient_id", patientId)
       .is("deleted_at", null)
       .order("due_date", { ascending: false });
-
     if (error) { toast.error("Erro ao carregar financeiro"); return; }
     setTransactions(data || []);
     setLoading(false);
@@ -83,6 +94,29 @@ export function PatientFinancialTab({ patientId, patientName }: Props) {
       .eq("id", txId);
     if (error) { toast.error("Erro ao registrar pagamento"); return; }
     toast.success("Pagamento registrado!");
+    loadTransactions();
+  };
+
+  const handleCreatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast.error("Sessão expirada"); setSaving(false); return; }
+
+    const { error } = await supabase.from("financial_transactions").insert({
+      patient_id: patientId,
+      psychologist_id: session.user.id,
+      amount: parseFloat(formData.amount),
+      description: formData.description,
+      due_date: formData.due_date,
+      payment_method: formData.payment_method,
+      type: formData.type,
+      status: "pending",
+    });
+    setSaving(false);
+    if (error) { toast.error("Erro ao registrar"); return; }
+    toast.success("Transação registrada!");
+    setCreateOpen(false);
     loadTransactions();
   };
 
@@ -136,6 +170,14 @@ export function PatientFinancialTab({ patientId, patientName }: Props) {
         </Card>
       </div>
 
+      {/* Add Payment button */}
+      <div className="flex justify-end">
+        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Registrar Pagamento
+        </Button>
+      </div>
+
       {/* Transaction list */}
       {transactions.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
@@ -184,6 +226,73 @@ export function PatientFinancialTab({ patientId, patientName }: Props) {
           Ver Financeiro Completo
         </Button>
       </div>
+
+      {/* Create Payment Dialog — patient auto-filled */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Pagamento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreatePayment} className="space-y-4">
+            <div className="bg-muted/30 rounded-lg p-3 flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Paciente</p>
+                <p className="font-medium text-sm">{patientName}</p>
+              </div>
+              <Badge variant="secondary" className="ml-auto text-xs">Contexto automático</Badge>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Valor (R$)</Label>
+                <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={formData.type} onValueChange={(v) => setFormData(prev => ({ ...prev, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="income">Receita</SelectItem>
+                    <SelectItem value="expense">Despesa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Descrição</Label>
+              <Input value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Data de Vencimento</Label>
+                <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Forma de Pagamento</Label>
+                <Select value={formData.payment_method} onValueChange={(v) => setFormData(prev => ({ ...prev, payment_method: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="credit_card">Cartão Crédito</SelectItem>
+                    <SelectItem value="debit_card">Cartão Débito</SelectItem>
+                    <SelectItem value="cash">Dinheiro</SelectItem>
+                    <SelectItem value="bank_transfer">Transferência</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving ? "Salvando..." : "Registrar"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

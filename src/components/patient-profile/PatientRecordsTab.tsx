@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { FileText, Search, Plus, Calendar, Eye, Download } from "lucide-react";
+import { FileText, Search, Plus, Calendar, Eye, Hash, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useNavigate } from "react-router-dom";
 
 interface Record {
   id: string;
@@ -28,13 +31,23 @@ interface Props {
 }
 
 export function PatientRecordsTab({ patientId, patientName }: Props) {
-  const navigate = useNavigate();
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    session_date: format(new Date(), "yyyy-MM-dd"),
+    session_number: 1,
+    complaints: "",
+    observations: "",
+    techniques_used: "",
+    evolution: "",
+    next_steps: "",
+  });
 
   useEffect(() => {
     loadRecords();
@@ -51,6 +64,46 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
     if (error) { toast.error("Erro ao carregar prontuários"); return; }
     setRecords(data || []);
     setLoading(false);
+  };
+
+  const openCreate = useCallback(() => {
+    const maxSession = Math.max(0, ...records.map(r => r.session_number || 0));
+    setFormData({
+      session_date: format(new Date(), "yyyy-MM-dd"),
+      session_number: maxSession + 1,
+      complaints: "",
+      observations: "",
+      techniques_used: "",
+      evolution: "",
+      next_steps: "",
+    });
+    setCreateOpen(true);
+  }, [records]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast.error("Sessão expirada"); setSaving(false); return; }
+
+    const { error } = await supabase.from("medical_records").insert({
+      patient_id: patientId,
+      psychologist_id: session.user.id,
+      session_date: formData.session_date,
+      session_number: formData.session_number,
+      complaints: formData.complaints || null,
+      observations: formData.observations || null,
+      techniques_used: formData.techniques_used || null,
+      evolution: formData.evolution || null,
+      next_steps: formData.next_steps || null,
+    });
+
+    setSaving(false);
+    if (error) { toast.error("Erro ao criar prontuário"); return; }
+    toast.success("Prontuário criado!");
+    setCreateOpen(false);
+    loadRecords();
   };
 
   const filtered = records.filter(r => {
@@ -79,16 +132,11 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar nos prontuários..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Buscar nos prontuários..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-auto" placeholder="De" />
-        <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-auto" placeholder="Até" />
-        <Button className="gap-2" onClick={() => navigate("/prontuarios")}>
+        <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-auto" />
+        <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-auto" />
+        <Button className="gap-2" onClick={openCreate}>
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Novo Prontuário</span>
         </Button>
@@ -115,9 +163,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
                       <FileText className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium text-sm">
-                        Sessão {record.session_number ?? "—"}
-                      </p>
+                      <p className="font-medium text-sm">Sessão {record.session_number ?? "—"}</p>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         {format(new Date(record.session_date + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR })}
@@ -129,36 +175,11 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
 
                 {expandedId === record.id && (
                   <div className="mt-4 pt-4 border-t space-y-3 text-sm">
-                    {record.complaints && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Queixas</p>
-                        <p className="whitespace-pre-wrap">{record.complaints}</p>
-                      </div>
-                    )}
-                    {record.evolution && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Evolução</p>
-                        <p className="whitespace-pre-wrap">{record.evolution}</p>
-                      </div>
-                    )}
-                    {record.techniques_used && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Técnicas</p>
-                        <p className="whitespace-pre-wrap">{record.techniques_used}</p>
-                      </div>
-                    )}
-                    {record.observations && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Observações</p>
-                        <p className="whitespace-pre-wrap">{record.observations}</p>
-                      </div>
-                    )}
-                    {record.next_steps && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Próximos Passos</p>
-                        <p className="whitespace-pre-wrap">{record.next_steps}</p>
-                      </div>
-                    )}
+                    {record.complaints && (<div><p className="text-xs font-medium text-muted-foreground mb-1">Queixas</p><p className="whitespace-pre-wrap">{record.complaints}</p></div>)}
+                    {record.evolution && (<div><p className="text-xs font-medium text-muted-foreground mb-1">Evolução</p><p className="whitespace-pre-wrap">{record.evolution}</p></div>)}
+                    {record.techniques_used && (<div><p className="text-xs font-medium text-muted-foreground mb-1">Técnicas</p><p className="whitespace-pre-wrap">{record.techniques_used}</p></div>)}
+                    {record.observations && (<div><p className="text-xs font-medium text-muted-foreground mb-1">Observações</p><p className="whitespace-pre-wrap">{record.observations}</p></div>)}
+                    {record.next_steps && (<div><p className="text-xs font-medium text-muted-foreground mb-1">Próximos Passos</p><p className="whitespace-pre-wrap">{record.next_steps}</p></div>)}
                   </div>
                 )}
               </CardContent>
@@ -170,6 +191,66 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
       <p className="text-xs text-muted-foreground text-center">
         {filtered.length} prontuário(s) encontrado(s)
       </p>
+
+      {/* Create Record Dialog — patient auto-filled & locked */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Novo Prontuário</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4">
+            {/* Patient locked */}
+            <div className="bg-muted/30 rounded-lg p-3 flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Paciente</p>
+                <p className="font-medium text-sm">{patientName}</p>
+              </div>
+              <Badge variant="secondary" className="ml-auto text-xs">Contexto automático</Badge>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Data da Sessão</Label>
+                <Input type="date" value={formData.session_date} onChange={(e) => setFormData(prev => ({ ...prev, session_date: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">Sessão Nº <Badge variant="secondary" className="text-xs">Auto</Badge></Label>
+                <Input type="number" min="1" value={formData.session_number} onChange={(e) => setFormData(prev => ({ ...prev, session_number: parseInt(e.target.value) }))} />
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label>Queixas</Label>
+              <Textarea rows={2} value={formData.complaints} onChange={(e) => setFormData(prev => ({ ...prev, complaints: e.target.value }))} placeholder="Queixas apresentadas pelo paciente..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Evolução</Label>
+              <Textarea rows={3} value={formData.evolution} onChange={(e) => setFormData(prev => ({ ...prev, evolution: e.target.value }))} placeholder="Evolução do tratamento..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Técnicas Utilizadas</Label>
+              <Textarea rows={2} value={formData.techniques_used} onChange={(e) => setFormData(prev => ({ ...prev, techniques_used: e.target.value }))} placeholder="TCC, EMDR, Psicodinâmica..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea rows={3} value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} placeholder="Observações gerais..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Próximos Passos</Label>
+              <Textarea rows={2} value={formData.next_steps} onChange={(e) => setFormData(prev => ({ ...prev, next_steps: e.target.value }))} placeholder="Plano para as próximas sessões..." />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving ? "Salvando..." : "Criar Prontuário"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

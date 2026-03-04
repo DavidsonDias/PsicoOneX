@@ -177,10 +177,10 @@ export default function PatientProfile() {
               <PatientRecordsTab patientId={patient.id} patientName={patient.full_name} />
             </TabsContent>
             <TabsContent value="financial" className="mt-0">
-              <PatientFinancialTab patientId={patient.id} patientName={patient.full_name} />
+              <PatientFinancialTab patientId={patient.id} patientName={patient.full_name} defaultSessionValue={patient.default_session_value} />
             </TabsContent>
             <TabsContent value="agenda" className="mt-0">
-              <PatientAgendaTab patientId={patient.id} patientName={patient.full_name} />
+              <PatientAgendaTab patientId={patient.id} patientName={patient.full_name} defaultSessionValue={patient.default_session_value} />
             </TabsContent>
             <TabsContent value="documents" className="mt-0">
               <PatientDocumentsTab patientId={patient.id} patientName={patient.full_name} />
