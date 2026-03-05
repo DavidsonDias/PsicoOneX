@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Loader2 } from "lucide-react";
+import { Mic, MicOff, Loader2, Square } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -13,81 +13,95 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [interimText, setInterimText] = useState("");
+
   const recognitionRef = useRef<any>(null);
-  // Stores only confirmed final sentences
-  const finalPartsRef = useRef<string[]>([]);
-  // Track how many results we already processed to avoid re-processing
-  const processedIndexRef = useRef(0);
+  const committedTextRef = useRef<string[]>([]);
+  const isStoppingRef = useRef(false);
+  const shouldRestartRef = useRef(false);
 
   useEffect(() => {
     return () => {
+      isStoppingRef.current = true;
+      shouldRestartRef.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
     };
   }, []);
 
-  const startRecording = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast.error("Seu navegador não suporta reconhecimento de voz. Use Chrome ou Edge.");
-      return;
-    }
-
-    // Reset state
-    finalPartsRef.current = [];
-    processedIndexRef.current = 0;
-    setInterimText("");
+  const createRecognition = useCallback(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
 
     const recognition = new SpeechRecognition();
     recognition.lang = "pt-BR";
-    recognition.continuous = true;
+    // KEY FIX: Don't use continuous mode — restart manually instead.
+    // This prevents the cumulative result duplication bug on mobile.
+    recognition.continuous = false;
     recognition.interimResults = true;
 
     recognition.onresult = (event: any) => {
-      let newInterim = "";
+      // With continuous=false, there's only one result set per session
+      const result = event.results[0];
+      if (!result) return;
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript.trim();
-        if (!transcript) continue;
+      const transcript = result[0].transcript.trim();
+      if (!transcript) return;
 
-        if (event.results[i].isFinal) {
-          // Only add if we haven't processed this index yet
-          if (i >= processedIndexRef.current) {
-            // Deduplicate: check if this exact text is already in our parts
-            const lastPart = finalPartsRef.current[finalPartsRef.current.length - 1];
-            if (!lastPart || lastPart !== transcript) {
-              finalPartsRef.current.push(transcript);
-            }
-            processedIndexRef.current = i + 1;
-          }
-          setInterimText("");
-        } else {
-          newInterim = transcript;
-        }
-      }
-
-      if (newInterim) {
-        setInterimText(newInterim);
+      if (result.isFinal) {
+        // Commit this sentence
+        committedTextRef.current.push(transcript);
+        setInterimText("");
+      } else {
+        // Show live preview only
+        setInterimText(transcript);
       }
     };
 
     recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      if (event.error !== "aborted") {
-        toast.error("Erro no reconhecimento de voz");
+      // "no-speech" and "aborted" are expected during normal usage
+      if (event.error === "no-speech") {
+        // No speech detected — just restart if still recording
+        return;
       }
+      if (event.error === "aborted") {
+        return;
+      }
+      console.error("Speech recognition error:", event.error);
+      toast.error("Erro no reconhecimento de voz");
+      shouldRestartRef.current = false;
       setIsRecording(false);
       setIsProcessing(false);
       setInterimText("");
     };
 
     recognition.onend = () => {
+      // If user hasn't clicked stop, restart for next sentence
+      if (shouldRestartRef.current && !isStoppingRef.current) {
+        try {
+          // Small delay to avoid rapid restart issues
+          setTimeout(() => {
+            if (shouldRestartRef.current && !isStoppingRef.current) {
+              const newRecognition = createRecognition();
+              if (newRecognition) {
+                recognitionRef.current = newRecognition;
+                newRecognition.start();
+              }
+            }
+          }, 100);
+        } catch (e) {
+          console.error("Failed to restart recognition:", e);
+        }
+        return;
+      }
+
+      // User clicked stop — finalize
       setIsRecording(false);
       setInterimText("");
-      const fullText = finalPartsRef.current.join(". ").trim();
+      const fullText = committedTextRef.current.join(". ").trim();
       if (fullText) {
-        // Add final period if missing
         const cleaned = fullText.endsWith(".") ? fullText : fullText + ".";
         onTranscript(cleaned);
         toast.success("Transcrição inserida!");
@@ -95,29 +109,53 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
       setIsProcessing(false);
     };
 
+    return recognition;
+  }, [onTranscript]);
+
+  const startRecording = useCallback(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Seu navegador não suporta reconhecimento de voz. Use Chrome ou Edge.");
+      return;
+    }
+
+    // Reset
+    committedTextRef.current = [];
+    isStoppingRef.current = false;
+    shouldRestartRef.current = true;
+    setInterimText("");
+
+    const recognition = createRecognition();
+    if (!recognition) return;
+
     recognitionRef.current = recognition;
     recognition.start();
     setIsRecording(true);
     toast.info("Gravação iniciada. Fale agora...");
-  }, [onTranscript]);
+  }, [createRecognition]);
 
   const stopRecording = useCallback(() => {
+    shouldRestartRef.current = false;
+    isStoppingRef.current = true;
+    setIsProcessing(true);
     if (recognitionRef.current) {
-      setIsProcessing(true);
       recognitionRef.current.stop();
     }
   }, []);
 
   const cancelRecording = useCallback(() => {
+    shouldRestartRef.current = false;
+    isStoppingRef.current = true;
+    committedTextRef.current = [];
     if (recognitionRef.current) {
-      finalPartsRef.current = [];
-      processedIndexRef.current = 0;
       recognitionRef.current.abort();
-      setIsRecording(false);
-      setIsProcessing(false);
-      setInterimText("");
-      toast.info("Gravação cancelada");
     }
+    setIsRecording(false);
+    setIsProcessing(false);
+    setInterimText("");
+    toast.info("Gravação cancelada");
   }, []);
 
   if (isProcessing) {
@@ -140,10 +178,7 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
             onClick={stopRecording}
             className="gap-2"
           >
-            <div className="relative">
-              <MicOff className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive-foreground animate-pulse" />
-            </div>
+            <Square className="h-3 w-3 fill-current" />
             Parar
           </Button>
           <Button type="button" variant="ghost" size="sm" onClick={cancelRecording}>
@@ -153,9 +188,7 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
             {[...Array(4)].map((_, i) => (
               <div
                 key={i}
-                className={cn(
-                  "w-1 rounded-full bg-destructive animate-pulse"
-                )}
+                className="w-1 rounded-full bg-destructive animate-pulse"
                 style={{
                   height: `${12 + Math.random() * 12}px`,
                   animationDelay: `${i * 0.15}s`,
@@ -163,6 +196,11 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
               />
             ))}
           </div>
+          {committedTextRef.current.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {committedTextRef.current.length} frase(s)
+            </span>
+          )}
         </div>
         {interimText && (
           <p className="text-xs text-muted-foreground italic truncate max-w-[300px] pl-1">
