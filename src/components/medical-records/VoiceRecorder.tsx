@@ -12,8 +12,12 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [interimText, setInterimText] = useState("");
   const recognitionRef = useRef<any>(null);
-  const transcriptRef = useRef("");
+  // Stores only confirmed final sentences
+  const finalPartsRef = useRef<string[]>([]);
+  // Track how many results we already processed to avoid re-processing
+  const processedIndexRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -30,26 +34,41 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
       return;
     }
 
+    // Reset state
+    finalPartsRef.current = [];
+    processedIndexRef.current = 0;
+    setInterimText("");
+
     const recognition = new SpeechRecognition();
     recognition.lang = "pt-BR";
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    transcriptRef.current = "";
-
     recognition.onresult = (event: any) => {
-      let finalTranscript = "";
-      let interimTranscript = "";
+      let newInterim = "";
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const t = event.results[i][0].transcript;
+        const transcript = event.results[i][0].transcript.trim();
+        if (!transcript) continue;
+
         if (event.results[i].isFinal) {
-          finalTranscript += t;
+          // Only add if we haven't processed this index yet
+          if (i >= processedIndexRef.current) {
+            // Deduplicate: check if this exact text is already in our parts
+            const lastPart = finalPartsRef.current[finalPartsRef.current.length - 1];
+            if (!lastPart || lastPart !== transcript) {
+              finalPartsRef.current.push(transcript);
+            }
+            processedIndexRef.current = i + 1;
+          }
+          setInterimText("");
         } else {
-          interimTranscript += t;
+          newInterim = transcript;
         }
       }
-      if (finalTranscript) {
-        transcriptRef.current += finalTranscript;
+
+      if (newInterim) {
+        setInterimText(newInterim);
       }
     };
 
@@ -60,12 +79,17 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
       }
       setIsRecording(false);
       setIsProcessing(false);
+      setInterimText("");
     };
 
     recognition.onend = () => {
       setIsRecording(false);
-      if (transcriptRef.current.trim()) {
-        onTranscript(transcriptRef.current.trim());
+      setInterimText("");
+      const fullText = finalPartsRef.current.join(". ").trim();
+      if (fullText) {
+        // Add final period if missing
+        const cleaned = fullText.endsWith(".") ? fullText : fullText + ".";
+        onTranscript(cleaned);
         toast.success("Transcrição inserida!");
       }
       setIsProcessing(false);
@@ -86,10 +110,12 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
 
   const cancelRecording = useCallback(() => {
     if (recognitionRef.current) {
-      transcriptRef.current = "";
+      finalPartsRef.current = [];
+      processedIndexRef.current = 0;
       recognitionRef.current.abort();
       setIsRecording(false);
       setIsProcessing(false);
+      setInterimText("");
       toast.info("Gravação cancelada");
     }
   }, []);
@@ -105,38 +131,44 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
 
   if (isRecording) {
     return (
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          onClick={stopRecording}
-          className="gap-2"
-        >
-          <div className="relative">
-            <MicOff className="h-4 w-4" />
-            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive-foreground animate-pulse" />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={stopRecording}
+            className="gap-2"
+          >
+            <div className="relative">
+              <MicOff className="h-4 w-4" />
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive-foreground animate-pulse" />
+            </div>
+            Parar
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={cancelRecording}>
+            Cancelar
+          </Button>
+          <div className="flex items-center gap-1">
+            {[...Array(4)].map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "w-1 rounded-full bg-destructive animate-pulse"
+                )}
+                style={{
+                  height: `${12 + Math.random() * 12}px`,
+                  animationDelay: `${i * 0.15}s`,
+                }}
+              />
+            ))}
           </div>
-          Parar
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={cancelRecording}>
-          Cancelar
-        </Button>
-        <div className="flex items-center gap-1">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className={cn(
-                "w-1 rounded-full bg-destructive",
-                "animate-pulse"
-              )}
-              style={{
-                height: `${12 + Math.random() * 12}px`,
-                animationDelay: `${i * 0.15}s`,
-              }}
-            />
-          ))}
         </div>
+        {interimText && (
+          <p className="text-xs text-muted-foreground italic truncate max-w-[300px] pl-1">
+            🎙️ {interimText}
+          </p>
+        )}
       </div>
     );
   }
