@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Save, Building2, Bell, Palette, FileText, Database, Download, Lock, Loader2, Shield } from "lucide-react";
+import { Save, Building2, Bell, Palette, FileText, Database, Download, Lock, Loader2, Shield, Plug } from "lucide-react";
+import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
@@ -175,8 +176,9 @@ export default function Configuracoes() {
   return (
     <AppLayout title="Configurações" description="Personalize seu sistema">
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile" className="gap-2"><Building2 className="h-4 w-4" />Perfil</TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2"><Plug className="h-4 w-4" />Integrações</TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" />Notificações</TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2"><Palette className="h-4 w-4" />Aparência</TabsTrigger>
           <TabsTrigger value="legal" className="gap-2"><FileText className="h-4 w-4" />Termos</TabsTrigger>
@@ -204,6 +206,10 @@ export default function Configuracoes() {
               </form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="integrations">
+          <GoogleCalendarSettings />
         </TabsContent>
 
         <TabsContent value="notifications">

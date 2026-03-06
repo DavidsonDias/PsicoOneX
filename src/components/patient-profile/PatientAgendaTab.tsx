@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import { Calendar, Clock, Video, MapPin, Plus, Sparkles } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
+import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { ptBR } from "date-fns/locale";
 
 interface Appointment {
@@ -74,7 +75,7 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
 
     const scheduledAt = `${formData.date}T${formData.time}:00`;
 
-    const { error } = await supabase.from("appointments").insert({
+    const { data: newApt, error } = await supabase.from("appointments").insert({
       patient_id: patientId,
       psychologist_id: session.user.id,
       scheduled_at: scheduledAt,
@@ -82,9 +83,22 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
       type: formData.type,
       session_value: parseFloat(formData.session_value),
       status: "scheduled",
-    });
+    }).select("id").single();
     setSaving(false);
     if (error) { toast.error("Erro ao agendar"); return; }
+
+    // Sync to Google Calendar
+    if (newApt) {
+      syncAppointmentToGoogle("create", {
+        id: newApt.id,
+        scheduled_at: scheduledAt,
+        duration_minutes: parseInt(formData.duration),
+        type: formData.type,
+        notes: null,
+        patient_name: patientName,
+      });
+    }
+
     toast.success("Sessão agendada!");
     setCreateOpen(false);
     loadAppointments();

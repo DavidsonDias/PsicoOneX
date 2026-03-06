@@ -1,0 +1,269 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+async function getValidAccessToken(serviceClient: any, userId: string): Promise<string | null> {
+  const { data: tokenData } = await serviceClient
+    .from("google_calendar_tokens")
+    .select("*")
+    .eq("user_id", userId)
+    .single();
+
+  if (!tokenData) return null;
+
+  // Check if token is expired (with 5 min buffer)
+  const expiresAt = new Date(tokenData.token_expires_at);
+  if (expiresAt.getTime() - Date.now() > 5 * 60 * 1000) {
+    return tokenData.access_token;
+  }
+
+  // Refresh token
+  const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      refresh_token: tokenData.refresh_token,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const refreshData = await refreshRes.json();
+  if (!refreshRes.ok) {
+    console.error("Token refresh failed:", refreshData);
+    return null;
+  }
+
+  const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+  await serviceClient
+    .from("google_calendar_tokens")
+    .update({
+      access_token: refreshData.access_token,
+      token_expires_at: newExpiresAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+
+  return refreshData.access_token;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+    const userId = claimsData.claims.sub as string;
+
+    const serviceClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // Check sync preferences
+    const { data: prefs } = await serviceClient
+      .from("google_calendar_tokens")
+      .select("sync_enabled, auto_create, auto_update, calendar_id")
+      .eq("user_id", userId)
+      .single();
+
+    if (!prefs?.sync_enabled) {
+      return new Response(JSON.stringify({ skipped: true, reason: "sync_disabled" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const accessToken = await getValidAccessToken(serviceClient, userId);
+    if (!accessToken) {
+      return new Response(JSON.stringify({ error: "Token inválido. Reconecte sua conta Google." }), {
+        status: 401, headers: corsHeaders,
+      });
+    }
+
+    const calendarId = prefs.calendar_id || "primary";
+    const body = await req.json();
+    const { action, appointment } = body;
+
+    const CALENDAR_API = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+
+    // CREATE event
+    if (action === "create") {
+      if (!prefs.auto_create) {
+        return new Response(JSON.stringify({ skipped: true, reason: "auto_create_disabled" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const startTime = new Date(appointment.scheduled_at);
+      const endTime = new Date(startTime.getTime() + (appointment.duration_minutes || 50) * 60000);
+
+      const event = {
+        summary: `Consulta — ${appointment.patient_name}`,
+        description: `Sessão agendada pelo sistema PsicoOne.\n\nTipo: ${appointment.type === "online" ? "Online" : "Presencial"}\nDuração: ${appointment.duration_minutes || 50} minutos${appointment.notes ? `\nObservações: ${appointment.notes}` : ""}`,
+        start: { dateTime: startTime.toISOString(), timeZone: "America/Sao_Paulo" },
+        end: { dateTime: endTime.toISOString(), timeZone: "America/Sao_Paulo" },
+        reminders: { useDefault: true },
+      };
+
+      const res = await fetch(CALENDAR_API, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+      });
+
+      const eventData = await res.json();
+      if (!res.ok) {
+        console.error("Google Calendar create failed:", eventData);
+        return new Response(JSON.stringify({ error: "Falha ao criar evento no Google Calendar" }), {
+          status: 500, headers: corsHeaders,
+        });
+      }
+
+      // Save google_event_id
+      await serviceClient
+        .from("appointments")
+        .update({ google_event_id: eventData.id })
+        .eq("id", appointment.id);
+
+      return new Response(JSON.stringify({ success: true, google_event_id: eventData.id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // UPDATE event
+    if (action === "update") {
+      if (!prefs.auto_update || !appointment.google_event_id) {
+        return new Response(JSON.stringify({ skipped: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const startTime = new Date(appointment.scheduled_at);
+      const endTime = new Date(startTime.getTime() + (appointment.duration_minutes || 50) * 60000);
+
+      const event = {
+        summary: `Consulta — ${appointment.patient_name}`,
+        description: `Sessão agendada pelo sistema PsicoOne.\n\nTipo: ${appointment.type === "online" ? "Online" : "Presencial"}\nDuração: ${appointment.duration_minutes || 50} minutos${appointment.notes ? `\nObservações: ${appointment.notes}` : ""}`,
+        start: { dateTime: startTime.toISOString(), timeZone: "America/Sao_Paulo" },
+        end: { dateTime: endTime.toISOString(), timeZone: "America/Sao_Paulo" },
+      };
+
+      const res = await fetch(`${CALENDAR_API}/${appointment.google_event_id}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        console.error("Google Calendar update failed:", errData);
+        return new Response(JSON.stringify({ error: "Falha ao atualizar evento" }), { status: 500, headers: corsHeaders });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // CANCEL/DELETE event
+    if (action === "cancel" || action === "delete") {
+      if (!appointment.google_event_id) {
+        return new Response(JSON.stringify({ skipped: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const res = await fetch(`${CALENDAR_API}/${appointment.google_event_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!res.ok && res.status !== 404) {
+        console.error("Google Calendar delete failed:", res.status);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // SYNC ALL - bulk sync existing appointments
+    if (action === "sync_all") {
+      const { data: appointments } = await serviceClient
+        .from("appointments")
+        .select("id, scheduled_at, duration_minutes, type, notes, status, google_event_id, patient_id, patients(full_name)")
+        .eq("psychologist_id", userId)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .is("google_event_id", null)
+        .order("scheduled_at", { ascending: true });
+
+      if (!appointments || appointments.length === 0) {
+        return new Response(JSON.stringify({ success: true, synced: 0 }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      let synced = 0;
+      for (const apt of appointments) {
+        const startTime = new Date(apt.scheduled_at);
+        const endTime = new Date(startTime.getTime() + (apt.duration_minutes || 50) * 60000);
+        const patientName = (apt as any).patients?.full_name || "Paciente";
+
+        const event = {
+          summary: `Consulta — ${patientName}`,
+          description: `Sessão agendada pelo sistema PsicoOne.\nTipo: ${apt.type === "online" ? "Online" : "Presencial"}`,
+          start: { dateTime: startTime.toISOString(), timeZone: "America/Sao_Paulo" },
+          end: { dateTime: endTime.toISOString(), timeZone: "America/Sao_Paulo" },
+        };
+
+        const res = await fetch(CALENDAR_API, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(event),
+        });
+
+        if (res.ok) {
+          const eventData = await res.json();
+          await serviceClient.from("appointments").update({ google_event_id: eventData.id }).eq("id", apt.id);
+          synced++;
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, synced }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400, headers: corsHeaders });
+  } catch (err) {
+    console.error("Sync error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+  }
+});

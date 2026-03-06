@@ -3,7 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, User, Video, MapPin } from "lucide-react";
+import { Clock, User, Video, MapPin, CalendarCheck2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ interface Appointment {
   notes: string | null;
   type?: string;
   duration_minutes?: number;
+  google_event_id?: string | null;
   patients: {
     full_name: string;
     phone: string;
@@ -109,6 +111,17 @@ export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusCh
                                 <span className="flex items-center gap-1"><Video className="h-3 w-3" />Online</span>
                               ) : (
                                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />Presencial</span>
+                              )}
+                              {(apt as any).google_event_id && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="flex items-center gap-1 text-primary">
+                                      <CalendarCheck2 className="h-3 w-3" />
+                                      <span className="text-xs">Google</span>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Sincronizado com Google Agenda</TooltipContent>
+                                </Tooltip>
                               )}
                             </div>
                             {apt.notes && (

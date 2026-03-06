@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download, ExternalLink, AlertTriangle } from "lucide-react";
+import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { useNavigate } from "react-router-dom";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -44,6 +45,7 @@ interface Appointment {
   recurrence_type?: string | null;
   recurrence_end_date?: string | null;
   recurrence_parent_id?: string | null;
+  google_event_id?: string | null;
   patients: {
     full_name: string;
     phone: string;
@@ -97,7 +99,7 @@ export default function Agenda() {
   const loadAppointments = async (psychologistId: string) => {
     const { data, error } = await supabase
       .from("appointments")
-      .select(`id, patient_id, scheduled_at, status, notes, type, duration_minutes, patients (full_name, phone)`)
+      .select(`id, patient_id, scheduled_at, status, notes, type, duration_minutes, google_event_id, patients (full_name, phone)`)
       .eq("psychologist_id", psychologistId)
       .is("deleted_at", null)
       .order("scheduled_at", { ascending: true });
@@ -220,6 +222,17 @@ export default function Agenda() {
       return;
     }
 
+    // Sync to Google Calendar
+    const patient = patients.find(p => p.id === formData.patient_id);
+    syncAppointmentToGoogle("create", {
+      id: mainAppointment.id,
+      scheduled_at: scheduledAt,
+      duration_minutes: parseInt(formData.duration),
+      type: formData.type,
+      notes: formData.notes || null,
+      patient_name: patient?.full_name || "Paciente",
+    });
+
     await createFinancialTransaction({
       patient_id: formData.patient_id,
       scheduled_at: scheduledAt,
@@ -313,6 +326,18 @@ export default function Agenda() {
       new_data: { scheduled_at: scheduledAt, status: formData.status },
     } as any);
 
+    // Sync update to Google Calendar
+    const patient = patients.find(p => p.id === formData.patient_id);
+    syncAppointmentToGoogle("update", {
+      id: editingAppointment.id,
+      scheduled_at: scheduledAt,
+      duration_minutes: parseInt(formData.duration),
+      type: formData.type,
+      notes: formData.notes || null,
+      patient_name: patient?.full_name || "Paciente",
+      google_event_id: (editingAppointment as any).google_event_id,
+    });
+
     toast.success("Agendamento atualizado!");
     setEditingAppointment(null);
     resetForm();
@@ -362,6 +387,16 @@ export default function Agenda() {
         .update({ status: "cancelled" })
         .eq("appointment_id", apt.id)
         .eq("status", "pending");
+
+      // Cancel in Google Calendar
+      syncAppointmentToGoogle("cancel", {
+        id: apt.id,
+        scheduled_at: apt.scheduled_at,
+        duration_minutes: apt.duration_minutes || 50,
+        type: apt.type || "presential",
+        patient_name: apt.patients.full_name,
+        google_event_id: apt.google_event_id,
+      });
     }
 
     const { error } = await supabase
