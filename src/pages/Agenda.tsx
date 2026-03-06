@@ -222,6 +222,17 @@ export default function Agenda() {
       return;
     }
 
+    // Sync to Google Calendar
+    const patient = patients.find(p => p.id === formData.patient_id);
+    syncAppointmentToGoogle("create", {
+      id: mainAppointment.id,
+      scheduled_at: scheduledAt,
+      duration_minutes: parseInt(formData.duration),
+      type: formData.type,
+      notes: formData.notes || null,
+      patient_name: patient?.full_name || "Paciente",
+    });
+
     await createFinancialTransaction({
       patient_id: formData.patient_id,
       scheduled_at: scheduledAt,
