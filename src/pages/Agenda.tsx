@@ -326,6 +326,18 @@ export default function Agenda() {
       new_data: { scheduled_at: scheduledAt, status: formData.status },
     } as any);
 
+    // Sync update to Google Calendar
+    const patient = patients.find(p => p.id === formData.patient_id);
+    syncAppointmentToGoogle("update", {
+      id: editingAppointment.id,
+      scheduled_at: scheduledAt,
+      duration_minutes: parseInt(formData.duration),
+      type: formData.type,
+      notes: formData.notes || null,
+      patient_name: patient?.full_name || "Paciente",
+      google_event_id: (editingAppointment as any).google_event_id,
+    });
+
     toast.success("Agendamento atualizado!");
     setEditingAppointment(null);
     resetForm();
