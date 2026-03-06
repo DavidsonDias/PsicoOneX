@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import { Calendar, Clock, Video, MapPin, Plus, Sparkles } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
+import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { ptBR } from "date-fns/locale";
 
 interface Appointment {
