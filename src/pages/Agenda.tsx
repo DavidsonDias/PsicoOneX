@@ -45,6 +45,7 @@ interface Appointment {
   recurrence_type?: string | null;
   recurrence_end_date?: string | null;
   recurrence_parent_id?: string | null;
+  google_event_id?: string | null;
   patients: {
     full_name: string;
     phone: string;
