@@ -86,6 +86,17 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
     });
     setSaving(false);
     if (error) { toast.error("Erro ao agendar"); return; }
+
+    // Sync to Google Calendar
+    syncAppointmentToGoogle("create", {
+      id: crypto.randomUUID(), // will be replaced by actual id
+      scheduled_at: scheduledAt,
+      duration_minutes: parseInt(formData.duration),
+      type: formData.type,
+      notes: null,
+      patient_name: patientName,
+    });
+
     toast.success("Sessão agendada!");
     setCreateOpen(false);
     loadAppointments();

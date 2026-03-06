@@ -112,6 +112,17 @@ export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusCh
                               ) : (
                                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />Presencial</span>
                               )}
+                              {(apt as any).google_event_id && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="flex items-center gap-1 text-primary">
+                                      <CalendarCheck2 className="h-3 w-3" />
+                                      <span className="text-xs">Google</span>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Sincronizado com Google Agenda</TooltipContent>
+                                </Tooltip>
+                              )}
                             </div>
                             {apt.notes && (
                               <p className="text-xs text-muted-foreground mt-2 line-clamp-1">{apt.notes}</p>
