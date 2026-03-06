@@ -208,6 +208,10 @@ export default function Configuracoes() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="integrations">
+          <GoogleCalendarSettings />
+        </TabsContent>
+
         <TabsContent value="notifications">
           <Card>
             <CardHeader><CardTitle>Configurações de Notificações</CardTitle><CardDescription>Configure como deseja notificar seus pacientes</CardDescription></CardHeader>
