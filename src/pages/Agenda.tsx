@@ -99,7 +99,7 @@ export default function Agenda() {
   const loadAppointments = async (psychologistId: string) => {
     const { data, error } = await supabase
       .from("appointments")
-      .select(`id, patient_id, scheduled_at, status, notes, type, duration_minutes, patients (full_name, phone)`)
+      .select(`id, patient_id, scheduled_at, status, notes, type, duration_minutes, google_event_id, patients (full_name, phone)`)
       .eq("psychologist_id", psychologistId)
       .is("deleted_at", null)
       .order("scheduled_at", { ascending: true });
