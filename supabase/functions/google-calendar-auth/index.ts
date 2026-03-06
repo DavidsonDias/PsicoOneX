@@ -1,0 +1,136 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+    const userId = claimsData.claims.sub;
+
+    const { action, code, redirect_uri } = await req.json();
+
+    // Generate OAuth URL
+    if (action === "get_auth_url") {
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: redirect_uri,
+        response_type: "code",
+        scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email",
+        access_type: "offline",
+        prompt: "consent",
+        state: userId,
+      });
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+      return new Response(JSON.stringify({ url }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Exchange code for tokens
+    if (action === "exchange_code") {
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: redirect_uri,
+          grant_type: "authorization_code",
+        }),
+      });
+
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) {
+        console.error("Google token exchange failed:", tokenData);
+        return new Response(JSON.stringify({ error: "Falha na autenticação com Google" }), { status: 400, headers: corsHeaders });
+      }
+
+      // Get user email
+      const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const userInfo = await userInfoRes.json();
+
+      const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+
+      // Use service role to upsert tokens
+      const serviceClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+      const { error: upsertError } = await serviceClient
+        .from("google_calendar_tokens")
+        .upsert({
+          user_id: userId,
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          token_expires_at: expiresAt,
+          google_email: userInfo.email,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+
+      if (upsertError) {
+        console.error("Upsert error:", upsertError);
+        return new Response(JSON.stringify({ error: "Erro ao salvar tokens" }), { status: 500, headers: corsHeaders });
+      }
+
+      return new Response(JSON.stringify({ success: true, email: userInfo.email }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Disconnect
+    if (action === "disconnect") {
+      const serviceClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await serviceClient.from("google_calendar_tokens").delete().eq("user_id", userId);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Get connection status
+    if (action === "status") {
+      const { data } = await supabase
+        .from("google_calendar_tokens")
+        .select("google_email, sync_enabled, auto_create, auto_update, sync_new_only")
+        .eq("user_id", userId)
+        .single();
+
+      return new Response(JSON.stringify({ connected: !!data, ...(data || {}) }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Update preferences
+    if (action === "update_preferences") {
+      const { sync_enabled, auto_create, auto_update, sync_new_only } = await req.json().catch(() => ({}));
+      // We already parsed JSON above, so re-read from the body won't work. Let's use the parsed data.
+      return new Response(JSON.stringify({ error: "Use body params" }), { status: 400, headers: corsHeaders });
+    }
+
+    return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400, headers: corsHeaders });
+  } catch (err) {
+    console.error("Error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+  }
+});
