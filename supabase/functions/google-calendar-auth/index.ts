@@ -30,23 +30,25 @@ Deno.serve(async (req) => {
     if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
-    const userId = claimsData.claims.sub;
+    const userId = claimsData.claims.sub as string;
 
-    const { action, code, redirect_uri } = await req.json();
+    const body = await req.json();
+    const { action, code, redirect_uri, sync_enabled, auto_create, auto_update, sync_new_only } = body;
 
     // Generate OAuth URL
     if (action === "get_auth_url") {
       const params = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: redirect_uri,
+        redirect_uri,
         response_type: "code",
         scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email",
         access_type: "offline",
         prompt: "consent",
         state: userId,
       });
-      const url = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-      return new Response(JSON.stringify({ url }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Exchange code for tokens
@@ -58,7 +60,7 @@ Deno.serve(async (req) => {
           code,
           client_id: GOOGLE_CLIENT_ID,
           client_secret: GOOGLE_CLIENT_SECRET,
-          redirect_uri: redirect_uri,
+          redirect_uri,
           grant_type: "authorization_code",
         }),
       });
@@ -76,8 +78,6 @@ Deno.serve(async (req) => {
       const userInfo = await userInfoRes.json();
 
       const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
-
-      // Use service role to upsert tokens
       const serviceClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
       const { error: upsertError } = await serviceClient
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Get connection status
+    // Status
     if (action === "status") {
       const { data } = await supabase
         .from("google_calendar_tokens")
@@ -123,9 +123,15 @@ Deno.serve(async (req) => {
 
     // Update preferences
     if (action === "update_preferences") {
-      const { sync_enabled, auto_create, auto_update, sync_new_only } = await req.json().catch(() => ({}));
-      // We already parsed JSON above, so re-read from the body won't work. Let's use the parsed data.
-      return new Response(JSON.stringify({ error: "Use body params" }), { status: 400, headers: corsHeaders });
+      const { error } = await supabase
+        .from("google_calendar_tokens")
+        .update({ sync_enabled, auto_create, auto_update, sync_new_only, updated_at: new Date().toISOString() })
+        .eq("user_id", userId);
+
+      if (error) {
+        return new Response(JSON.stringify({ error: "Erro ao atualizar preferências" }), { status: 500, headers: corsHeaders });
+      }
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400, headers: corsHeaders });
