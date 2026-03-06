@@ -387,6 +387,16 @@ export default function Agenda() {
         .update({ status: "cancelled" })
         .eq("appointment_id", apt.id)
         .eq("status", "pending");
+
+      // Cancel in Google Calendar
+      syncAppointmentToGoogle("cancel", {
+        id: apt.id,
+        scheduled_at: apt.scheduled_at,
+        duration_minutes: apt.duration_minutes || 50,
+        type: apt.type || "presential",
+        patient_name: apt.patients.full_name,
+        google_event_id: apt.google_event_id,
+      });
     }
 
     const { error } = await supabase
