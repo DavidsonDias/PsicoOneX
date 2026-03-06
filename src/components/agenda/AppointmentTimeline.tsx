@@ -15,6 +15,7 @@ interface Appointment {
   notes: string | null;
   type?: string;
   duration_minutes?: number;
+  google_event_id?: string | null;
   patients: {
     full_name: string;
     phone: string;
