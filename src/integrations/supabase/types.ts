@@ -21,6 +21,7 @@ export type Database = {
           deleted_by: string | null
           deleted_reason: string | null
           duration_minutes: number | null
+          google_event_id: string | null
           id: string
           notes: string | null
           patient_id: string
@@ -41,6 +42,7 @@ export type Database = {
           deleted_by?: string | null
           deleted_reason?: string | null
           duration_minutes?: number | null
+          google_event_id?: string | null
           id?: string
           notes?: string | null
           patient_id: string
@@ -61,6 +63,7 @@ export type Database = {
           deleted_by?: string | null
           deleted_reason?: string | null
           duration_minutes?: number | null
+          google_event_id?: string | null
           id?: string
           notes?: string | null
           patient_id?: string
@@ -240,6 +243,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      google_calendar_tokens: {
+        Row: {
+          access_token: string
+          auto_create: boolean | null
+          auto_update: boolean | null
+          calendar_id: string | null
+          created_at: string | null
+          google_email: string | null
+          id: string
+          refresh_token: string
+          sync_enabled: boolean | null
+          sync_new_only: boolean | null
+          token_expires_at: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          auto_create?: boolean | null
+          auto_update?: boolean | null
+          calendar_id?: string | null
+          created_at?: string | null
+          google_email?: string | null
+          id?: string
+          refresh_token: string
+          sync_enabled?: boolean | null
+          sync_new_only?: boolean | null
+          token_expires_at: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          auto_create?: boolean | null
+          auto_update?: boolean | null
+          calendar_id?: string | null
+          created_at?: string | null
+          google_email?: string | null
+          id?: string
+          refresh_token?: string
+          sync_enabled?: boolean | null
+          sync_new_only?: boolean | null
+          token_expires_at?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       medical_record_attachments: {
         Row: {
