@@ -587,6 +587,7 @@ export default function Agenda() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="30">30 min</SelectItem>
+              <SelectItem value="40">40 min</SelectItem>
               <SelectItem value="50">50 min</SelectItem>
               <SelectItem value="60">1 hora</SelectItem>
               <SelectItem value="90">1h 30min</SelectItem>
