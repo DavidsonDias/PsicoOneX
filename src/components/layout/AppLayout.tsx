@@ -143,6 +143,7 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
       />
       
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      <SubscriptionCenter open={subscriptionOpen} onOpenChange={setSubscriptionOpen} />
 
       {/* Main Content - Responsive padding */}
       <main 
