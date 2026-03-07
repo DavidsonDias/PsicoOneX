@@ -72,6 +72,7 @@ interface AppSidebarProps {
 export function AppSidebar({ isAdmin, isSuperAdmin, onOpenCommandPalette, notifications = 0 }: AppSidebarProps) {
   const { collapsed, toggleCollapsed } = useSidebar();
   const { planLabel, isTrial, trialDaysRemaining, isExpired } = useSubscription();
+  const { setOpen: openSubscriptionCenter } = useSubscriptionCenter();
   const navigate = useNavigate();
   const location = useLocation();
 
