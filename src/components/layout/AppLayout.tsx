@@ -9,6 +9,8 @@ import { AppSidebar } from "./AppSidebar";
 import { MobileHeader } from "./MobileHeader";
 import { CommandPalette } from "./CommandPalette";
 import { SubscriptionBanner } from "@/components/subscription/SubscriptionBanner";
+import { SubscriptionCenter } from "@/components/subscription/SubscriptionCenter";
+import { SubscriptionCenterProvider, useSubscriptionCenter } from "@/contexts/SubscriptionCenterContext";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
@@ -24,11 +26,20 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, title, description }: AppLayoutProps) {
+  return (
+    <SubscriptionCenterProvider>
+      <AppLayoutInner title={title} description={description}>{children}</AppLayoutInner>
+    </SubscriptionCenterProvider>
+  );
+}
+
+function AppLayoutInner({ children, title, description }: AppLayoutProps) {
   const navigate = useNavigate();
   const { isAdmin, isSuperAdmin } = useUserRole();
   const { canWrite } = useSubscription();
   const { unreadCount } = useNotifications();
   const { collapsed } = useSidebar();
+  const { open: subscriptionOpen, setOpen: setSubscriptionOpen } = useSubscriptionCenter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -132,6 +143,7 @@ export function AppLayout({ children, title, description }: AppLayoutProps) {
       />
       
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      <SubscriptionCenter open={subscriptionOpen} onOpenChange={setSubscriptionOpen} />
 
       {/* Main Content - Responsive padding */}
       <main 
