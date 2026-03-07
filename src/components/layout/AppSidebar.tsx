@@ -281,11 +281,14 @@ export function AppSidebar({ isAdmin, isSuperAdmin, onOpenCommandPalette, notifi
         </Tooltip>
 
         {/* Plan Status */}
-        {!collapsed && (
-          <div className={cn(
-            "px-3 py-2 rounded-lg text-xs",
-            isExpired ? "bg-destructive/10 text-destructive" : isTrial ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-primary/10 text-primary"
-          )}>
+        {!collapsed ? (
+          <button
+            onClick={() => openSubscriptionCenter(true)}
+            className={cn(
+              "w-full px-3 py-2 rounded-lg text-xs text-left transition-all hover:opacity-80 cursor-pointer",
+              isExpired ? "bg-destructive/10 text-destructive" : isTrial ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-primary/10 text-primary"
+            )}
+          >
             <div className="flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5" />
               <span className="font-medium">Plano {planLabel}</span>
@@ -296,7 +299,24 @@ export function AppSidebar({ isAdmin, isSuperAdmin, onOpenCommandPalette, notifi
             {isExpired && (
               <p className="text-[10px] mt-0.5 opacity-80">Expirado — Ative um plano</p>
             )}
-          </div>
+          </button>
+        ) : (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "w-full h-10",
+                  isExpired ? "text-destructive" : isTrial ? "text-amber-600 dark:text-amber-400" : "text-primary"
+                )}
+                onClick={() => openSubscriptionCenter(true)}
+              >
+                <Sparkles className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Plano {planLabel}</TooltipContent>
+          </Tooltip>
         )}
 
         {/* Sign Out */}
