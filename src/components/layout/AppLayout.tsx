@@ -26,6 +26,14 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, title, description }: AppLayoutProps) {
+  return (
+    <SubscriptionCenterProvider>
+      <AppLayoutInner title={title} description={description}>{children}</AppLayoutInner>
+    </SubscriptionCenterProvider>
+  );
+}
+
+function AppLayoutInner({ children, title, description }: AppLayoutProps) {
   const navigate = useNavigate();
   const { isAdmin, isSuperAdmin } = useUserRole();
   const { canWrite } = useSubscription();
