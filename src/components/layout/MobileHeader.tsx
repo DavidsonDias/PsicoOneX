@@ -157,6 +157,28 @@ export function MobileHeader({ isAdmin, isSuperAdmin, onOpenSearch, notification
                 </div>
               </nav>
 
+              {/* Plan Status */}
+              <div className="px-2 pb-2">
+                <button
+                  onClick={() => { setOpen(false); openSubscriptionCenter(true); }}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-lg text-xs text-left transition-all hover:opacity-80",
+                    isExpired ? "bg-destructive/10 text-destructive" : isTrial ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-primary/10 text-primary"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span className="font-medium">Plano {planLabel}</span>
+                  </div>
+                  {isTrial && (
+                    <p className="text-[10px] mt-0.5 opacity-80">{trialDaysRemaining} dias restantes</p>
+                  )}
+                  {isExpired && (
+                    <p className="text-[10px] mt-0.5 opacity-80">Expirado — Ative um plano</p>
+                  )}
+                </button>
+              </div>
+
               {/* Footer */}
               <div className="border-t border-border p-2 space-y-1">
                 <button
