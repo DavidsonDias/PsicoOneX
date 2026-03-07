@@ -62,6 +62,8 @@ export function MobileHeader({ isAdmin, isSuperAdmin, onOpenSearch, notification
   const [logoLoaded, setLogoLoaded] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { planLabel, isTrial, trialDaysRemaining, isExpired } = useSubscription();
+  const { setOpen: openSubscriptionCenter } = useSubscriptionCenter();
 
   // Pre-load logo to avoid flickering
   useEffect(() => {
