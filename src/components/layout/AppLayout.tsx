@@ -9,6 +9,8 @@ import { AppSidebar } from "./AppSidebar";
 import { MobileHeader } from "./MobileHeader";
 import { CommandPalette } from "./CommandPalette";
 import { SubscriptionBanner } from "@/components/subscription/SubscriptionBanner";
+import { SubscriptionCenter } from "@/components/subscription/SubscriptionCenter";
+import { SubscriptionCenterProvider, useSubscriptionCenter } from "@/contexts/SubscriptionCenterContext";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
