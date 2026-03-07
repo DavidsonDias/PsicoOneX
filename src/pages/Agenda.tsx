@@ -266,6 +266,16 @@ export default function Agenda() {
             session_value: sessionValue,
             appointment_id: childApt.id,
           });
+          // Sync recurring appointment to Google Calendar
+          const patient = patients.find(p => p.id === formData.patient_id);
+          syncAppointmentToGoogle("create", {
+            id: childApt.id,
+            scheduled_at: date,
+            duration_minutes: parseInt(formData.duration),
+            type: formData.type,
+            notes: formData.notes || null,
+            patient_name: patient?.full_name || "Paciente",
+          });
         }
       }
       toast.success(`Série de ${count} agendamentos criada!`);
