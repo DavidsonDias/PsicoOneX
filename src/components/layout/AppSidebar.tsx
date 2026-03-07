@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useSubscriptionCenter } from "@/contexts/SubscriptionCenterContext";
 
 interface NavItem {
   icon: React.ElementType;
