@@ -48,6 +48,7 @@ export default function Dashboard() {
   const [pendingPayments, setPendingPayments] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const { notifications, markAsRead, markAllAsRead, createNotification } = useNotifications();
+  const { showOnboarding, authProvider, googleCalendarConnected, completeOnboarding } = useOnboarding();
 
   const [chartData, setChartData] = useState<any[]>([]);
 
