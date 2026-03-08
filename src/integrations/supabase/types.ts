@@ -530,34 +530,40 @@ export type Database = {
       }
       profiles: {
         Row: {
+          auth_provider: string | null
           avatar_url: string | null
           clinic_name: string | null
           created_at: string | null
           crp: string | null
           full_name: string
           id: string
+          onboarding_completed: boolean
           phone: string | null
           specialty: string | null
           updated_at: string | null
         }
         Insert: {
+          auth_provider?: string | null
           avatar_url?: string | null
           clinic_name?: string | null
           created_at?: string | null
           crp?: string | null
           full_name: string
           id: string
+          onboarding_completed?: boolean
           phone?: string | null
           specialty?: string | null
           updated_at?: string | null
         }
         Update: {
+          auth_provider?: string | null
           avatar_url?: string | null
           clinic_name?: string | null
           created_at?: string | null
           crp?: string | null
           full_name?: string
           id?: string
+          onboarding_completed?: boolean
           phone?: string | null
           specialty?: string | null
           updated_at?: string | null

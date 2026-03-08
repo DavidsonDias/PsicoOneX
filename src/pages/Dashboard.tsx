@@ -20,6 +20,8 @@ import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { format, differenceInHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -46,6 +48,7 @@ export default function Dashboard() {
   const [pendingPayments, setPendingPayments] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const { notifications, markAsRead, markAllAsRead, createNotification } = useNotifications();
+  const { showOnboarding, authProvider, googleCalendarConnected, completeOnboarding } = useOnboarding();
 
   const [chartData, setChartData] = useState<any[]>([]);
 
@@ -203,6 +206,16 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
+      {/* Onboarding Tour */}
+      {showOnboarding && (
+        <OnboardingTour
+          authProvider={authProvider}
+          googleCalendarConnected={googleCalendarConnected}
+          onComplete={completeOnboarding}
+          onSkip={completeOnboarding}
+        />
+      )}
+
       {/* Header with Welcome and Notifications */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-8">
         <motion.div

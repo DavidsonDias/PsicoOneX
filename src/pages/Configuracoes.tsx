@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Save, Building2, Bell, Palette, FileText, Database, Download, Lock, Loader2, Shield, Plug } from "lucide-react";
+import { Save, Building2, Bell, Palette, FileText, Database, Download, Lock, Loader2, Shield, Plug, HelpCircle } from "lucide-react";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ export default function Configuracoes() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportPassword, setExportPassword] = useState("");
   const { isAdmin, isPsychologist } = useUserRole();
+  const { resetOnboarding } = useOnboarding();
 
   const [settings, setSettings] = useState({
     clinic_name: "",
@@ -176,13 +178,14 @@ export default function Configuracoes() {
   return (
     <AppLayout title="Configurações" description="Personalize seu sistema">
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="profile" className="gap-2"><Building2 className="h-4 w-4" />Perfil</TabsTrigger>
           <TabsTrigger value="integrations" className="gap-2"><Plug className="h-4 w-4" />Integrações</TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" />Notificações</TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2"><Palette className="h-4 w-4" />Aparência</TabsTrigger>
           <TabsTrigger value="legal" className="gap-2"><FileText className="h-4 w-4" />Termos</TabsTrigger>
           <TabsTrigger value="export" className="gap-2"><Database className="h-4 w-4" />Exportar</TabsTrigger>
+          <TabsTrigger value="help" className="gap-2"><HelpCircle className="h-4 w-4" />Ajuda</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -293,6 +296,27 @@ export default function Configuracoes() {
               >
                 {exporting ? <><Loader2 className="h-4 w-4 animate-spin" />Exportando...</> : <><Download className="h-4 w-4" />Exportar Backup Completo</>}
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="help">
+          <Card>
+            <CardHeader>
+              <CardTitle>Central de Ajuda</CardTitle>
+              <CardDescription>Recursos para ajudá-lo a usar o PsicoOne</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 rounded-xl border border-border bg-muted/30">
+                <h4 className="font-medium mb-2">🎓 Guia do Sistema</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Reveja o tour interativo que apresenta todas as funcionalidades do PsicoOne.
+                </p>
+                <Button onClick={() => { resetOnboarding(); window.location.href = "/dashboard"; }} className="gap-2">
+                  <HelpCircle className="h-4 w-4" />
+                  Ver guia do sistema novamente
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
