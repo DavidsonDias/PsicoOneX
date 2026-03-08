@@ -34,6 +34,7 @@ export default function Configuracoes() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportPassword, setExportPassword] = useState("");
   const { isAdmin, isPsychologist } = useUserRole();
+  const { resetOnboarding } = useOnboarding();
 
   const [settings, setSettings] = useState({
     clinic_name: "",
