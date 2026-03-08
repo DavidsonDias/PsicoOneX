@@ -354,8 +354,10 @@ export default function Agenda() {
     await loadAppointments(userId);
   };
 
-  // Soft delete instead of hard delete
+  // Soft delete instead of hard delete + sync Google Calendar
   const handleDeleteAppointment = async (appointmentId: string) => {
+    const apt = appointments.find(a => a.id === appointmentId);
+
     const { error } = await supabase
       .from("appointments")
       .update({
@@ -368,6 +370,18 @@ export default function Agenda() {
     if (error) {
       toast.error("Erro ao excluir agendamento");
       return;
+    }
+
+    // Sync deletion to Google Calendar
+    if (apt?.google_event_id) {
+      syncAppointmentToGoogle("cancel", {
+        id: apt.id,
+        scheduled_at: apt.scheduled_at,
+        duration_minutes: apt.duration_minutes || 50,
+        type: apt.type || "presential",
+        patient_name: apt.patients?.full_name || "Paciente",
+        google_event_id: apt.google_event_id,
+      });
     }
 
     await supabase.from("audit_logs").insert({
