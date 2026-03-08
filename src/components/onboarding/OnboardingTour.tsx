@@ -51,9 +51,7 @@ export function OnboardingTour({
         id: "google-prompt",
         icon: Calendar,
         title: "Conecte sua Agenda Google",
-        description: authProvider === "google"
-          ? "Você entrou com Google! Conecte sua agenda para sincronizar consultas automaticamente."
-          : "Integre sua agenda do Google para sincronizar automaticamente seus atendimentos.",
+        description: "Integre sua agenda do Google para sincronizar automaticamente seus atendimentos com o Google Calendar.",
         features: [
           "Sincronização automática de consultas",
           "Lembretes e alertas no Google Agenda",
@@ -254,13 +252,21 @@ export function OnboardingTour({
 
                 {/* Google Calendar connect button */}
                 {step.variant === "google-prompt" && (
-                  <div className="pt-2">
+                  <div className="space-y-3 pt-2">
+                    <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm text-muted-foreground space-y-1">
+                      <p className="font-medium text-foreground">Para conectar sua conta:</p>
+                      <ol className="list-decimal list-inside space-y-0.5">
+                        <li>Acesse <strong>Configurações</strong></li>
+                        <li>Vá até a aba <strong>Integrações</strong></li>
+                        <li>Clique em <strong>Conectar Google Agenda</strong></li>
+                      </ol>
+                    </div>
                     <Button
                       variant="outline"
                       className="w-full gap-2"
                       onClick={() => {
                         onComplete();
-                        navigate("/configuracoes");
+                        navigate("/configuracoes?tab=integrations");
                       }}
                     >
                       <ExternalLink className="h-4 w-4" />
