@@ -20,6 +20,8 @@ import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { format, differenceInHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
