@@ -51,9 +51,7 @@ export function OnboardingTour({
         id: "google-prompt",
         icon: Calendar,
         title: "Conecte sua Agenda Google",
-        description: authProvider === "google"
-          ? "Você entrou com Google! Conecte sua agenda para sincronizar consultas automaticamente."
-          : "Integre sua agenda do Google para sincronizar automaticamente seus atendimentos.",
+        description: "Integre sua agenda do Google para sincronizar automaticamente seus atendimentos com o Google Calendar.",
         features: [
           "Sincronização automática de consultas",
           "Lembretes e alertas no Google Agenda",
