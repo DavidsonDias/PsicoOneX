@@ -299,6 +299,27 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="help">
+          <Card>
+            <CardHeader>
+              <CardTitle>Central de Ajuda</CardTitle>
+              <CardDescription>Recursos para ajudá-lo a usar o PsicoOne</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 rounded-xl border border-border bg-muted/30">
+                <h4 className="font-medium mb-2">🎓 Guia do Sistema</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Reveja o tour interativo que apresenta todas as funcionalidades do PsicoOne.
+                </p>
+                <Button onClick={() => { resetOnboarding(); window.location.href = "/dashboard"; }} className="gap-2">
+                  <HelpCircle className="h-4 w-4" />
+                  Ver guia do sistema novamente
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <AlertDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
