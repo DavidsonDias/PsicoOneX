@@ -206,6 +206,16 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
+      {/* Onboarding Tour */}
+      {showOnboarding && (
+        <OnboardingTour
+          authProvider={authProvider}
+          googleCalendarConnected={googleCalendarConnected}
+          onComplete={completeOnboarding}
+          onSkip={completeOnboarding}
+        />
+      )}
+
       {/* Header with Welcome and Notifications */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-8">
         <motion.div
