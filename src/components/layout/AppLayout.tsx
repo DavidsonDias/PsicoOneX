@@ -11,6 +11,7 @@ import { CommandPalette } from "./CommandPalette";
 import { SubscriptionBanner } from "@/components/subscription/SubscriptionBanner";
 import { SubscriptionCenter } from "@/components/subscription/SubscriptionCenter";
 import { SubscriptionCenterProvider, useSubscriptionCenter } from "@/contexts/SubscriptionCenterContext";
+import { SevenDevXFooter } from "./SevenDevXFooter";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
