@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Loader2, Square } from "lucide-react";
+import { Mic, MicOff, Loader2, Square, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -9,27 +9,50 @@ interface VoiceRecorderProps {
   disabled?: boolean;
 }
 
+type RecordingState = "idle" | "recording" | "processing" | "error";
+
 export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [state, setState] = useState<RecordingState>("idle");
   const [interimText, setInterimText] = useState("");
+  const [committedPreview, setCommittedPreview] = useState("");
 
   const recognitionRef = useRef<any>(null);
-  const committedTextRef = useRef<string[]>([]);
+  const committedSegmentsRef = useRef<string[]>([]);
+  const lastFinalTranscriptRef = useRef("");
   const isStoppingRef = useRef(false);
   const shouldRestartRef = useRef(false);
+  const activeSessionIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
       isStoppingRef.current = true;
       shouldRestartRef.current = false;
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        try { recognitionRef.current.abort(); } catch {}
       }
     };
   }, []);
 
-  const createRecognition = useCallback(() => {
+  const isDuplicate = useCallback((newText: string): boolean => {
+    if (!newText.trim()) return true;
+    const last = lastFinalTranscriptRef.current;
+    if (!last) return false;
+
+    const normalize = (s: string) => s.toLowerCase().trim().replace(/[.,!?;:]+$/g, "");
+    const a = normalize(newText);
+    const b = normalize(last);
+
+    // Exact match
+    if (a === b) return true;
+
+    // One contains the other (partial overlap from interim→final)
+    if (a.includes(b) && a.length - b.length < 10) return false; // extended version is OK
+    if (b.includes(a)) return true; // subset of last = duplicate
+
+    return false;
+  }, []);
+
+  const createRecognition = useCallback((sessionId: number) => {
     const SpeechRecognition =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
@@ -37,80 +60,97 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
 
     const recognition = new SpeechRecognition();
     recognition.lang = "pt-BR";
-    // KEY FIX: Don't use continuous mode — restart manually instead.
-    // This prevents the cumulative result duplication bug on mobile.
     recognition.continuous = false;
     recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: any) => {
-      // With continuous=false, there's only one result set per session
-      const result = event.results[0];
-      if (!result) return;
+      // Guard: ignore events from old sessions
+      if (sessionId !== activeSessionIdRef.current) return;
 
-      const transcript = result[0].transcript.trim();
-      if (!transcript) return;
+      // With continuous=false, process all results (usually just one)
+      let currentInterim = "";
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0].transcript.trim();
+        if (!transcript) continue;
 
-      if (result.isFinal) {
-        // Commit this sentence
-        committedTextRef.current.push(transcript);
-        setInterimText("");
-      } else {
-        // Show live preview only
-        setInterimText(transcript);
+        if (result.isFinal) {
+          if (!isDuplicate(transcript)) {
+            committedSegmentsRef.current.push(transcript);
+            lastFinalTranscriptRef.current = transcript;
+            setCommittedPreview(committedSegmentsRef.current.join(". "));
+          }
+          setInterimText("");
+        } else {
+          currentInterim = transcript;
+        }
+      }
+
+      if (currentInterim) {
+        setInterimText(currentInterim);
       }
     };
 
     recognition.onerror = (event: any) => {
-      // "no-speech" and "aborted" are expected during normal usage
-      if (event.error === "no-speech") {
-        // No speech detected — just restart if still recording
-        return;
-      }
-      if (event.error === "aborted") {
-        return;
-      }
+      if (sessionId !== activeSessionIdRef.current) return;
+      if (event.error === "no-speech" || event.error === "aborted") return;
+
       console.error("Speech recognition error:", event.error);
-      toast.error("Erro no reconhecimento de voz");
+      if (event.error === "not-allowed") {
+        toast.error("Permissão de microfone negada. Verifique as configurações do navegador.");
+        setState("error");
+      } else {
+        toast.error("Erro no reconhecimento de voz");
+      }
       shouldRestartRef.current = false;
-      setIsRecording(false);
-      setIsProcessing(false);
+      setState("idle");
       setInterimText("");
     };
 
     recognition.onend = () => {
-      // If user hasn't clicked stop, restart for next sentence
+      if (sessionId !== activeSessionIdRef.current) return;
+
       if (shouldRestartRef.current && !isStoppingRef.current) {
-        try {
-          // Small delay to avoid rapid restart issues
-          setTimeout(() => {
-            if (shouldRestartRef.current && !isStoppingRef.current) {
-              const newRecognition = createRecognition();
+        setTimeout(() => {
+          if (shouldRestartRef.current && !isStoppingRef.current && sessionId === activeSessionIdRef.current) {
+            try {
+              const newRecognition = createRecognition(sessionId);
               if (newRecognition) {
                 recognitionRef.current = newRecognition;
                 newRecognition.start();
               }
+            } catch (e) {
+              console.error("Failed to restart recognition:", e);
             }
-          }, 100);
-        } catch (e) {
-          console.error("Failed to restart recognition:", e);
-        }
+          }
+        }, 150);
         return;
       }
 
-      // User clicked stop — finalize
-      setIsRecording(false);
+      // Finalize
+      setState("idle");
       setInterimText("");
-      const fullText = committedTextRef.current.join(". ").trim();
-      if (fullText) {
-        const cleaned = fullText.endsWith(".") ? fullText : fullText + ".";
-        onTranscript(cleaned);
-        toast.success("Transcrição inserida!");
+      setCommittedPreview("");
+
+      const segments = committedSegmentsRef.current;
+      if (segments.length > 0) {
+        // Join and clean up
+        let fullText = segments.join(". ").trim();
+        // Capitalize first letter
+        fullText = fullText.charAt(0).toUpperCase() + fullText.slice(1);
+        // Ensure ends with period
+        if (!/[.!?]$/.test(fullText)) fullText += ".";
+        // Clean double periods
+        fullText = fullText.replace(/\.{2,}/g, ".").replace(/\.\s*\./g, ".");
+
+        onTranscript(fullText);
+        toast.success(`Transcrição inserida (${segments.length} trecho${segments.length > 1 ? "s" : ""})!`);
       }
-      setIsProcessing(false);
     };
 
     return recognition;
-  }, [onTranscript]);
+  }, [onTranscript, isDuplicate]);
 
   const startRecording = useCallback(() => {
     const SpeechRecognition =
@@ -121,44 +161,62 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
       return;
     }
 
-    // Reset
-    committedTextRef.current = [];
+    // Abort any existing recognition
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch {}
+    }
+
+    // New session
+    const sessionId = Date.now();
+    activeSessionIdRef.current = sessionId;
+    committedSegmentsRef.current = [];
+    lastFinalTranscriptRef.current = "";
     isStoppingRef.current = false;
     shouldRestartRef.current = true;
     setInterimText("");
+    setCommittedPreview("");
 
-    const recognition = createRecognition();
+    const recognition = createRecognition(sessionId);
     if (!recognition) return;
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsRecording(true);
-    toast.info("Gravação iniciada. Fale agora...");
+
+    try {
+      recognition.start();
+      setState("recording");
+      toast.info("🎙️ Gravação iniciada. Fale agora...");
+    } catch (e) {
+      console.error("Failed to start recognition:", e);
+      toast.error("Erro ao iniciar gravação");
+      setState("idle");
+    }
   }, [createRecognition]);
 
   const stopRecording = useCallback(() => {
     shouldRestartRef.current = false;
     isStoppingRef.current = true;
-    setIsProcessing(true);
+    setState("processing");
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try { recognitionRef.current.stop(); } catch {}
     }
   }, []);
 
   const cancelRecording = useCallback(() => {
     shouldRestartRef.current = false;
     isStoppingRef.current = true;
-    committedTextRef.current = [];
+    activeSessionIdRef.current = 0;
+    committedSegmentsRef.current = [];
+    lastFinalTranscriptRef.current = "";
     if (recognitionRef.current) {
-      recognitionRef.current.abort();
+      try { recognitionRef.current.abort(); } catch {}
     }
-    setIsRecording(false);
-    setIsProcessing(false);
+    setState("idle");
     setInterimText("");
+    setCommittedPreview("");
     toast.info("Gravação cancelada");
   }, []);
 
-  if (isProcessing) {
+  if (state === "processing") {
     return (
       <Button type="button" variant="outline" size="sm" disabled className="gap-2">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -167,7 +225,23 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
     );
   }
 
-  if (isRecording) {
+  if (state === "error") {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={startRecording}
+        disabled={disabled}
+        className="gap-2 text-destructive border-destructive/50"
+      >
+        <AlertCircle className="h-4 w-4" />
+        Tentar novamente
+      </Button>
+    );
+  }
+
+  if (state === "recording") {
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
@@ -196,21 +270,34 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
               />
             ))}
           </div>
-          {committedTextRef.current.length > 0 && (
+          <span className="text-xs text-muted-foreground font-medium">
+            🎙️ Gravando
+          </span>
+          {committedSegmentsRef.current.length > 0 && (
             <span className="text-xs text-muted-foreground">
-              {committedTextRef.current.length} frase(s)
+              ({committedSegmentsRef.current.length} trecho{committedSegmentsRef.current.length > 1 ? "s" : ""})
             </span>
           )}
         </div>
-        {interimText && (
-          <p className="text-xs text-muted-foreground italic truncate max-w-[300px] pl-1">
-            🎙️ {interimText}
-          </p>
+
+        {/* Live preview: committed text + interim */}
+        {(committedPreview || interimText) && (
+          <div className="text-xs pl-1 max-w-[400px] space-y-0.5">
+            {committedPreview && (
+              <p className="text-foreground/70 truncate">{committedPreview}</p>
+            )}
+            {interimText && (
+              <p className="text-muted-foreground/60 italic truncate">
+                {interimText}...
+              </p>
+            )}
+          </div>
         )}
       </div>
     );
   }
 
+  // Idle state
   return (
     <Button
       type="button"
