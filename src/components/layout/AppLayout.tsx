@@ -49,6 +49,18 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
     checkAuth();
   }, []);
 
+  // SevenDevX Technical Signature Validation (invisible, non-blocking)
+  useEffect(() => {
+    const validateSignature = async () => {
+      try {
+        await supabase.rpc('validate_system_signature');
+      } catch {
+        // Silent - does not impact UX
+      }
+    };
+    validateSignature();
+  }, []);
+
   // Keyboard shortcut for command palette
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
