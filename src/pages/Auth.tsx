@@ -224,10 +224,17 @@ export default function Auth() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-3">
           <Button variant="link" onClick={() => navigate("/")} className="text-muted-foreground hover:text-foreground">
             Voltar para a página inicial
           </Button>
+          <p className="text-xs text-muted-foreground/60">
+            © {new Date().getFullYear()}{" "}
+            <a href="https://SevenDevX.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+              SevenDevX
+            </a>{" "}
+            — Todos os direitos reservados.
+          </p>
         </div>
       </div>
     </div>
