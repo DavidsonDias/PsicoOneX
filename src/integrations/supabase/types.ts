@@ -615,6 +615,36 @@ export type Database = {
         }
         Relationships: []
       }
+      system_metadata: {
+        Row: {
+          architecture: string
+          build_timestamp: string
+          created_at: string | null
+          developed_by: string
+          id: string
+          system_signature: string
+          system_type: string
+        }
+        Insert: {
+          architecture?: string
+          build_timestamp?: string
+          created_at?: string | null
+          developed_by?: string
+          id?: string
+          system_signature?: string
+          system_type?: string
+        }
+        Update: {
+          architecture?: string
+          build_timestamp?: string
+          created_at?: string | null
+          developed_by?: string
+          id?: string
+          system_signature?: string
+          system_type?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -656,6 +686,7 @@ export type Database = {
         Args: { _entity_id: string; _entity_type: string; _restored_by: string }
         Returns: boolean
       }
+      validate_system_signature: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "psychologist" | "secretary" | "super_admin"
