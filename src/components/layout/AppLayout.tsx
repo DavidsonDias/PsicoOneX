@@ -200,6 +200,9 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
             </WritePermissionContext.Provider>
           </motion.div>
         </div>
+
+        {/* SevenDevX Institutional Footer */}
+        <SevenDevXFooter />
       </main>
     </div>
   );

@@ -471,12 +471,25 @@ npm run preview
 ## 📄 Licença
 
 Este projeto é **proprietário** e protegido por direitos autorais.  
-Todos os direitos reservados © 2025-2026 **SevenDevX**.
+Todos os direitos reservados © 2025-2026 **[SevenDevX](https://SevenDevX.com)**.
+
+**Powered by SevenDevX**
+
+---
+
+## 🏷️ Governança Técnica
+
+Este sistema segue o **Padrão Corporativo de Engenharia, Arquitetura e Governança Tecnológica da SevenDevX (Enterprise v2)**.
+
+- Assinatura técnica invisível integrada
+- Validação de integridade no boot da aplicação
+- Auditoria de alterações via `audit_logs`
+- Rastreabilidade completa do software
 
 ---
 
 <p align="center">
-  Desenvolvido com 💜 por <strong>SevenDevX</strong>
+  Desenvolvido com 💜 por <strong><a href="https://SevenDevX.com" target="_blank">SevenDevX</a></strong>
 </p>
 
 <p align="center">
