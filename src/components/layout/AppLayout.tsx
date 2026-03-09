@@ -11,6 +11,7 @@ import { CommandPalette } from "./CommandPalette";
 import { SubscriptionBanner } from "@/components/subscription/SubscriptionBanner";
 import { SubscriptionCenter } from "@/components/subscription/SubscriptionCenter";
 import { SubscriptionCenterProvider, useSubscriptionCenter } from "@/contexts/SubscriptionCenterContext";
+import { SevenDevXFooter } from "./SevenDevXFooter";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,18 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
 
   useEffect(() => {
     checkAuth();
+  }, []);
+
+  // SevenDevX Technical Signature Validation (invisible, non-blocking)
+  useEffect(() => {
+    const validateSignature = async () => {
+      try {
+        await supabase.rpc('validate_system_signature');
+      } catch {
+        // Silent - does not impact UX
+      }
+    };
+    validateSignature();
   }, []);
 
   // Keyboard shortcut for command palette
@@ -187,6 +200,9 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
             </WritePermissionContext.Provider>
           </motion.div>
         </div>
+
+        {/* SevenDevX Institutional Footer */}
+        <SevenDevXFooter />
       </main>
     </div>
   );
