@@ -197,7 +197,16 @@ export const Footer = () => {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground text-center md:text-left">
-              © {currentYear} PsicoOne by SevenDevX. Todos os direitos reservados.
+              © {currentYear} PsicoOne by{" "}
+              <a
+                href="https://SevenDevX.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors underline-offset-2 hover:underline"
+              >
+                SevenDevX
+              </a>
+              . Todos os direitos reservados.
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground">
               <span className="px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">LGPD</span>
