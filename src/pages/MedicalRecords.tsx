@@ -1,19 +1,18 @@
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { 
   Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, 
-  Download, Trash2, Upload, TrendingUp, Eye, Info, Hash,
-  SortAsc, SortDesc, UserPlus, CalendarDays, ExternalLink
+  Download, Trash2, Upload, TrendingUp, Eye, Hash,
+  SortAsc, SortDesc, CalendarDays, ExternalLink
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -23,7 +22,6 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatsOverview } from "@/components/ui/stats-overview";
 import { ProntuarioEditor } from "@/components/medical-records/ProntuarioEditor";
-import type { ProntuarioFormData } from "@/components/medical-records/ProntuarioEditor";
 import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
 
