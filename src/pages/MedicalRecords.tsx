@@ -22,8 +22,8 @@ import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatsOverview } from "@/components/ui/stats-overview";
-import { FreeFormEditor } from "@/components/medical-records/FreeFormEditor";
-import { AttachmentUploader } from "@/components/medical-records/AttachmentUploader";
+import { ProntuarioEditor } from "@/components/medical-records/ProntuarioEditor";
+import type { ProntuarioFormData } from "@/components/medical-records/ProntuarioEditor";
 import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
 
