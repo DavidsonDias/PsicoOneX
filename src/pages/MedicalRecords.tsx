@@ -1,19 +1,18 @@
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { 
   Plus, FileText, Calendar, User, Search, Sparkles, Paperclip, 
-  Download, Trash2, Upload, TrendingUp, Eye, Info, Hash,
-  SortAsc, SortDesc, UserPlus, CalendarDays, ExternalLink
+  Download, Trash2, Upload, TrendingUp, Eye, Hash,
+  SortAsc, SortDesc, CalendarDays, ExternalLink
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -22,8 +21,7 @@ import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatsOverview } from "@/components/ui/stats-overview";
-import { FreeFormEditor } from "@/components/medical-records/FreeFormEditor";
-import { AttachmentUploader } from "@/components/medical-records/AttachmentUploader";
+import { ProntuarioEditor } from "@/components/medical-records/ProntuarioEditor";
 import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
 
@@ -70,183 +68,7 @@ interface PreviewFile {
   createdAt?: string;
 }
 
-// ===== Extracted RecordFormContent as a stable memoized component =====
-// This fixes the mobile keyboard focus loss bug by preventing re-mounts
-interface RecordFormContentProps {
-  formData: {
-    patient_id: string;
-    session_date: string;
-    session_number: number;
-    complaints: string;
-    observations: string;
-    techniques_used: string;
-    evolution: string;
-    next_steps: string;
-  };
-  setFormData: React.Dispatch<React.SetStateAction<RecordFormContentProps["formData"]>>;
-  freeFormNotes: string;
-  setFreeFormNotes: (v: string) => void;
-  patients: Patient[];
-  pendingFiles: PendingFile[];
-  setPendingFiles: React.Dispatch<React.SetStateAction<PendingFile[]>>;
-  onPreviewPendingFile: (pf: PendingFile) => void;
-  generatingAI: boolean;
-  onGenerateAI: () => void;
-  isEdit?: boolean;
-  onOpenQuickPatient: () => void;
-}
-
-const RecordFormContent = memo(function RecordFormContent({
-  formData,
-  setFormData,
-  freeFormNotes,
-  setFreeFormNotes,
-  patients,
-  pendingFiles,
-  setPendingFiles,
-  onPreviewPendingFile,
-  generatingAI,
-  onGenerateAI,
-  isEdit = false,
-  onOpenQuickPatient,
-}: RecordFormContentProps) {
-  const handleStructuredChange = useCallback((field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }, [setFormData]);
-
-  return (
-    <div className="space-y-6">
-      {/* Session Info Header */}
-      <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Info className="h-4 w-4" />
-          Informações da sessão são preenchidas automaticamente
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="patient" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Paciente *
-            </Label>
-            <div className="flex gap-2">
-              <Select 
-                value={formData.patient_id} 
-                onValueChange={(value) => setFormData(prev => ({...prev, patient_id: value}))}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Selecione o paciente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {patients.map(patient => (
-                    <SelectItem key={patient.id} value={patient.id}>
-                      {patient.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={onOpenQuickPatient}
-                title="Cadastrar paciente novo"
-              >
-                <UserPlus className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="session_date" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Data da Sessão
-            </Label>
-            <Input
-              id="session_date"
-              type="date"
-              value={formData.session_date}
-              onChange={(e) => setFormData(prev => ({...prev, session_date: e.target.value}))}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Hash className="h-4 w-4" />
-              Sessão Nº
-              <Badge variant="secondary" className="text-xs">Auto</Badge>
-            </Label>
-            <Input
-              type="number"
-              min="1"
-              value={formData.session_number}
-              onChange={(e) => setFormData(prev => ({...prev, session_number: parseInt(e.target.value)}))}
-              className="bg-muted/50"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* AI Generation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <span className="font-medium">Assistente de Escrita</span>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onGenerateAI}
-          disabled={generatingAI || !formData.patient_id}
-          className="gap-2"
-        >
-          <Sparkles className="h-4 w-4" />
-          {generatingAI ? "Gerando..." : "Gerar com IA"}
-        </Button>
-      </div>
-
-      <Separator />
-
-      {/* Free-Form Editor with Optional Structured Fields */}
-      <FreeFormEditor
-        value={freeFormNotes}
-        onChange={setFreeFormNotes}
-        structuredFields={{
-          complaints: formData.complaints,
-          observations: formData.observations,
-          techniques_used: formData.techniques_used,
-          evolution: formData.evolution,
-          next_steps: formData.next_steps
-        }}
-        onStructuredChange={handleStructuredChange}
-      />
-
-      <Separator />
-
-      {/* Attachments Section */}
-      <div className="space-y-3">
-        <Label className="flex items-center gap-2">
-          <Paperclip className="h-4 w-4" />
-          Anexos
-          {pendingFiles.length > 0 && (
-            <Badge variant="secondary">{pendingFiles.length}</Badge>
-          )}
-        </Label>
-        <AttachmentUploader
-          pendingFiles={pendingFiles}
-          onFilesChange={setPendingFiles}
-          onPreview={onPreviewPendingFile}
-        />
-      </div>
-
-      <Button type="submit" className="w-full">
-        {isEdit ? "Salvar Alterações" : "Criar Prontuário"}
-      </Button>
-    </div>
-  );
-});
-
+// RecordFormContent is now the shared ProntuarioEditor component
 // ===== Patient Record Folder (collapsible grouping) =====
 interface PatientRecordFolderProps {
   patientId: string;
@@ -929,7 +751,7 @@ const MedicalRecords = () => {
                 <DialogTitle>Novo Registro de Sessão</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreateRecord}>
-                <RecordFormContent
+                <ProntuarioEditor
                   formData={formData}
                   setFormData={setFormData}
                   freeFormNotes={freeFormNotes}
@@ -1208,7 +1030,7 @@ const MedicalRecords = () => {
             <DialogTitle>Editar Prontuário</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditRecord}>
-            <RecordFormContent
+            <ProntuarioEditor
               formData={formData}
               setFormData={setFormData}
               freeFormNotes={freeFormNotes}
