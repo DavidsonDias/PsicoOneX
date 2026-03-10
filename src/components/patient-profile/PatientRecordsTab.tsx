@@ -373,7 +373,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
               onGenerateAI={handleGenerateAI}
               isEdit={dialogMode === "edit"}
               lockedPatient={{ id: patientId, name: patientName }}
-              hideAttachments
+              
             />
           </form>
         </DialogContent>
