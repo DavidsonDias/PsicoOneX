@@ -1032,7 +1032,7 @@ const MedicalRecords = () => {
             <DialogTitle>Editar Prontuário</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditRecord}>
-            <RecordFormContent
+            <ProntuarioEditor
               formData={formData}
               setFormData={setFormData}
               freeFormNotes={freeFormNotes}
