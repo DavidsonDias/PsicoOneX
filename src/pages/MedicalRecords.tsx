@@ -753,7 +753,7 @@ const MedicalRecords = () => {
                 <DialogTitle>Novo Registro de Sessão</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreateRecord}>
-                <RecordFormContent
+                <ProntuarioEditor
                   formData={formData}
                   setFormData={setFormData}
                   freeFormNotes={freeFormNotes}
