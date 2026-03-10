@@ -299,7 +299,6 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <ActionMenu
-                      onView={() => setExpandedId(expandedId === record.id ? null : record.id)}
                       onEdit={() => openEdit(record)}
                       onDelete={() => handleDelete(record.id)}
                       deleteTitle="Excluir Prontuário"
