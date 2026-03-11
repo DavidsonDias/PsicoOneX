@@ -3,76 +3,20 @@ import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, Star, Sparkles, ArrowRight } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
+import { PLANS, type PlanConfig } from "@/lib/plans";
 
 export const Pricing = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: "-100px" });
 
-  const plans = [
-    {
-      name: "Estudante",
-      price: "Gratuito",
-      period: "sempre",
-      description: "Para estudantes de psicologia iniciando sua jornada",
-      features: [
-        "Agenda básica",
-        "Até 10 pacientes",
-        "Prontuário simples",
-        "Acesso mobile",
-        "Suporte por email",
-      ],
-      cta: "Começar Grátis",
-      variant: "outline" as const,
-      popular: false,
-      gradient: "from-slate-500/10 to-zinc-500/10",
-    },
-    {
-      name: "Profissional",
-      price: "R$ 97",
-      period: "/mês",
-      description: "Para psicólogos autônomos que querem crescer",
-      features: [
-        "Pacientes ilimitados",
-        "Agenda inteligente + WhatsApp",
-        "Prontuário com IA",
-        "Gestão financeira completa",
-        "Teleatendimento HD",
-        "Portal do paciente",
-        "Recursos terapêuticos",
-        "Documentos + assinatura digital",
-        "Suporte prioritário",
-      ],
-      cta: "Teste 15 Dias Grátis",
-      variant: "hero" as const,
-      popular: true,
-      gradient: "from-primary/20 to-secondary/20",
-    },
-    {
-      name: "Clínica",
-      price: "R$ 297",
-      period: "/mês",
-      description: "Para clínicas e equipes multidisciplinares",
-      features: [
-        "Tudo do Profissional",
-        "Múltiplos psicólogos",
-        "Gestão de equipes",
-        "Relatórios por profissional",
-        "Acesso para secretárias",
-        "Controle de repasses",
-        "API personalizada",
-        "Onboarding dedicado",
-        "Gerente de sucesso",
-      ],
-      cta: "Falar com Vendas",
-      variant: "outline" as const,
-      popular: false,
-      gradient: "from-purple-500/10 to-pink-500/10",
-    },
-  ];
+  const landingPlans = PLANS.map((plan) => ({
+    ...plan,
+    cta: plan.popular ? "Teste 7 Dias Grátis" : "Escolher plano",
+    variant: (plan.popular ? "hero" : "outline") as "hero" | "outline",
+  }));
 
   return (
     <section className="py-24 md:py-32 bg-background relative overflow-hidden" id="pricing" ref={containerRef}>
-      {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-muted/30 via-transparent to-muted/30" />
       
       <div className="container mx-auto px-4 relative z-10">
@@ -96,8 +40,8 @@ export const Pricing = () => {
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto items-start">
-          {plans.map((plan, index) => (
-            <PlanCard key={index} {...plan} index={index} isInView={isInView} />
+          {landingPlans.map((plan, index) => (
+            <PlanCard key={plan.id} plan={plan} cta={plan.cta} variant={plan.variant} index={index} isInView={isInView} />
           ))}
         </div>
 
@@ -131,41 +75,23 @@ export const Pricing = () => {
 };
 
 interface PlanCardProps {
-  name: string;
-  price: string;
-  period: string;
-  description: string;
-  features: string[];
+  plan: PlanConfig;
   cta: string;
   variant: "outline" | "hero";
-  popular: boolean;
-  gradient: string;
   index: number;
   isInView: boolean;
 }
 
-const PlanCard = ({ 
-  name, 
-  price, 
-  period, 
-  description, 
-  features, 
-  cta, 
-  variant, 
-  popular, 
-  gradient,
-  index,
-  isInView,
-}: PlanCardProps) => {
+const PlanCard = ({ plan, cta, variant, index, isInView }: PlanCardProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.5, delay: index * 0.15 }}
       whileHover={{ y: -10 }}
-      className={`relative ${popular ? 'md:-mt-4 md:mb-4' : ''}`}
+      className={`relative ${plan.popular ? 'md:-mt-4 md:mb-4' : ''}`}
     >
-      {popular && (
+      {plan.popular && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={isInView ? { opacity: 1, scale: 1 } : {}}
@@ -181,30 +107,29 @@ const PlanCard = ({
 
       <GlassCard 
         className={`p-8 h-full transition-all duration-500 ${
-          popular 
+          plan.popular 
             ? 'border-primary shadow-2xl shadow-primary/20' 
             : 'hover:border-primary/50 hover:shadow-xl'
         }`}
-        glow={popular}
+        glow={plan.popular}
       >
-        {/* Gradient background */}
-        <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${gradient} opacity-50`} />
+        <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${plan.gradient} opacity-50`} />
         
         <div className="relative space-y-6">
           <div>
-            <h3 className="text-2xl font-bold text-card-foreground mb-2">{name}</h3>
-            <p className="text-sm text-muted-foreground">{description}</p>
+            <h3 className="text-2xl font-bold text-card-foreground mb-2">{plan.name}</h3>
+            <p className="text-sm text-muted-foreground">{plan.description}</p>
           </div>
 
           <div className="flex items-baseline gap-2">
-            <span className="text-5xl font-bold text-foreground">{price}</span>
-            <span className="text-muted-foreground text-lg">{period}</span>
+            <span className="text-5xl font-bold text-foreground">{plan.price}</span>
+            <span className="text-muted-foreground text-lg">{plan.period}</span>
           </div>
 
           <Button 
             variant={variant} 
             size="lg" 
-            className={`w-full group ${popular ? 'shadow-lg' : ''}`}
+            className={`w-full group ${plan.popular ? 'shadow-lg' : ''}`}
             onClick={() => window.location.href = '/auth'}
           >
             {cta}
@@ -212,7 +137,7 @@ const PlanCard = ({
           </Button>
 
           <div className="space-y-3 pt-6 border-t border-border">
-            {features.map((feature, i) => (
+            {plan.features.map((feature, i) => (
               <motion.div 
                 key={i} 
                 className="flex items-start gap-3"
