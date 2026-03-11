@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { PLAN_LABELS } from '@/lib/plans';
 
 export type PlanType = 'trial' | 'basic' | 'pro' | 'enterprise';
 export type SubscriptionStatus = 'active' | 'trial' | 'expired' | 'blocked' | 'suspended' | 'cancelled';
@@ -15,6 +16,8 @@ export interface Subscription {
   plan_expires_at: string | null;
   blocked_at: string | null;
   blocked_reason: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -23,7 +26,19 @@ export const useSubscription = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadSubscription = useCallback(async () => {
+  const checkStripeSubscription = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      if (!error && data?.subscribed) {
+        // Stripe has an active subscription, reload local data
+        await loadSubscriptionLocal();
+      }
+    } catch {
+      // Silently fail — Stripe check is supplementary
+    }
+  }, []);
+
+  const loadSubscriptionLocal = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -51,23 +66,33 @@ export const useSubscription = () => {
     }
   }, []);
 
+  const loadSubscription = useCallback(async () => {
+    await loadSubscriptionLocal();
+    // Also check Stripe in background
+    checkStripeSubscription();
+  }, [loadSubscriptionLocal, checkStripeSubscription]);
+
   useEffect(() => {
     loadSubscription();
   }, [loadSubscription]);
+
+  // Periodic check every 60s
+  useEffect(() => {
+    const interval = setInterval(checkStripeSubscription, 60000);
+    return () => clearInterval(interval);
+  }, [checkStripeSubscription]);
 
   const isActive = subscription?.status === 'active' || subscription?.status === 'trial';
   const isTrial = subscription?.status === 'trial';
   const isExpired = subscription?.status === 'expired';
   const isBlocked = subscription?.status === 'blocked' || subscription?.status === 'suspended' || subscription?.status === 'cancelled';
   
-  // Calculate trial days remaining
   const trialDaysRemaining = (() => {
     if (!subscription?.trial_end_date || subscription.status !== 'trial') return 0;
     const now = new Date();
     const end = new Date(subscription.trial_end_date);
     const diffMs = end.getTime() - now.getTime();
     if (diffMs <= 0) return 0;
-    // Count business days remaining
     let businessDays = 0;
     const current = new Date(now);
     current.setHours(0, 0, 0, 0);
@@ -82,16 +107,7 @@ export const useSubscription = () => {
   })();
 
   const isTrialExpiring = isTrial && trialDaysRemaining <= 2;
-
-  // Can the user create/edit/delete? (read-only mode if not active)
   const canWrite = isActive;
-
-  const planLabel: Record<PlanType, string> = {
-    trial: 'Trial',
-    basic: 'Básico',
-    pro: 'Profissional',
-    enterprise: 'Enterprise',
-  };
 
   return {
     subscription,
@@ -103,7 +119,7 @@ export const useSubscription = () => {
     trialDaysRemaining,
     isTrialExpiring,
     canWrite,
-    planLabel: subscription ? planLabel[subscription.plan] : 'Trial',
+    planLabel: subscription ? (PLAN_LABELS[subscription.plan] || 'Trial') : 'Trial',
     refresh: loadSubscription,
   };
 };

@@ -632,7 +632,7 @@ const SuperAdmin = () => {
                         suspended: "bg-orange-500/15 text-orange-400 border-orange-500/30",
                         cancelled: "bg-[hsl(220,9%,30%)]/15 text-[hsl(220,9%,50%)] border-[hsl(220,9%,30%)]",
                       };
-                      const planLabels: Record<string, string> = { trial: "Trial", basic: "Básico", pro: "Pro", enterprise: "Enterprise" };
+                      const planLabels: Record<string, string> = { trial: "Trial", basic: "Starter", pro: "Profissional", enterprise: "Clínica" };
                       const trialEnd = sub.trial_end_date ? new Date(sub.trial_end_date) : null;
                       const isTrialExpired = trialEnd && trialEnd < new Date();
 
@@ -659,13 +659,31 @@ const SuperAdmin = () => {
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            {sub.status === "trial" && (
-                              <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
-                                onClick={() => handleUpdateSubscription(sub.user_id, { plan: "pro", status: "active", plan_started_at: new Date().toISOString() })}>
-                                Ativar Pro
-                              </Button>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {/* Plan change buttons */}
+                            {sub.status !== "blocked" && sub.status !== "cancelled" && (
+                              <>
+                                {sub.plan !== "basic" && (
+                                  <Button variant="ghost" size="sm" className="text-xs text-sky-400 hover:bg-sky-500/10 h-7"
+                                    onClick={() => handleUpdateSubscription(sub.user_id, { plan: "basic", status: "active", plan_started_at: new Date().toISOString(), blocked_at: null, blocked_reason: null })}>
+                                    Starter
+                                  </Button>
+                                )}
+                                {sub.plan !== "pro" && (
+                                  <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
+                                    onClick={() => handleUpdateSubscription(sub.user_id, { plan: "pro", status: "active", plan_started_at: new Date().toISOString(), blocked_at: null, blocked_reason: null })}>
+                                    Pro
+                                  </Button>
+                                )}
+                                {sub.plan !== "enterprise" && (
+                                  <Button variant="ghost" size="sm" className="text-xs text-purple-400 hover:bg-purple-500/10 h-7"
+                                    onClick={() => handleUpdateSubscription(sub.user_id, { plan: "enterprise", status: "active", plan_started_at: new Date().toISOString(), blocked_at: null, blocked_reason: null })}>
+                                    Clínica
+                                  </Button>
+                                )}
+                              </>
                             )}
+                            {/* Extend trial */}
                             {sub.status === "trial" && (
                               <Button variant="ghost" size="sm" className="text-xs text-amber-400 hover:bg-amber-500/10 h-7"
                                 onClick={() => {
@@ -676,12 +694,21 @@ const SuperAdmin = () => {
                                 +7 dias
                               </Button>
                             )}
-                            {(sub.status === "expired" || sub.status === "blocked") && (
+                            {/* Reactivate */}
+                            {(sub.status === "expired" || sub.status === "blocked" || sub.status === "cancelled") && (
                               <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
-                                onClick={() => handleUpdateSubscription(sub.user_id, { status: "active", plan: "basic", blocked_at: null, blocked_reason: null })}>
+                                onClick={() => handleUpdateSubscription(sub.user_id, { status: "active", plan: sub.plan === "trial" ? "basic" : sub.plan, blocked_at: null, blocked_reason: null, plan_started_at: new Date().toISOString() })}>
                                 Reativar
                               </Button>
                             )}
+                            {/* Cancel */}
+                            {sub.status === "active" && (
+                              <Button variant="ghost" size="sm" className="text-xs text-orange-400 hover:bg-orange-500/10 h-7"
+                                onClick={() => handleUpdateSubscription(sub.user_id, { status: "cancelled" })}>
+                                Cancelar
+                              </Button>
+                            )}
+                            {/* Block */}
                             {sub.status !== "blocked" && sub.status !== "cancelled" && (
                               <Button variant="ghost" size="sm" className="text-xs text-destructive hover:bg-destructive/10 h-7"
                                 onClick={() => handleUpdateSubscription(sub.user_id, { status: "blocked", blocked_at: new Date().toISOString(), blocked_reason: "Bloqueado pelo Super Admin" })}>
@@ -739,7 +766,7 @@ const SuperAdmin = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {["trial", "basic", "pro", "enterprise"].map(plan => {
                       const count = subscriptions.filter(s => s.plan === plan).length;
-                      const labels: Record<string, string> = { trial: "Trial", basic: "Básico", pro: "Pro", enterprise: "Enterprise" };
+                      const labels: Record<string, string> = { trial: "Trial", basic: "Starter", pro: "Profissional", enterprise: "Clínica" };
                       const colors: Record<string, string> = { trial: "text-amber-400", basic: "text-sky-400", pro: "text-primary", enterprise: "text-emerald-400" };
                       return (
                         <div key={plan} className="p-3 rounded-lg bg-[hsl(222,47%,14%)] text-center">

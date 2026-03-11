@@ -54,6 +54,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData();
+    // Check for Stripe checkout return
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      toast.success("Pagamento realizado com sucesso! Sua assinatura está ativa.");
+      // Clean URL
+      window.history.replaceState({}, "", "/dashboard");
+      // Trigger subscription check
+      supabase.functions.invoke("check-subscription").catch(() => {});
+    }
   }, []);
 
   const loadDashboardData = async () => {

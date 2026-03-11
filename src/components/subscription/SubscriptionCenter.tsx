@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -26,91 +28,51 @@ import {
   CreditCard,
   Clock,
   Shield,
-  Zap,
-  Crown,
-  Building2,
   ArrowRight,
-  Calendar,
   FileText,
-  Users,
-  BarChart3,
-  Video,
   Download,
-  MessageSquare,
   Star,
+  Loader2,
 } from "lucide-react";
+import { PLANS, PLAN_LABELS } from "@/lib/plans";
 
 interface SubscriptionCenterProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const plans = [
-  {
-    id: "basic" as const,
-    name: "Starter",
-    icon: Zap,
-    price: "R$ 39",
-    period: "/mês",
-    description: "Ideal para psicólogos iniciantes",
-    gradient: "from-emerald-500/20 to-teal-500/20",
-    borderColor: "border-emerald-500/30",
-    iconColor: "text-emerald-500",
-    features: [
-      "Até 30 pacientes",
-      "Agenda inteligente",
-      "Prontuários digitais",
-      "Relatórios básicos",
-      "Suporte por email",
-    ],
-  },
-  {
-    id: "pro" as const,
-    name: "Profissional",
-    icon: Crown,
-    price: "R$ 79",
-    period: "/mês",
-    description: "Para profissionais com maior volume",
-    popular: true,
-    gradient: "from-primary/20 to-secondary/20",
-    borderColor: "border-primary/50",
-    iconColor: "text-primary",
-    features: [
-      "Pacientes ilimitados",
-      "Prontuários avançados com IA",
-      "Relatórios financeiros",
-      "Integração Google Agenda",
-      "Exportação de dados",
-      "Teleatendimento HD",
-      "Portal do paciente",
-      "Suporte prioritário",
-    ],
-  },
-  {
-    id: "enterprise" as const,
-    name: "Clínica",
-    icon: Building2,
-    price: "R$ 149",
-    period: "/mês",
-    description: "Para clínicas e equipes",
-    gradient: "from-purple-500/20 to-pink-500/20",
-    borderColor: "border-purple-500/30",
-    iconColor: "text-purple-500",
-    features: [
-      "Tudo do Profissional",
-      "Múltiplos profissionais",
-      "Gestão de equipe",
-      "Agenda compartilhada",
-      "Relatórios avançados",
-      "Controle de repasses",
-      "Onboarding dedicado",
-      "Gerente de sucesso",
-    ],
-  },
-];
-
 function SubscriptionCenterContent({ onClose }: { onClose: () => void }) {
-  const { subscription, loading, isTrial, isExpired, isBlocked, trialDaysRemaining, planLabel, isActive } = useSubscription();
+  const { subscription, loading, isTrial, isExpired, isBlocked, trialDaysRemaining, isActive } = useSubscription();
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+
+  const handleChoosePlan = async (priceId: string, planId: string) => {
+    setCheckoutLoading(planId);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: { priceId },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, "_blank");
+      }
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message || "Não foi possível iniciar o checkout.", variant: "destructive" });
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("customer-portal");
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, "_blank");
+      }
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message || "Não foi possível abrir o portal.", variant: "destructive" });
+    }
+  };
 
   if (loading) {
     return (
@@ -121,6 +83,8 @@ function SubscriptionCenterContent({ onClose }: { onClose: () => void }) {
       </div>
     );
   }
+
+  const currentPlanLabel = subscription ? PLAN_LABELS[subscription.plan] || subscription.plan : "Trial";
 
   const statusConfig = (() => {
     if (isExpired) return { label: "Expirado", color: "bg-destructive/10 text-destructive border-destructive/30", dot: "bg-destructive" };
@@ -141,7 +105,7 @@ function SubscriptionCenterContent({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Plano atual</p>
-            <h3 className="text-xl font-bold mt-1">Plano {planLabel}</h3>
+            <h3 className="text-xl font-bold mt-1">Plano {currentPlanLabel}</h3>
           </div>
           <Badge variant="outline" className={cn("gap-1.5 px-3 py-1 text-xs font-medium", statusConfig.color)}>
             <span className={cn("h-1.5 w-1.5 rounded-full", statusConfig.dot)} />
@@ -189,7 +153,7 @@ function SubscriptionCenterContent({ onClose }: { onClose: () => void }) {
         )}
       </motion.div>
 
-      {/* Plans Comparison */}
+      {/* Plans */}
       <div className="space-y-3">
         <div>
           <h3 className="text-lg font-bold">Escolha seu plano</h3>
@@ -197,9 +161,10 @@ function SubscriptionCenterContent({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="grid gap-4">
-          {plans.map((plan, index) => {
+          {PLANS.map((plan, index) => {
             const Icon = plan.icon;
             const isCurrent = subscription?.plan === plan.id;
+            const isLoading = checkoutLoading === plan.id;
 
             return (
               <motion.div
@@ -213,7 +178,6 @@ function SubscriptionCenterContent({ onClose }: { onClose: () => void }) {
                   isCurrent && "ring-2 ring-primary/50"
                 )}
               >
-                {/* Gradient background */}
                 <div className={cn("absolute inset-0 rounded-xl bg-gradient-to-br opacity-30", plan.gradient)} />
 
                 <div className="relative space-y-4">
@@ -258,10 +222,16 @@ function SubscriptionCenterContent({ onClose }: { onClose: () => void }) {
                     variant={plan.popular ? "hero" : "outline"}
                     size="sm"
                     className="w-full gap-1.5"
-                    disabled={isCurrent}
+                    disabled={isCurrent || isLoading}
+                    onClick={() => handleChoosePlan(plan.stripePriceId, plan.id)}
                   >
-                    {isCurrent ? "Plano atual" : "Escolher plano"}
-                    {!isCurrent && <ArrowRight className="h-3.5 w-3.5" />}
+                    {isLoading ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Redirecionando...</>
+                    ) : isCurrent ? (
+                      "Plano atual"
+                    ) : (
+                      <>{isActive && !isTrial ? "Alterar plano" : "Escolher plano"}<ArrowRight className="h-3.5 w-3.5" /></>
+                    )}
                   </Button>
                 </div>
               </motion.div>
@@ -284,28 +254,10 @@ function SubscriptionCenterContent({ onClose }: { onClose: () => void }) {
 
         {isActive && !isTrial ? (
           <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-12 rounded bg-gradient-to-r from-blue-600 to-blue-400 flex items-center justify-center">
-                  <CreditCard className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">•••• •••• •••• 4321</p>
-                  <p className="text-xs text-muted-foreground">Expira 12/28</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm">Alterar</Button>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1 gap-1.5">
-                <FileText className="h-3.5 w-3.5" />
-                Ver histórico
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1 gap-1.5">
-                <Download className="h-3.5 w-3.5" />
-                Baixar recibo
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={handleManageSubscription}>
+              <CreditCard className="h-3.5 w-3.5" />
+              Gerenciar assinatura no Stripe
+            </Button>
           </div>
         ) : (
           <div className="text-center py-4">
