@@ -632,7 +632,7 @@ const SuperAdmin = () => {
                         suspended: "bg-orange-500/15 text-orange-400 border-orange-500/30",
                         cancelled: "bg-[hsl(220,9%,30%)]/15 text-[hsl(220,9%,50%)] border-[hsl(220,9%,30%)]",
                       };
-                      const planLabels: Record<string, string> = { trial: "Trial", basic: "Básico", pro: "Pro", enterprise: "Enterprise" };
+                      const planLabels: Record<string, string> = { trial: "Trial", basic: "Starter", pro: "Profissional", enterprise: "Clínica" };
                       const trialEnd = sub.trial_end_date ? new Date(sub.trial_end_date) : null;
                       const isTrialExpired = trialEnd && trialEnd < new Date();
 
