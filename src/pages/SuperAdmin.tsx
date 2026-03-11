@@ -766,7 +766,7 @@ const SuperAdmin = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {["trial", "basic", "pro", "enterprise"].map(plan => {
                       const count = subscriptions.filter(s => s.plan === plan).length;
-                      const labels: Record<string, string> = { trial: "Trial", basic: "Básico", pro: "Pro", enterprise: "Enterprise" };
+                      const labels: Record<string, string> = { trial: "Trial", basic: "Starter", pro: "Profissional", enterprise: "Clínica" };
                       const colors: Record<string, string> = { trial: "text-amber-400", basic: "text-sky-400", pro: "text-primary", enterprise: "text-emerald-400" };
                       return (
                         <div key={plan} className="p-3 rounded-lg bg-[hsl(222,47%,14%)] text-center">
