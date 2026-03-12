@@ -471,7 +471,7 @@ export default function Patients() {
           </Button>
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetCreateForm(); }}>
             <DialogTrigger asChild>
-              <Button className="gap-2"><Plus className="w-4 h-4" />Novo Paciente</Button>
+              <Button className="gap-2" onClick={(e) => { guardWrite(() => {}); if (!document.querySelector('[data-state="open"]')) { e.preventDefault(); } }}><Plus className="w-4 h-4" />Novo Paciente</Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
               <DialogHeader>
