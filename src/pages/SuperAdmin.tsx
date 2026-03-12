@@ -750,14 +750,23 @@ const SuperAdmin = () => {
           {activeTab === "finance" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {(() => {
-                  const mrr = stats?.totalRevenue || 0; // TODO: calculate from subscription revenue when Stripe is active
+              {(() => {
+                  const planPrices: Record<string, number> = { basic: 39, pro: 79, enterprise: 149 };
+                  const mrr = subscriptions
+                    .filter(s => s.status === "active" && s.plan !== "trial")
+                    .reduce((sum, s) => sum + (planPrices[s.plan] || 0), 0);
                   const arr = mrr * 12;
+                  const activeCount = subscriptions.filter(s => s.status === "active").length;
+                  const trialCount = subscriptions.filter(s => s.status === "trial").length;
+                  const cancelledCount = subscriptions.filter(s => ["cancelled", "expired"].includes(s.status)).length;
+                  const totalEver = subscriptions.length;
+                  const churnRate = totalEver > 0 ? Math.round((cancelledCount / totalEver) * 100) : 0;
+                  const conversionRate = totalEver > 0 ? Math.round((activeCount / totalEver) * 100) : 0;
                   return [
-                    { label: "Receita Total", value: `R$ ${(stats?.totalRevenue || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: "text-emerald-400" },
-                    { label: "MRR Estimado", value: `R$ ${mrr.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, icon: DollarSign, color: "text-primary" },
+                    { label: "MRR", value: `R$ ${mrr.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: DollarSign, color: "text-emerald-400" },
                     { label: "ARR Projetado", value: `R$ ${arr.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, icon: TrendingUp, color: "text-sky-400" },
-                    { label: "Conversão", value: `${stats?.conversionRate || 0}%`, icon: UserCheck, color: "text-amber-400" },
+                    { label: "Churn Rate", value: `${churnRate}%`, icon: ArrowDownRight, color: "text-destructive" },
+                    { label: "Conversão Trial→Pago", value: `${conversionRate}%`, icon: UserCheck, color: "text-amber-400" },
                   ];
                 })().map((s, i) => (
                   <Card key={i} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
