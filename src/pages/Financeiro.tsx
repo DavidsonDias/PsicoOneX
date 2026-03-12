@@ -67,6 +67,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function Financeiro() {
+  const { guardWrite } = useWriteGuard();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
