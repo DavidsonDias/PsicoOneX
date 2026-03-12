@@ -28,6 +28,7 @@ import Notificacoes from "./pages/Notificacoes";
 import SuperAdmin from "./pages/SuperAdmin";
 import Lixeira from "./pages/Lixeira";
 import PatientProfile from "./pages/PatientProfile";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
