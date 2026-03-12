@@ -659,7 +659,7 @@ export default function Financeiro() {
               }}>PDF</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); } }}>
           <DialogTrigger asChild>
             <Button className="gap-2"><Plus className="h-4 w-4" />Nova Transação</Button>
           </DialogTrigger>

@@ -739,8 +739,8 @@ const MedicalRecords = () => {
             </Select>
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
+            if (open) { guardWrite(() => setDialogOpen(true)); }
+            else { setDialogOpen(false); resetForm(); }
           }}>
             <DialogTrigger asChild>
               <Button className="gap-2">
