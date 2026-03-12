@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,6 +91,7 @@ const PATIENT_EXPORT_HEADERS = {
 
 export default function Patients() {
   const navigate = useNavigate();
+  const { guardWrite } = useWriteGuard();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -467,7 +469,7 @@ export default function Patients() {
           <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
             <Upload className="w-4 h-4" />Importar
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetCreateForm(); }}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); resetCreateForm(); } }}>
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="w-4 h-4" />Novo Paciente</Button>
             </DialogTrigger>

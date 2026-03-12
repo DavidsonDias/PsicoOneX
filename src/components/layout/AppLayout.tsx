@@ -11,6 +11,7 @@ import { CommandPalette } from "./CommandPalette";
 import { SubscriptionBanner } from "@/components/subscription/SubscriptionBanner";
 import { SubscriptionCenter } from "@/components/subscription/SubscriptionCenter";
 import { SubscriptionCenterProvider, useSubscriptionCenter } from "@/contexts/SubscriptionCenterContext";
+import { WriteBlockedProvider } from "@/components/subscription/WriteBlockedModal";
 import { SevenDevXFooter } from "./SevenDevXFooter";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -196,7 +197,9 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
             transition={{ delay: 0.1 }}
           >
             <WritePermissionContext.Provider value={canWrite}>
-              {children}
+              <WriteBlockedProvider canWrite={canWrite}>
+                {children}
+              </WriteBlockedProvider>
             </WritePermissionContext.Provider>
           </motion.div>
         </div>

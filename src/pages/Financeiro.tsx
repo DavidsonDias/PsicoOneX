@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react";
+import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function Financeiro() {
+  const { guardWrite } = useWriteGuard();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
@@ -658,7 +660,7 @@ export default function Financeiro() {
               }}>PDF</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); } }}>
           <DialogTrigger asChild>
             <Button className="gap-2"><Plus className="h-4 w-4" />Nova Transação</Button>
           </DialogTrigger>

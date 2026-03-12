@@ -28,6 +28,7 @@ import Notificacoes from "./pages/Notificacoes";
 import SuperAdmin from "./pages/SuperAdmin";
 import Lixeira from "./pages/Lixeira";
 import PatientProfile from "./pages/PatientProfile";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,7 @@ const App = () => (
                 <Route path="/notificacoes" element={<Notificacoes />} />
                 <Route path="/super-admin" element={<SuperAdmin />} />
                 <Route path="/lixeira" element={<Lixeira />} />
+                <Route path="/payment-success" element={<PaymentSuccess />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

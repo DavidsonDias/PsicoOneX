@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar } from "@/components/ui/calendar";
@@ -60,6 +61,7 @@ interface Patient {
 
 export default function Agenda() {
   const navigate = useNavigate();
+  const { guardWrite } = useWriteGuard();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -766,7 +768,7 @@ export default function Agenda() {
               <DropdownMenuItem onClick={() => handleExportAgenda("pdf")} className="cursor-pointer">PDF</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); } }}>
           <DialogTrigger asChild>
             <Button className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />

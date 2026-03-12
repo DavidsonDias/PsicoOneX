@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -144,6 +145,7 @@ function PatientRecordFolder({ patientId, patientName, records, onView, onEdit, 
 // ===== Main Component =====
 const MedicalRecords = () => {
   const navigate = useNavigate();
+  const { guardWrite } = useWriteGuard();
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -737,8 +739,8 @@ const MedicalRecords = () => {
             </Select>
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
+            if (open) { guardWrite(() => setDialogOpen(true)); }
+            else { setDialogOpen(false); resetForm(); }
           }}>
             <DialogTrigger asChild>
               <Button className="gap-2">
