@@ -469,9 +469,9 @@ export default function Patients() {
           <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
             <Upload className="w-4 h-4" />Importar
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetCreateForm(); }}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); resetCreateForm(); } }}>
             <DialogTrigger asChild>
-              <Button className="gap-2" onClick={(e) => { const canWrite = true; guardWrite(() => {}); }}><Plus className="w-4 h-4" />Novo Paciente</Button>
+              <Button className="gap-2"><Plus className="w-4 h-4" />Novo Paciente</Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
               <DialogHeader>
