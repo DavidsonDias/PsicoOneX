@@ -637,30 +637,49 @@ const SuperAdmin = () => {
                       const isTrialExpired = trialEnd && trialEnd < new Date();
 
                       return (
-                        <div key={sub.id} className="flex items-center justify-between p-3 rounded-lg bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,18%)]">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
-                              {profile?.full_name?.charAt(0) || "?"}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">{profile?.full_name || "Desconhecido"}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <Badge className={cn("text-[10px] h-5", statusColors[sub.status] || "")}>
-                                  {sub.status}
-                                </Badge>
-                                <Badge variant="outline" className="text-[10px] h-5 border-[hsl(222,47%,22%)] text-[hsl(220,9%,55%)]">
-                                  {planLabels[sub.plan] || sub.plan}
-                                </Badge>
-                                {sub.status === "trial" && trialEnd && (
-                                  <span className="text-[10px] text-[hsl(220,9%,45%)]">
-                                    Expira: {format(trialEnd, "dd/MM/yyyy")}
-                                  </span>
-                                )}
+                        <div key={sub.id} className="p-4 rounded-lg bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,18%)] space-y-3">
+                          {/* Row 1: User info + status */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
+                                {profile?.full_name?.charAt(0) || "?"}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{profile?.full_name || "Desconhecido"}</p>
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  <Badge className={cn("text-[10px] h-5", statusColors[sub.status] || "")}>
+                                    {sub.status}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] h-5 border-[hsl(222,47%,22%)] text-[hsl(220,9%,55%)]">
+                                    {planLabels[sub.plan] || sub.plan}
+                                  </Badge>
+                                </div>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {/* Plan change buttons */}
+
+                          {/* Row 2: Details */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-[hsl(220,9%,50%)]">
+                            <div>
+                              <p className="font-medium text-[hsl(220,9%,65%)]">Início</p>
+                              <p>{sub.plan_started_at ? format(new Date(sub.plan_started_at), "dd/MM/yyyy") : sub.trial_start_date ? format(new Date(sub.trial_start_date), "dd/MM/yyyy") : "—"}</p>
+                            </div>
+                            <div>
+                              <p className="font-medium text-[hsl(220,9%,65%)]">Expira</p>
+                              <p>{sub.plan_expires_at ? format(new Date(sub.plan_expires_at), "dd/MM/yyyy") : trialEnd ? format(trialEnd, "dd/MM/yyyy") : "—"}</p>
+                            </div>
+                            <div>
+                              <p className="font-medium text-[hsl(220,9%,65%)]">Stripe Customer</p>
+                              <p className="truncate">{sub.stripe_customer_id || "—"}</p>
+                            </div>
+                            <div>
+                              <p className="font-medium text-[hsl(220,9%,65%)]">Stripe Sub</p>
+                              <p className="truncate">{sub.stripe_subscription_id || "—"}</p>
+                            </div>
+                          </div>
+
+                          {/* Row 3: Actions */}
+                          <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-[hsl(222,47%,18%)]">
                             {sub.status !== "blocked" && sub.status !== "cancelled" && (
                               <>
                                 {sub.plan !== "basic" && (
@@ -683,7 +702,6 @@ const SuperAdmin = () => {
                                 )}
                               </>
                             )}
-                            {/* Extend trial */}
                             {sub.status === "trial" && (
                               <Button variant="ghost" size="sm" className="text-xs text-amber-400 hover:bg-amber-500/10 h-7"
                                 onClick={() => {
@@ -694,21 +712,18 @@ const SuperAdmin = () => {
                                 +7 dias
                               </Button>
                             )}
-                            {/* Reactivate */}
                             {(sub.status === "expired" || sub.status === "blocked" || sub.status === "cancelled") && (
                               <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
                                 onClick={() => handleUpdateSubscription(sub.user_id, { status: "active", plan: sub.plan === "trial" ? "basic" : sub.plan, blocked_at: null, blocked_reason: null, plan_started_at: new Date().toISOString() })}>
                                 Reativar
                               </Button>
                             )}
-                            {/* Cancel */}
                             {sub.status === "active" && (
                               <Button variant="ghost" size="sm" className="text-xs text-orange-400 hover:bg-orange-500/10 h-7"
                                 onClick={() => handleUpdateSubscription(sub.user_id, { status: "cancelled" })}>
                                 Cancelar
                               </Button>
                             )}
-                            {/* Block */}
                             {sub.status !== "blocked" && sub.status !== "cancelled" && (
                               <Button variant="ghost" size="sm" className="text-xs text-destructive hover:bg-destructive/10 h-7"
                                 onClick={() => handleUpdateSubscription(sub.user_id, { status: "blocked", blocked_at: new Date().toISOString(), blocked_reason: "Bloqueado pelo Super Admin" })}>
