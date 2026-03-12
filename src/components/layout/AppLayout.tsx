@@ -197,7 +197,9 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
             transition={{ delay: 0.1 }}
           >
             <WritePermissionContext.Provider value={canWrite}>
-              {children}
+              <WriteBlockedProvider canWrite={canWrite}>
+                {children}
+              </WriteBlockedProvider>
             </WritePermissionContext.Provider>
           </motion.div>
         </div>
