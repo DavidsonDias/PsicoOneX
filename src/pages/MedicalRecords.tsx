@@ -407,33 +407,35 @@ const MedicalRecords = () => {
   };
 
   const handleDeleteRecord = async (recordId: string) => {
-    // Soft delete — never hard delete clinical data
-    const { error } = await supabase
-      .from("medical_records")
-      .update({
-        deleted_at: new Date().toISOString(),
-        deleted_by: userId,
-        deleted_reason: "Excluído pelo usuário",
-      })
-      .eq("id", recordId);
+    guardWrite(() => {
+      (async () => {
+        const { error } = await supabase
+          .from("medical_records")
+          .update({
+            deleted_at: new Date().toISOString(),
+            deleted_by: userId,
+            deleted_reason: "Excluído pelo usuário",
+          })
+          .eq("id", recordId);
 
-    if (error) {
-      toast.error("Erro ao excluir prontuário");
-      return;
-    }
+        if (error) {
+          toast.error("Erro ao excluir prontuário");
+          return;
+        }
 
-    // Audit log
-    await supabase.from("audit_logs").insert({
-      user_id: userId,
-      action_type: "soft_delete",
-      entity_type: "medical_record",
-      entity_id: recordId,
-    } as any);
+        await supabase.from("audit_logs").insert({
+          user_id: userId,
+          action_type: "soft_delete",
+          entity_type: "medical_record",
+          entity_id: recordId,
+        } as any);
 
-    toast.success("Prontuário excluído com sucesso!");
-    setViewDialogOpen(false);
-    setSelectedRecord(null);
-    await loadRecords(userId);
+        toast.success("Prontuário excluído com sucesso!");
+        setViewDialogOpen(false);
+        setSelectedRecord(null);
+        await loadRecords(userId);
+      })();
+    });
   };
 
   const openEditDialog = (record: MedicalRecord) => {

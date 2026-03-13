@@ -401,54 +401,57 @@ export default function Agenda() {
   };
 
   const handleStatusChange = async (appointmentId: string, newStatus: string) => {
-    const apt = appointments.find(a => a.id === appointmentId);
-    const oldStatus = apt?.status;
+    guardWrite(() => {
+      (async () => {
+        const apt = appointments.find(a => a.id === appointmentId);
+        const oldStatus = apt?.status;
 
-    if (newStatus === "completed" && apt) {
-      await supabase.from("financial_transactions")
-        .update({ status: "paid", paid_date: new Date().toISOString().split("T")[0] })
-        .eq("appointment_id", apt.id)
-        .eq("status", "pending");
-    }
+        if (newStatus === "completed" && apt) {
+          await supabase.from("financial_transactions")
+            .update({ status: "paid", paid_date: new Date().toISOString().split("T")[0] })
+            .eq("appointment_id", apt.id)
+            .eq("status", "pending");
+        }
 
-    if (newStatus === "cancelled" && apt) {
-      await supabase.from("financial_transactions")
-        .update({ status: "cancelled" })
-        .eq("appointment_id", apt.id)
-        .eq("status", "pending");
+        if (newStatus === "cancelled" && apt) {
+          await supabase.from("financial_transactions")
+            .update({ status: "cancelled" })
+            .eq("appointment_id", apt.id)
+            .eq("status", "pending");
 
-      // Cancel in Google Calendar
-      syncAppointmentToGoogle("cancel", {
-        id: apt.id,
-        scheduled_at: apt.scheduled_at,
-        duration_minutes: apt.duration_minutes || 50,
-        type: apt.type || "presential",
-        patient_name: apt.patients.full_name,
-        google_event_id: apt.google_event_id,
-      });
-    }
+          syncAppointmentToGoogle("cancel", {
+            id: apt.id,
+            scheduled_at: apt.scheduled_at,
+            duration_minutes: apt.duration_minutes || 50,
+            type: apt.type || "presential",
+            patient_name: apt.patients.full_name,
+            google_event_id: apt.google_event_id,
+          });
+        }
 
-    const { error } = await supabase
-      .from("appointments")
-      .update({ status: newStatus } as any)
-      .eq("id", appointmentId);
+        const { error } = await supabase
+          .from("appointments")
+          .update({ status: newStatus } as any)
+          .eq("id", appointmentId);
 
-    if (error) {
-      toast.error("Erro ao atualizar status");
-      return;
-    }
+        if (error) {
+          toast.error("Erro ao atualizar status");
+          return;
+        }
 
-    await supabase.from("audit_logs").insert({
-      user_id: userId,
-      action_type: "status_change",
-      entity_type: "appointment",
-      entity_id: appointmentId,
-      old_data: { status: oldStatus },
-      new_data: { status: newStatus },
-    } as any);
+        await supabase.from("audit_logs").insert({
+          user_id: userId,
+          action_type: "status_change",
+          entity_type: "appointment",
+          entity_id: appointmentId,
+          old_data: { status: oldStatus },
+          new_data: { status: newStatus },
+        } as any);
 
-    toast.success("Status atualizado!");
-    await loadAppointments(userId);
+        toast.success("Status atualizado!");
+        await loadAppointments(userId);
+      })();
+    });
   };
 
   const resetForm = () => {

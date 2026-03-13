@@ -259,19 +259,22 @@ export default function Financeiro() {
     loadTransactions(userId);
   };
 
-  // Soft delete
   const handleDeleteTransaction = async (id: string) => {
-    const { error } = await supabase.from("financial_transactions")
-      .update({ deleted_at: new Date().toISOString(), deleted_by: userId, deleted_reason: "Excluído pelo usuário" })
-      .eq("id", id);
-    if (error) { toast.error("Erro ao excluir"); return; }
+    guardWrite(() => {
+      (async () => {
+        const { error } = await supabase.from("financial_transactions")
+          .update({ deleted_at: new Date().toISOString(), deleted_by: userId, deleted_reason: "Excluído pelo usuário" })
+          .eq("id", id);
+        if (error) { toast.error("Erro ao excluir"); return; }
 
-    await supabase.from("audit_logs").insert({
-      user_id: userId, action_type: "soft_delete", entity_type: "financial_transaction", entity_id: id,
-    } as any);
+        await supabase.from("audit_logs").insert({
+          user_id: userId, action_type: "soft_delete", entity_type: "financial_transaction", entity_id: id,
+        } as any);
 
-    toast.success("Transação excluída!");
-    loadTransactions(userId);
+        toast.success("Transação excluída!");
+        loadTransactions(userId);
+      })();
+    });
   };
 
   const openEditDialog = (t: Transaction) => {
