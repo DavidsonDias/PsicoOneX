@@ -358,43 +358,46 @@ export default function Agenda() {
 
   // Soft delete instead of hard delete + sync Google Calendar
   const handleDeleteAppointment = async (appointmentId: string) => {
-    const apt = appointments.find(a => a.id === appointmentId);
+    guardWrite(() => {
+      (async () => {
+        const apt = appointments.find(a => a.id === appointmentId);
 
-    const { error } = await supabase
-      .from("appointments")
-      .update({
-        deleted_at: new Date().toISOString(),
-        deleted_by: userId,
-        deleted_reason: "Excluído pelo usuário",
-      })
-      .eq("id", appointmentId);
+        const { error } = await supabase
+          .from("appointments")
+          .update({
+            deleted_at: new Date().toISOString(),
+            deleted_by: userId,
+            deleted_reason: "Excluído pelo usuário",
+          })
+          .eq("id", appointmentId);
 
-    if (error) {
-      toast.error("Erro ao excluir agendamento");
-      return;
-    }
+        if (error) {
+          toast.error("Erro ao excluir agendamento");
+          return;
+        }
 
-    // Sync deletion to Google Calendar
-    if (apt?.google_event_id) {
-      syncAppointmentToGoogle("cancel", {
-        id: apt.id,
-        scheduled_at: apt.scheduled_at,
-        duration_minutes: apt.duration_minutes || 50,
-        type: apt.type || "presential",
-        patient_name: apt.patients?.full_name || "Paciente",
-        google_event_id: apt.google_event_id,
-      });
-    }
+        if (apt?.google_event_id) {
+          syncAppointmentToGoogle("cancel", {
+            id: apt.id,
+            scheduled_at: apt.scheduled_at,
+            duration_minutes: apt.duration_minutes || 50,
+            type: apt.type || "presential",
+            patient_name: apt.patients?.full_name || "Paciente",
+            google_event_id: apt.google_event_id,
+          });
+        }
 
-    await supabase.from("audit_logs").insert({
-      user_id: userId,
-      action_type: "soft_delete",
-      entity_type: "appointment",
-      entity_id: appointmentId,
-    } as any);
+        await supabase.from("audit_logs").insert({
+          user_id: userId,
+          action_type: "soft_delete",
+          entity_type: "appointment",
+          entity_id: appointmentId,
+        } as any);
 
-    toast.success("Agendamento excluído!");
-    await loadAppointments(userId);
+        toast.success("Agendamento excluído!");
+        await loadAppointments(userId);
+      })();
+    });
   };
 
   const handleStatusChange = async (appointmentId: string, newStatus: string) => {
