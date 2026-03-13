@@ -282,6 +282,7 @@ export default function Patients() {
   const handleEditPatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingPatient) return;
+    // Write guard is on the dialog open, so if we got here we're allowed
     const formData = new FormData(e.currentTarget);
     try {
       const { error } = await supabase.from("patients").update({
