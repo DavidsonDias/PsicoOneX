@@ -278,14 +278,16 @@ export default function Financeiro() {
   };
 
   const openEditDialog = (t: Transaction) => {
-    setFormData({
-      type: t.type, amount: t.amount.toString(), description: t.description,
-      category: t.category, payment_method: t.payment_method,
-      payment_status: t.payment_status, due_date: t.due_date,
-      patient_id: t.patient_id || "", cost_center: t.cost_center || "",
-      tax_rate: String(t.tax_rate || 0),
+    guardWrite(() => {
+      setFormData({
+        type: t.type, amount: t.amount.toString(), description: t.description,
+        category: t.category, payment_method: t.payment_method,
+        payment_status: t.payment_status, due_date: t.due_date,
+        patient_id: t.patient_id || "", cost_center: t.cost_center || "",
+        tax_rate: String(t.tax_rate || 0),
+      });
+      setEditingTransaction(t);
     });
-    setEditingTransaction(t);
   };
 
   const resetForm = () => setFormData({

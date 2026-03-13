@@ -439,41 +439,38 @@ const MedicalRecords = () => {
   };
 
   const openEditDialog = (record: MedicalRecord) => {
-    const obsContent = record.observations || "";
-    const freeNotesMarker = "--- Anotações Livres ---";
-    const markerIndex = obsContent.indexOf(freeNotesMarker);
+    guardWrite(() => {
+      const obsContent = record.observations || "";
+      const freeNotesMarker = "--- Anotações Livres ---";
+      const markerIndex = obsContent.indexOf(freeNotesMarker);
 
-    let observations = "";
-    let freeNotes = "";
+      let observations = "";
+      let freeNotes = "";
 
-    if (markerIndex !== -1) {
-      // Has marker: split structured observations from free notes
-      observations = obsContent.substring(0, markerIndex).trim();
-      freeNotes = obsContent.substring(markerIndex + freeNotesMarker.length).trim();
-    } else {
-      // No marker: treat entire content as free-form notes (new editor format)
-      freeNotes = obsContent;
-    }
+      if (markerIndex !== -1) {
+        observations = obsContent.substring(0, markerIndex).trim();
+        freeNotes = obsContent.substring(markerIndex + freeNotesMarker.length).trim();
+      } else {
+        freeNotes = obsContent;
+      }
 
-    // Close any open dialogs first
-    setDialogOpen(false);
-    setViewDialogOpen(false);
-    
-    // CRITICAL: Set editingRecord FIRST so that the useEffect for session_number
-    // doesn't overwrite the loaded value
-    setEditingRecord(record);
-    setFormData({
-      patient_id: record.patient_id,
-      session_date: record.session_date,
-      session_number: record.session_number || 1,
-      complaints: record.complaints || "",
-      observations: observations,
-      techniques_used: record.techniques_used || "",
-      evolution: record.evolution || "",
-      next_steps: record.next_steps || ""
+      setDialogOpen(false);
+      setViewDialogOpen(false);
+      
+      setEditingRecord(record);
+      setFormData({
+        patient_id: record.patient_id,
+        session_date: record.session_date,
+        session_number: record.session_number || 1,
+        complaints: record.complaints || "",
+        observations: observations,
+        techniques_used: record.techniques_used || "",
+        evolution: record.evolution || "",
+        next_steps: record.next_steps || ""
+      });
+      setFreeFormNotes(freeNotes);
+      setPendingFiles([]);
     });
-    setFreeFormNotes(freeNotes);
-    setPendingFiles([]);
   };
 
   const resetForm = () => {

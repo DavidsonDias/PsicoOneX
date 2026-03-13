@@ -471,21 +471,23 @@ export default function Agenda() {
   };
 
   const openEditDialog = (appointment: Appointment) => {
-    const dateTime = new Date(appointment.scheduled_at);
-    setFormData({
-      patient_id: appointment.patient_id,
-      date: format(dateTime, "yyyy-MM-dd"),
-      time: format(dateTime, "HH:mm"),
-      notes: appointment.notes || "",
-      type: appointment.type || "presential",
-      duration: String(appointment.duration_minutes || 50),
-      status: appointment.status || "scheduled",
-      session_value: String(appointment.session_value || 200),
-      recurrence_enabled: false,
-      recurrence_type: appointment.recurrence_type || "weekly",
-      recurrence_count: "4",
+    guardWrite(() => {
+      const dateTime = new Date(appointment.scheduled_at);
+      setFormData({
+        patient_id: appointment.patient_id,
+        date: format(dateTime, "yyyy-MM-dd"),
+        time: format(dateTime, "HH:mm"),
+        notes: appointment.notes || "",
+        type: appointment.type || "presential",
+        duration: String(appointment.duration_minutes || 50),
+        status: appointment.status || "scheduled",
+        session_value: String(appointment.session_value || 200),
+        recurrence_enabled: false,
+        recurrence_type: appointment.recurrence_type || "weekly",
+        recurrence_count: "4",
+      });
+      setEditingAppointment(appointment);
     });
-    setEditingAppointment(appointment);
   };
 
   const filteredAppointments = appointments.filter(apt => {
