@@ -282,6 +282,7 @@ export default function Patients() {
   const handleEditPatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingPatient) return;
+    // Write guard is on the dialog open, so if we got here we're allowed
     const formData = new FormData(e.currentTarget);
     try {
       const { error } = await supabase.from("patients").update({
@@ -305,40 +306,48 @@ export default function Patients() {
   };
 
   const handleDeletePatient = async (patientId: string) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { error } = await supabase.from("patients").update({
-        deleted_at: new Date().toISOString(), deleted_by: session.user.id, deleted_reason: "Excluído pelo usuário",
-      }).eq("id", patientId);
-      if (error) throw error;
-      await supabase.from("audit_logs").insert({
-        user_id: session.user.id, action_type: "soft_delete", entity_type: "patient", entity_id: patientId,
-      } as any);
-      toast.success("Paciente excluído!");
-      loadPatients();
-    } catch {
-      toast.error("Erro ao excluir paciente");
-    }
+    guardWrite(() => {
+      (async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) return;
+          const { error } = await supabase.from("patients").update({
+            deleted_at: new Date().toISOString(), deleted_by: session.user.id, deleted_reason: "Excluído pelo usuário",
+          }).eq("id", patientId);
+          if (error) throw error;
+          await supabase.from("audit_logs").insert({
+            user_id: session.user.id, action_type: "soft_delete", entity_type: "patient", entity_id: patientId,
+          } as any);
+          toast.success("Paciente excluído!");
+          loadPatients();
+        } catch {
+          toast.error("Erro ao excluir paciente");
+        }
+      })();
+    });
   };
 
   const handleToggleStatus = async (patientId: string, currentStatus: string) => {
-    try {
-      const newStatus = currentStatus === "active" ? "inactive" : "active";
-      const { error } = await supabase.from("patients").update({ status: newStatus }).eq("id", patientId);
-      if (error) throw error;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await supabase.from("audit_logs").insert({
-          user_id: session.user.id, action_type: "status_change", entity_type: "patient", entity_id: patientId,
-          old_data: { status: currentStatus }, new_data: { status: newStatus },
-        } as any);
-      }
-      toast.success(newStatus === "active" ? "Paciente reativado!" : "Paciente inativado!");
-      loadPatients();
-    } catch {
-      toast.error("Erro ao alterar status");
-    }
+    guardWrite(() => {
+      (async () => {
+        try {
+          const newStatus = currentStatus === "active" ? "inactive" : "active";
+          const { error } = await supabase.from("patients").update({ status: newStatus }).eq("id", patientId);
+          if (error) throw error;
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await supabase.from("audit_logs").insert({
+              user_id: session.user.id, action_type: "status_change", entity_type: "patient", entity_id: patientId,
+              old_data: { status: currentStatus }, new_data: { status: newStatus },
+            } as any);
+          }
+          toast.success(newStatus === "active" ? "Paciente reativado!" : "Paciente inativado!");
+          loadPatients();
+        } catch {
+          toast.error("Erro ao alterar status");
+        }
+      })();
+    });
   };
 
   // Bulk delete

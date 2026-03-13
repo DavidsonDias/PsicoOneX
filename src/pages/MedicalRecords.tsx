@@ -407,71 +407,70 @@ const MedicalRecords = () => {
   };
 
   const handleDeleteRecord = async (recordId: string) => {
-    // Soft delete — never hard delete clinical data
-    const { error } = await supabase
-      .from("medical_records")
-      .update({
-        deleted_at: new Date().toISOString(),
-        deleted_by: userId,
-        deleted_reason: "Excluído pelo usuário",
-      })
-      .eq("id", recordId);
+    guardWrite(() => {
+      (async () => {
+        const { error } = await supabase
+          .from("medical_records")
+          .update({
+            deleted_at: new Date().toISOString(),
+            deleted_by: userId,
+            deleted_reason: "Excluído pelo usuário",
+          })
+          .eq("id", recordId);
 
-    if (error) {
-      toast.error("Erro ao excluir prontuário");
-      return;
-    }
+        if (error) {
+          toast.error("Erro ao excluir prontuário");
+          return;
+        }
 
-    // Audit log
-    await supabase.from("audit_logs").insert({
-      user_id: userId,
-      action_type: "soft_delete",
-      entity_type: "medical_record",
-      entity_id: recordId,
-    } as any);
+        await supabase.from("audit_logs").insert({
+          user_id: userId,
+          action_type: "soft_delete",
+          entity_type: "medical_record",
+          entity_id: recordId,
+        } as any);
 
-    toast.success("Prontuário excluído com sucesso!");
-    setViewDialogOpen(false);
-    setSelectedRecord(null);
-    await loadRecords(userId);
+        toast.success("Prontuário excluído com sucesso!");
+        setViewDialogOpen(false);
+        setSelectedRecord(null);
+        await loadRecords(userId);
+      })();
+    });
   };
 
   const openEditDialog = (record: MedicalRecord) => {
-    const obsContent = record.observations || "";
-    const freeNotesMarker = "--- Anotações Livres ---";
-    const markerIndex = obsContent.indexOf(freeNotesMarker);
+    guardWrite(() => {
+      const obsContent = record.observations || "";
+      const freeNotesMarker = "--- Anotações Livres ---";
+      const markerIndex = obsContent.indexOf(freeNotesMarker);
 
-    let observations = "";
-    let freeNotes = "";
+      let observations = "";
+      let freeNotes = "";
 
-    if (markerIndex !== -1) {
-      // Has marker: split structured observations from free notes
-      observations = obsContent.substring(0, markerIndex).trim();
-      freeNotes = obsContent.substring(markerIndex + freeNotesMarker.length).trim();
-    } else {
-      // No marker: treat entire content as free-form notes (new editor format)
-      freeNotes = obsContent;
-    }
+      if (markerIndex !== -1) {
+        observations = obsContent.substring(0, markerIndex).trim();
+        freeNotes = obsContent.substring(markerIndex + freeNotesMarker.length).trim();
+      } else {
+        freeNotes = obsContent;
+      }
 
-    // Close any open dialogs first
-    setDialogOpen(false);
-    setViewDialogOpen(false);
-    
-    // CRITICAL: Set editingRecord FIRST so that the useEffect for session_number
-    // doesn't overwrite the loaded value
-    setEditingRecord(record);
-    setFormData({
-      patient_id: record.patient_id,
-      session_date: record.session_date,
-      session_number: record.session_number || 1,
-      complaints: record.complaints || "",
-      observations: observations,
-      techniques_used: record.techniques_used || "",
-      evolution: record.evolution || "",
-      next_steps: record.next_steps || ""
+      setDialogOpen(false);
+      setViewDialogOpen(false);
+      
+      setEditingRecord(record);
+      setFormData({
+        patient_id: record.patient_id,
+        session_date: record.session_date,
+        session_number: record.session_number || 1,
+        complaints: record.complaints || "",
+        observations: observations,
+        techniques_used: record.techniques_used || "",
+        evolution: record.evolution || "",
+        next_steps: record.next_steps || ""
+      });
+      setFreeFormNotes(freeNotes);
+      setPendingFiles([]);
     });
-    setFreeFormNotes(freeNotes);
-    setPendingFiles([]);
   };
 
   const resetForm = () => {

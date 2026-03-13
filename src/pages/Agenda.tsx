@@ -358,94 +358,100 @@ export default function Agenda() {
 
   // Soft delete instead of hard delete + sync Google Calendar
   const handleDeleteAppointment = async (appointmentId: string) => {
-    const apt = appointments.find(a => a.id === appointmentId);
+    guardWrite(() => {
+      (async () => {
+        const apt = appointments.find(a => a.id === appointmentId);
 
-    const { error } = await supabase
-      .from("appointments")
-      .update({
-        deleted_at: new Date().toISOString(),
-        deleted_by: userId,
-        deleted_reason: "Excluído pelo usuário",
-      })
-      .eq("id", appointmentId);
+        const { error } = await supabase
+          .from("appointments")
+          .update({
+            deleted_at: new Date().toISOString(),
+            deleted_by: userId,
+            deleted_reason: "Excluído pelo usuário",
+          })
+          .eq("id", appointmentId);
 
-    if (error) {
-      toast.error("Erro ao excluir agendamento");
-      return;
-    }
+        if (error) {
+          toast.error("Erro ao excluir agendamento");
+          return;
+        }
 
-    // Sync deletion to Google Calendar
-    if (apt?.google_event_id) {
-      syncAppointmentToGoogle("cancel", {
-        id: apt.id,
-        scheduled_at: apt.scheduled_at,
-        duration_minutes: apt.duration_minutes || 50,
-        type: apt.type || "presential",
-        patient_name: apt.patients?.full_name || "Paciente",
-        google_event_id: apt.google_event_id,
-      });
-    }
+        if (apt?.google_event_id) {
+          syncAppointmentToGoogle("cancel", {
+            id: apt.id,
+            scheduled_at: apt.scheduled_at,
+            duration_minutes: apt.duration_minutes || 50,
+            type: apt.type || "presential",
+            patient_name: apt.patients?.full_name || "Paciente",
+            google_event_id: apt.google_event_id,
+          });
+        }
 
-    await supabase.from("audit_logs").insert({
-      user_id: userId,
-      action_type: "soft_delete",
-      entity_type: "appointment",
-      entity_id: appointmentId,
-    } as any);
+        await supabase.from("audit_logs").insert({
+          user_id: userId,
+          action_type: "soft_delete",
+          entity_type: "appointment",
+          entity_id: appointmentId,
+        } as any);
 
-    toast.success("Agendamento excluído!");
-    await loadAppointments(userId);
+        toast.success("Agendamento excluído!");
+        await loadAppointments(userId);
+      })();
+    });
   };
 
   const handleStatusChange = async (appointmentId: string, newStatus: string) => {
-    const apt = appointments.find(a => a.id === appointmentId);
-    const oldStatus = apt?.status;
+    guardWrite(() => {
+      (async () => {
+        const apt = appointments.find(a => a.id === appointmentId);
+        const oldStatus = apt?.status;
 
-    if (newStatus === "completed" && apt) {
-      await supabase.from("financial_transactions")
-        .update({ status: "paid", paid_date: new Date().toISOString().split("T")[0] })
-        .eq("appointment_id", apt.id)
-        .eq("status", "pending");
-    }
+        if (newStatus === "completed" && apt) {
+          await supabase.from("financial_transactions")
+            .update({ status: "paid", paid_date: new Date().toISOString().split("T")[0] })
+            .eq("appointment_id", apt.id)
+            .eq("status", "pending");
+        }
 
-    if (newStatus === "cancelled" && apt) {
-      await supabase.from("financial_transactions")
-        .update({ status: "cancelled" })
-        .eq("appointment_id", apt.id)
-        .eq("status", "pending");
+        if (newStatus === "cancelled" && apt) {
+          await supabase.from("financial_transactions")
+            .update({ status: "cancelled" })
+            .eq("appointment_id", apt.id)
+            .eq("status", "pending");
 
-      // Cancel in Google Calendar
-      syncAppointmentToGoogle("cancel", {
-        id: apt.id,
-        scheduled_at: apt.scheduled_at,
-        duration_minutes: apt.duration_minutes || 50,
-        type: apt.type || "presential",
-        patient_name: apt.patients.full_name,
-        google_event_id: apt.google_event_id,
-      });
-    }
+          syncAppointmentToGoogle("cancel", {
+            id: apt.id,
+            scheduled_at: apt.scheduled_at,
+            duration_minutes: apt.duration_minutes || 50,
+            type: apt.type || "presential",
+            patient_name: apt.patients.full_name,
+            google_event_id: apt.google_event_id,
+          });
+        }
 
-    const { error } = await supabase
-      .from("appointments")
-      .update({ status: newStatus } as any)
-      .eq("id", appointmentId);
+        const { error } = await supabase
+          .from("appointments")
+          .update({ status: newStatus } as any)
+          .eq("id", appointmentId);
 
-    if (error) {
-      toast.error("Erro ao atualizar status");
-      return;
-    }
+        if (error) {
+          toast.error("Erro ao atualizar status");
+          return;
+        }
 
-    await supabase.from("audit_logs").insert({
-      user_id: userId,
-      action_type: "status_change",
-      entity_type: "appointment",
-      entity_id: appointmentId,
-      old_data: { status: oldStatus },
-      new_data: { status: newStatus },
-    } as any);
+        await supabase.from("audit_logs").insert({
+          user_id: userId,
+          action_type: "status_change",
+          entity_type: "appointment",
+          entity_id: appointmentId,
+          old_data: { status: oldStatus },
+          new_data: { status: newStatus },
+        } as any);
 
-    toast.success("Status atualizado!");
-    await loadAppointments(userId);
+        toast.success("Status atualizado!");
+        await loadAppointments(userId);
+      })();
+    });
   };
 
   const resetForm = () => {
@@ -465,21 +471,23 @@ export default function Agenda() {
   };
 
   const openEditDialog = (appointment: Appointment) => {
-    const dateTime = new Date(appointment.scheduled_at);
-    setFormData({
-      patient_id: appointment.patient_id,
-      date: format(dateTime, "yyyy-MM-dd"),
-      time: format(dateTime, "HH:mm"),
-      notes: appointment.notes || "",
-      type: appointment.type || "presential",
-      duration: String(appointment.duration_minutes || 50),
-      status: appointment.status || "scheduled",
-      session_value: String(appointment.session_value || 200),
-      recurrence_enabled: false,
-      recurrence_type: appointment.recurrence_type || "weekly",
-      recurrence_count: "4",
+    guardWrite(() => {
+      const dateTime = new Date(appointment.scheduled_at);
+      setFormData({
+        patient_id: appointment.patient_id,
+        date: format(dateTime, "yyyy-MM-dd"),
+        time: format(dateTime, "HH:mm"),
+        notes: appointment.notes || "",
+        type: appointment.type || "presential",
+        duration: String(appointment.duration_minutes || 50),
+        status: appointment.status || "scheduled",
+        session_value: String(appointment.session_value || 200),
+        recurrence_enabled: false,
+        recurrence_type: appointment.recurrence_type || "weekly",
+        recurrence_count: "4",
+      });
+      setEditingAppointment(appointment);
     });
-    setEditingAppointment(appointment);
   };
 
   const filteredAppointments = appointments.filter(apt => {
