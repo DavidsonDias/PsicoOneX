@@ -306,22 +306,25 @@ export default function Patients() {
   };
 
   const handleDeletePatient = async (patientId: string) => {
-    guardWrite(async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { error } = await supabase.from("patients").update({
-        deleted_at: new Date().toISOString(), deleted_by: session.user.id, deleted_reason: "Excluído pelo usuário",
-      }).eq("id", patientId);
-      if (error) throw error;
-      await supabase.from("audit_logs").insert({
-        user_id: session.user.id, action_type: "soft_delete", entity_type: "patient", entity_id: patientId,
-      } as any);
-      toast.success("Paciente excluído!");
-      loadPatients();
-    } catch {
-      toast.error("Erro ao excluir paciente");
-    }
+    guardWrite(() => {
+      (async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) return;
+          const { error } = await supabase.from("patients").update({
+            deleted_at: new Date().toISOString(), deleted_by: session.user.id, deleted_reason: "Excluído pelo usuário",
+          }).eq("id", patientId);
+          if (error) throw error;
+          await supabase.from("audit_logs").insert({
+            user_id: session.user.id, action_type: "soft_delete", entity_type: "patient", entity_id: patientId,
+          } as any);
+          toast.success("Paciente excluído!");
+          loadPatients();
+        } catch {
+          toast.error("Erro ao excluir paciente");
+        }
+      })();
+    });
   };
 
   const handleToggleStatus = async (patientId: string, currentStatus: string) => {
