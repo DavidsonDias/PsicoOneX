@@ -306,6 +306,7 @@ export default function Patients() {
   };
 
   const handleDeletePatient = async (patientId: string) => {
+    guardWrite(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
