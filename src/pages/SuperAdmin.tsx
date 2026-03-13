@@ -747,7 +747,91 @@ const SuperAdmin = () => {
             </motion.div>
           )}
 
-          {/* FINANCE */}
+          {/* PAYMENTS */}
+          {activeTab === "payments" && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              {/* Payment stats */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {(() => {
+                  const planPrices: Record<string, number> = { basic: 39, pro: 79, enterprise: 149 };
+                  const activePaying = subscriptions.filter(s => s.status === "active" && s.plan !== "trial");
+                  const totalMRR = activePaying.reduce((sum, s) => sum + (planPrices[s.plan] || 0), 0);
+                  const totalPaying = activePaying.length;
+                  const avgTicket = totalPaying > 0 ? totalMRR / totalPaying : 0;
+                  return [
+                    { label: "Receita Mensal (MRR)", value: `R$ ${totalMRR.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: DollarSign, color: "text-emerald-400" },
+                    { label: "Assinantes Pagantes", value: totalPaying, icon: UserCheck, color: "text-primary" },
+                    { label: "Ticket Médio", value: `R$ ${avgTicket.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: "text-sky-400" },
+                    { label: "Em Trial (grátis)", value: subscriptions.filter(s => s.status === "trial").length, icon: Clock, color: "text-amber-400" },
+                  ];
+                })().map((s, i) => (
+                  <Card key={i} className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                    <CardContent className="p-4">
+                      <s.icon className={cn("h-5 w-5 mb-2", s.color)} />
+                      <p className="text-xl font-bold">{s.value}</p>
+                      <p className="text-xs text-[hsl(220,9%,50%)]">{s.label}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Payments list (derived from active subscriptions) */}
+              <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-emerald-400" /> Histórico de Assinaturas Ativas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {subscriptions
+                      .filter(s => s.status === "active" && s.plan !== "trial")
+                      .sort((a, b) => new Date(b.plan_started_at || b.created_at).getTime() - new Date(a.plan_started_at || a.created_at).getTime())
+                      .map(sub => {
+                        const profile = profiles.find(p => p.id === sub.user_id);
+                        const planPrices: Record<string, number> = { basic: 39, pro: 79, enterprise: 149 };
+                        const planLabels: Record<string, string> = { basic: "Starter", pro: "Profissional", enterprise: "Clínica" };
+                        const price = planPrices[sub.plan] || 0;
+
+                        return (
+                          <div key={sub.id} className="p-4 rounded-lg bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,18%)] flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
+                                {profile?.full_name?.charAt(0) || "?"}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{profile?.full_name || "Desconhecido"}</p>
+                                <div className="flex items-center gap-2 mt-0.5 text-xs text-[hsl(220,9%,50%)]">
+                                  <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] h-5">
+                                    {planLabels[sub.plan] || sub.plan}
+                                  </Badge>
+                                  <span>Desde {sub.plan_started_at ? format(new Date(sub.plan_started_at), "dd/MM/yyyy") : "—"}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-emerald-400">R$ {price.toFixed(2)}</p>
+                              <p className="text-[10px] text-[hsl(220,9%,45%)]">/mês</p>
+                              {sub.stripe_subscription_id && (
+                                <p className="text-[10px] text-[hsl(220,9%,35%)] truncate max-w-[120px]">{sub.stripe_subscription_id}</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {subscriptions.filter(s => s.status === "active" && s.plan !== "trial").length === 0 && (
+                      <div className="text-center py-12 text-[hsl(220,9%,40%)]">
+                        <DollarSign className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>Nenhum pagamento ativo</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* FINANCE / SaaS Metrics */}
           {activeTab === "finance" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
