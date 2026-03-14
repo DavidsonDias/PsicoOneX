@@ -82,13 +82,27 @@ export const useSubscription = () => {
     return () => clearInterval(interval);
   }, [checkStripeSubscription]);
 
-  const isActive = subscription?.status === 'active' || subscription?.status === 'trial';
   const isTrial = subscription?.status === 'trial';
-  const isExpired = subscription?.status === 'expired';
+  
+  // Check if trial has expired by date even if status hasn't been updated yet
+  const isTrialExpiredByDate = (() => {
+    if (!isTrial || !subscription?.trial_end_date) return false;
+    return new Date(subscription.trial_end_date).getTime() < Date.now();
+  })();
+
+  // Check if paid plan has expired by date
+  const isPlanExpiredByDate = (() => {
+    if (!subscription?.plan_expires_at || subscription.status !== 'active') return false;
+    return new Date(subscription.plan_expires_at).getTime() < Date.now();
+  })();
+
+  const isActive = (subscription?.status === 'active' && !isPlanExpiredByDate) || 
+                   (subscription?.status === 'trial' && !isTrialExpiredByDate);
+  const isExpired = subscription?.status === 'expired' || isTrialExpiredByDate || isPlanExpiredByDate;
   const isBlocked = subscription?.status === 'blocked' || subscription?.status === 'suspended' || subscription?.status === 'cancelled';
   
   const trialDaysRemaining = (() => {
-    if (!subscription?.trial_end_date || subscription.status !== 'trial') return 0;
+    if (!subscription?.trial_end_date || !isTrial || isTrialExpiredByDate) return 0;
     const now = new Date();
     const end = new Date(subscription.trial_end_date);
     const diffMs = end.getTime() - now.getTime();
@@ -106,7 +120,7 @@ export const useSubscription = () => {
     return Math.max(0, businessDays);
   })();
 
-  const isTrialExpiring = isTrial && trialDaysRemaining <= 2;
+  const isTrialExpiring = isTrial && !isTrialExpiredByDate && trialDaysRemaining <= 2;
   const canWrite = isActive;
 
   return {
