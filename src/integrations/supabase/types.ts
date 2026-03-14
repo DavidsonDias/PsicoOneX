@@ -539,6 +539,7 @@ export type Database = {
           id: string
           onboarding_completed: boolean
           phone: string | null
+          preferred_clinical_style: string | null
           specialty: string | null
           updated_at: string | null
         }
@@ -552,6 +553,7 @@ export type Database = {
           id: string
           onboarding_completed?: boolean
           phone?: string | null
+          preferred_clinical_style?: string | null
           specialty?: string | null
           updated_at?: string | null
         }
@@ -565,6 +567,7 @@ export type Database = {
           id?: string
           onboarding_completed?: boolean
           phone?: string | null
+          preferred_clinical_style?: string | null
           specialty?: string | null
           updated_at?: string | null
         }
