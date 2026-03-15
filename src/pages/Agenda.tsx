@@ -181,7 +181,10 @@ export default function Agenda() {
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (creating) return; // Prevent double-submit
+    if (creating) return;
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setDialogOpen(false); return; }
     if (!formData.patient_id) {
       toast.error("Selecione um paciente");
       return;
