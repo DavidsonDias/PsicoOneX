@@ -43,6 +43,7 @@ const APPROACHES = [
   { value: "humanistic", label: "Humanista", icon: "🌱" },
   { value: "systemic", label: "Sistêmica", icon: "🔗" },
   { value: "integrative", label: "Integrativa", icon: "🔄" },
+  { value: "phenomenological", label: "Fenomenológica Existencial", icon: "🌀" },
 ];
 
 const AI_ACTIONS = [

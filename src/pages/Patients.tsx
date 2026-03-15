@@ -588,7 +588,7 @@ export default function Patients() {
           <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium mb-2">{searchTerm ? "Nenhum paciente encontrado" : "Nenhum paciente cadastrado ainda"}</p>
           <p className="text-muted-foreground mb-6">{searchTerm ? "Tente ajustar os filtros" : "Comece cadastrando seu primeiro paciente"}</p>
-          {!searchTerm && <Button onClick={() => setDialogOpen(true)}><Plus className="w-4 h-4 mr-2" />Cadastrar Primeiro Paciente</Button>}
+          {!searchTerm && <Button onClick={() => guardWrite(() => setDialogOpen(true))}><Plus className="w-4 h-4 mr-2" />Cadastrar Primeiro Paciente</Button>}
         </CardContent></Card>
       ) : viewMode === "grid" ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
