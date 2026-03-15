@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
+import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +93,7 @@ const PATIENT_EXPORT_HEADERS = {
 export default function Patients() {
   const navigate = useNavigate();
   const { guardWrite } = useWriteGuard();
+  const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -178,6 +180,9 @@ export default function Patients() {
 
   const handleCreatePatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setDialogOpen(false); return; }
     setCreating(true);
     const formData = new FormData(e.currentTarget);
 
@@ -282,7 +287,9 @@ export default function Patients() {
   const handleEditPatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingPatient) return;
-    // Write guard is on the dialog open, so if we got here we're allowed
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setEditingPatient(null); return; }
     const formData = new FormData(e.currentTarget);
     try {
       const { error } = await supabase.from("patients").update({

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
+import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -146,6 +147,7 @@ function PatientRecordFolder({ patientId, patientName, records, onView, onEdit, 
 const MedicalRecords = () => {
   const navigate = useNavigate();
   const { guardWrite } = useWriteGuard();
+  const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -328,11 +330,13 @@ const MedicalRecords = () => {
 
   const handleCreateRecord = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formData.patient_id) {
       toast.error("Selecione um paciente");
       return;
     }
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setDialogOpen(false); return; }
 
     const combinedObservations = freeFormNotes 
       ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)
@@ -372,6 +376,9 @@ const MedicalRecords = () => {
   const handleEditRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRecord) return;
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setEditingRecord(null); return; }
 
     const combinedObservations = freeFormNotes 
       ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)

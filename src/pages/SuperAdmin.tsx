@@ -703,12 +703,16 @@ const SuperAdmin = () => {
                                 )}
                               </>
                             )}
-                            {sub.status === "trial" && (
+                            {(sub.status === "trial" || sub.status === "expired") && (
                               <Button variant="ghost" size="sm" className="text-xs text-amber-400 hover:bg-amber-500/10 h-7"
                                 onClick={() => {
-                                  const newEnd = new Date();
-                                  newEnd.setDate(newEnd.getDate() + 10);
-                                  handleUpdateSubscription(sub.user_id, { trial_end_date: newEnd.toISOString() });
+                                  const baseDate = sub.trial_end_date ? new Date(sub.trial_end_date) : new Date();
+                                  const newEnd = new Date(Math.max(baseDate.getTime(), Date.now()));
+                                  newEnd.setDate(newEnd.getDate() + 7);
+                                  handleUpdateSubscription(sub.user_id, { 
+                                    trial_end_date: newEnd.toISOString(),
+                                    status: "trial" as any,
+                                  });
                                 }}>
                                 +7 dias
                               </Button>

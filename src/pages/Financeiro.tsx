@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
+import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ const PAYMENT_METHODS = [
 
 export default function Financeiro() {
   const { guardWrite } = useWriteGuard();
+  const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
@@ -193,6 +195,9 @@ export default function Financeiro() {
 
   const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setDialogOpen(false); return; }
     const fd = new FormData(e.currentTarget);
 
     const amount = parseFloat(fd.get("amount") as string);
@@ -227,6 +232,9 @@ export default function Financeiro() {
   const handleEditTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingTransaction) return;
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setEditingTransaction(null); return; }
 
     const amount = parseFloat(formData.amount);
     const taxRate = parseFloat(formData.tax_rate) || 0;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
+import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar } from "@/components/ui/calendar";
@@ -62,6 +63,7 @@ interface Patient {
 export default function Agenda() {
   const navigate = useNavigate();
   const { guardWrite } = useWriteGuard();
+  const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -179,7 +181,10 @@ export default function Agenda() {
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (creating) return; // Prevent double-submit
+    if (creating) return;
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setDialogOpen(false); return; }
     if (!formData.patient_id) {
       toast.error("Selecione um paciente");
       return;
@@ -302,6 +307,9 @@ export default function Agenda() {
   const handleEditAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAppointment) return;
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setEditingAppointment(null); return; }
 
     const conflicts = checkConflicts(formData.date, formData.time, parseInt(formData.duration), editingAppointment.id);
     if (conflicts.length > 0) {
