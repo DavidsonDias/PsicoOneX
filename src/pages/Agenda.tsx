@@ -63,6 +63,7 @@ interface Patient {
 export default function Agenda() {
   const navigate = useNavigate();
   const { guardWrite } = useWriteGuard();
+  const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
