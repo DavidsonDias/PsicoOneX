@@ -93,6 +93,7 @@ const PATIENT_EXPORT_HEADERS = {
 export default function Patients() {
   const navigate = useNavigate();
   const { guardWrite } = useWriteGuard();
+  const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
