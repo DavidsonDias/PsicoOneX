@@ -195,6 +195,9 @@ export default function Financeiro() {
 
   const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setDialogOpen(false); return; }
     const fd = new FormData(e.currentTarget);
 
     const amount = parseFloat(fd.get("amount") as string);
