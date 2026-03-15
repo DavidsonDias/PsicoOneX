@@ -147,6 +147,7 @@ function PatientRecordFolder({ patientId, patientName, records, onView, onEdit, 
 const MedicalRecords = () => {
   const navigate = useNavigate();
   const { guardWrite } = useWriteGuard();
+  const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
