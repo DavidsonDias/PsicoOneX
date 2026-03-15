@@ -298,7 +298,22 @@ export default function Patients() {
   const handleEditPatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingPatient) return;
-    // Write guard is on the dialog open, so if we got here we're allowed
+    // Double-check subscription before write
+    const { data: { session: authCheck } } = await supabase.auth.getSession();
+    if (authCheck) {
+      const { data: subData } = await supabase.from('subscriptions').select('status, trial_end_date, plan_expires_at').eq('user_id', authCheck.user.id).maybeSingle();
+      if (subData) {
+        const now = Date.now();
+        const isTrialExpired = subData.status === 'trial' && subData.trial_end_date && new Date(subData.trial_end_date).getTime() < now;
+        const isPlanExpired = subData.status === 'active' && subData.plan_expires_at && new Date(subData.plan_expires_at).getTime() < now;
+        const isBlocked = subData.status === 'expired' || subData.status === 'blocked' || subData.status === 'cancelled' || subData.status === 'suspended';
+        if (isTrialExpired || isPlanExpired || isBlocked) {
+          setEditingPatient(null);
+          guardWrite(() => {});
+          return;
+        }
+      }
+    }
     const formData = new FormData(e.currentTarget);
     try {
       const { error } = await supabase.from("patients").update({
