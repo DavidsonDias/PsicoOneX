@@ -12,6 +12,7 @@ const APPROACH_PROMPTS: Record<string, string> = {
   systemic: "Use linguagem sistêmica. Foque em padrões relacionais, dinâmicas familiares, circularidade, fronteiras, alianças, triangulações e contexto sociofamiliar.",
   integrative: "Use linguagem integrativa, combinando elementos de diferentes abordagens conforme adequado ao conteúdo clínico.",
   neutral: "Use linguagem clínica neutra e técnica, sem se restringir a uma abordagem específica. Mantenha objetividade e clareza profissional.",
+  phenomenological: "Use linguagem fenomenológico-existencial. Foque em vivência, experiência imediata, intencionalidade da consciência, sentido de existência, angústia existencial, liberdade, responsabilidade, autenticidade, ser-no-mundo (Dasein), temporalidade e encontro terapêutico. Valorize a descrição fenomenológica da experiência sem reduzi-la a categorias diagnósticas.",
 };
 
 const ACTION_PROMPTS: Record<string, string> = {
