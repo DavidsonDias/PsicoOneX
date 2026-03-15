@@ -330,11 +330,13 @@ const MedicalRecords = () => {
 
   const handleCreateRecord = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formData.patient_id) {
       toast.error("Selecione um paciente");
       return;
     }
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setDialogOpen(false); return; }
 
     const combinedObservations = freeFormNotes 
       ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)
