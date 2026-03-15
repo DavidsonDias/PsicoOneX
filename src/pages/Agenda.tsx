@@ -307,6 +307,9 @@ export default function Agenda() {
   const handleEditAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAppointment) return;
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setEditingAppointment(null); return; }
 
     const conflicts = checkConflicts(formData.date, formData.time, parseInt(formData.duration), editingAppointment.id);
     if (conflicts.length > 0) {

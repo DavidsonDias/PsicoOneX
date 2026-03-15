@@ -376,6 +376,9 @@ const MedicalRecords = () => {
   const handleEditRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRecord) return;
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setEditingRecord(null); return; }
 
     const combinedObservations = freeFormNotes 
       ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)

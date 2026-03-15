@@ -232,6 +232,9 @@ export default function Financeiro() {
   const handleEditTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingTransaction) return;
+    // Server-side subscription check before write
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setEditingTransaction(null); return; }
 
     const amount = parseFloat(formData.amount);
     const taxRate = parseFloat(formData.tax_rate) || 0;
