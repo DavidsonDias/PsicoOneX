@@ -178,6 +178,22 @@ export default function Patients() {
 
   const handleCreatePatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Double-check subscription before write
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (authSession) {
+      const { data: subData } = await supabase.from('subscriptions').select('status, trial_end_date, plan_expires_at').eq('user_id', authSession.user.id).maybeSingle();
+      if (subData) {
+        const now = Date.now();
+        const isTrialExpired = subData.status === 'trial' && subData.trial_end_date && new Date(subData.trial_end_date).getTime() < now;
+        const isPlanExpired = subData.status === 'active' && subData.plan_expires_at && new Date(subData.plan_expires_at).getTime() < now;
+        const isBlocked = subData.status === 'expired' || subData.status === 'blocked' || subData.status === 'cancelled' || subData.status === 'suspended';
+        if (isTrialExpired || isPlanExpired || isBlocked) {
+          setDialogOpen(false);
+          guardWrite(() => {}); // triggers the modal
+          return;
+        }
+      }
+    }
     setCreating(true);
     const formData = new FormData(e.currentTarget);
 
