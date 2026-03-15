@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
+import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
