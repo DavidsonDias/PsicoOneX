@@ -94,6 +94,7 @@ const SuperAdmin = () => {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [editingDates, setEditingDates] = useState<Record<string, { trial_start?: string; trial_end?: string; plan_started?: string; plan_expires?: string }>>({});
 
   useEffect(() => {
     if (!roleLoading && !isSuperAdmin) {
@@ -659,16 +660,70 @@ const SuperAdmin = () => {
                             </div>
                           </div>
 
-                          {/* Row 2: Details */}
+                          {/* Row 2: Editable Dates */}
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-[hsl(220,9%,50%)]">
                             <div>
-                              <p className="font-medium text-[hsl(220,9%,65%)]">Início</p>
-                              <p>{sub.plan_started_at ? format(new Date(sub.plan_started_at), "dd/MM/yyyy") : sub.trial_start_date ? format(new Date(sub.trial_start_date), "dd/MM/yyyy") : "—"}</p>
+                              <p className="font-medium text-[hsl(220,9%,65%)]">Início Trial</p>
+                              <input
+                                type="date"
+                                className="bg-[hsl(222,47%,18%)] border border-[hsl(222,47%,22%)] rounded px-1.5 py-0.5 text-[10px] text-[hsl(0,0%,90%)] w-full mt-0.5"
+                                value={editingDates[sub.user_id]?.trial_start ?? (sub.trial_start_date ? format(new Date(sub.trial_start_date), "yyyy-MM-dd") : "")}
+                                onChange={(e) => setEditingDates(prev => ({ ...prev, [sub.user_id]: { ...prev[sub.user_id], trial_start: e.target.value } }))}
+                                onBlur={(e) => {
+                                  if (e.target.value) {
+                                    handleUpdateSubscription(sub.user_id, { trial_start_date: new Date(e.target.value).toISOString() });
+                                  }
+                                }}
+                              />
                             </div>
                             <div>
-                              <p className="font-medium text-[hsl(220,9%,65%)]">Expira</p>
-                              <p>{sub.plan_expires_at ? format(new Date(sub.plan_expires_at), "dd/MM/yyyy") : trialEnd ? format(trialEnd, "dd/MM/yyyy") : "—"}</p>
+                              <p className="font-medium text-[hsl(220,9%,65%)]">Expira Trial</p>
+                              <input
+                                type="date"
+                                className="bg-[hsl(222,47%,18%)] border border-[hsl(222,47%,22%)] rounded px-1.5 py-0.5 text-[10px] text-[hsl(0,0%,90%)] w-full mt-0.5"
+                                value={editingDates[sub.user_id]?.trial_end ?? (trialEnd ? format(trialEnd, "yyyy-MM-dd") : "")}
+                                onChange={(e) => setEditingDates(prev => ({ ...prev, [sub.user_id]: { ...prev[sub.user_id], trial_end: e.target.value } }))}
+                                onBlur={(e) => {
+                                  if (e.target.value) {
+                                    const newDate = new Date(e.target.value + "T23:59:59Z");
+                                    handleUpdateSubscription(sub.user_id, { trial_end_date: newDate.toISOString() });
+                                  }
+                                }}
+                              />
                             </div>
+                            <div>
+                              <p className="font-medium text-[hsl(220,9%,65%)]">Início Plano</p>
+                              <input
+                                type="date"
+                                className="bg-[hsl(222,47%,18%)] border border-[hsl(222,47%,22%)] rounded px-1.5 py-0.5 text-[10px] text-[hsl(0,0%,90%)] w-full mt-0.5"
+                                value={editingDates[sub.user_id]?.plan_started ?? (sub.plan_started_at ? format(new Date(sub.plan_started_at), "yyyy-MM-dd") : "")}
+                                onChange={(e) => setEditingDates(prev => ({ ...prev, [sub.user_id]: { ...prev[sub.user_id], plan_started: e.target.value } }))}
+                                onBlur={(e) => {
+                                  if (e.target.value) {
+                                    handleUpdateSubscription(sub.user_id, { plan_started_at: new Date(e.target.value).toISOString() });
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <p className="font-medium text-[hsl(220,9%,65%)]">Expira Plano</p>
+                              <input
+                                type="date"
+                                className="bg-[hsl(222,47%,18%)] border border-[hsl(222,47%,22%)] rounded px-1.5 py-0.5 text-[10px] text-[hsl(0,0%,90%)] w-full mt-0.5"
+                                value={editingDates[sub.user_id]?.plan_expires ?? (sub.plan_expires_at ? format(new Date(sub.plan_expires_at), "yyyy-MM-dd") : "")}
+                                onChange={(e) => setEditingDates(prev => ({ ...prev, [sub.user_id]: { ...prev[sub.user_id], plan_expires: e.target.value } }))}
+                                onBlur={(e) => {
+                                  if (e.target.value) {
+                                    const newDate = new Date(e.target.value + "T23:59:59Z");
+                                    handleUpdateSubscription(sub.user_id, { plan_expires_at: newDate.toISOString() });
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Stripe info */}
+                          <div className="grid grid-cols-2 gap-2 text-[10px] text-[hsl(220,9%,50%)]">
                             <div>
                               <p className="font-medium text-[hsl(220,9%,65%)]">Stripe Customer</p>
                               <p className="truncate">{sub.stripe_customer_id || "—"}</p>
@@ -681,54 +736,92 @@ const SuperAdmin = () => {
 
                           {/* Row 3: Actions */}
                           <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-[hsl(222,47%,18%)]">
-                            {sub.status !== "blocked" && sub.status !== "cancelled" && (
-                              <>
-                                {sub.plan !== "basic" && (
-                                  <Button variant="ghost" size="sm" className="text-xs text-sky-400 hover:bg-sky-500/10 h-7"
-                                    onClick={() => handleUpdateSubscription(sub.user_id, { plan: "basic", status: "active", plan_started_at: new Date().toISOString(), blocked_at: null, blocked_reason: null })}>
-                                    Starter
-                                  </Button>
-                                )}
-                                {sub.plan !== "pro" && (
-                                  <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
-                                    onClick={() => handleUpdateSubscription(sub.user_id, { plan: "pro", status: "active", plan_started_at: new Date().toISOString(), blocked_at: null, blocked_reason: null })}>
-                                    Pro
-                                  </Button>
-                                )}
-                                {sub.plan !== "enterprise" && (
-                                  <Button variant="ghost" size="sm" className="text-xs text-purple-400 hover:bg-purple-500/10 h-7"
-                                    onClick={() => handleUpdateSubscription(sub.user_id, { plan: "enterprise", status: "active", plan_started_at: new Date().toISOString(), blocked_at: null, blocked_reason: null })}>
-                                    Clínica
-                                  </Button>
-                                )}
-                              </>
-                            )}
-                            {(sub.status === "trial" || sub.status === "expired") && (
-                              <Button variant="ghost" size="sm" className="text-xs text-amber-400 hover:bg-amber-500/10 h-7"
-                                onClick={() => {
-                                  const baseDate = sub.trial_end_date ? new Date(sub.trial_end_date) : new Date();
-                                  const newEnd = new Date(Math.max(baseDate.getTime(), Date.now()));
-                                  newEnd.setDate(newEnd.getDate() + 7);
-                                  handleUpdateSubscription(sub.user_id, { 
-                                    trial_end_date: newEnd.toISOString(),
-                                    status: "trial" as any,
-                                  });
-                                }}>
-                                +7 dias
+                            {/* Plan change buttons */}
+                            {sub.plan !== "basic" && (
+                              <Button variant="ghost" size="sm" className="text-xs text-sky-400 hover:bg-sky-500/10 h-7"
+                                onClick={() => handleUpdateSubscription(sub.user_id, { plan: "basic", status: "active", plan_started_at: new Date().toISOString(), plan_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(), blocked_at: null, blocked_reason: null })}>
+                                Starter
                               </Button>
                             )}
+                            {sub.plan !== "pro" && (
+                              <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
+                                onClick={() => handleUpdateSubscription(sub.user_id, { plan: "pro", status: "active", plan_started_at: new Date().toISOString(), plan_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(), blocked_at: null, blocked_reason: null })}>
+                                Pro
+                              </Button>
+                            )}
+                            {sub.plan !== "enterprise" && (
+                              <Button variant="ghost" size="sm" className="text-xs text-purple-400 hover:bg-purple-500/10 h-7"
+                                onClick={() => handleUpdateSubscription(sub.user_id, { plan: "enterprise", status: "active", plan_started_at: new Date().toISOString(), plan_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(), blocked_at: null, blocked_reason: null })}>
+                                Clínica
+                              </Button>
+                            )}
+
+                            <div className="w-px h-5 bg-[hsl(222,47%,22%)] mx-0.5" />
+
+                            {/* Extension buttons */}
+                            {[7, 30, 90].map(days => (
+                              <Button key={days} variant="ghost" size="sm" className="text-xs text-amber-400 hover:bg-amber-500/10 h-7"
+                                onClick={() => {
+                                  const isTrialPlan = sub.plan === "trial";
+                                  const dateField = isTrialPlan ? "trial_end_date" : "plan_expires_at";
+                                  const currentEnd = isTrialPlan ? sub.trial_end_date : sub.plan_expires_at;
+                                  const baseDate = currentEnd ? new Date(currentEnd) : new Date();
+                                  const newEnd = new Date(Math.max(baseDate.getTime(), Date.now()));
+                                  newEnd.setDate(newEnd.getDate() + days);
+                                  const statusUpdate = sub.status === "expired" ? (isTrialPlan ? "trial" : "active") : sub.status;
+                                  handleUpdateSubscription(sub.user_id, {
+                                    [dateField]: newEnd.toISOString(),
+                                    status: statusUpdate as any,
+                                  });
+                                }}>
+                                +{days}d
+                              </Button>
+                            ))}
+
+                            <div className="w-px h-5 bg-[hsl(222,47%,22%)] mx-0.5" />
+
+                            {/* Activate Trial */}
+                            {sub.status !== "trial" && (
+                              <Button variant="ghost" size="sm" className="text-xs text-amber-400 hover:bg-amber-500/10 h-7"
+                                onClick={() => {
+                                  const trialEnd = new Date(Date.now() + 7 * 86400000);
+                                  handleUpdateSubscription(sub.user_id, {
+                                    plan: "trial",
+                                    status: "trial" as any,
+                                    trial_start_date: new Date().toISOString(),
+                                    trial_end_date: trialEnd.toISOString(),
+                                    blocked_at: null,
+                                    blocked_reason: null,
+                                  });
+                                }}>
+                                Ativar Trial
+                              </Button>
+                            )}
+
+                            {/* Reactivate */}
                             {(sub.status === "expired" || sub.status === "blocked" || sub.status === "cancelled") && (
                               <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:bg-emerald-500/10 h-7"
-                                onClick={() => handleUpdateSubscription(sub.user_id, { status: "active", plan: sub.plan === "trial" ? "basic" : sub.plan, blocked_at: null, blocked_reason: null, plan_started_at: new Date().toISOString() })}>
+                                onClick={() => handleUpdateSubscription(sub.user_id, {
+                                  status: "active",
+                                  plan: sub.plan === "trial" ? "basic" : sub.plan,
+                                  blocked_at: null,
+                                  blocked_reason: null,
+                                  plan_started_at: new Date().toISOString(),
+                                  plan_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+                                })}>
                                 Reativar
                               </Button>
                             )}
+
+                            {/* Cancel */}
                             {sub.status === "active" && (
                               <Button variant="ghost" size="sm" className="text-xs text-orange-400 hover:bg-orange-500/10 h-7"
                                 onClick={() => handleUpdateSubscription(sub.user_id, { status: "cancelled" })}>
                                 Cancelar
                               </Button>
                             )}
+
+                            {/* Block */}
                             {sub.status !== "blocked" && sub.status !== "cancelled" && (
                               <Button variant="ghost" size="sm" className="text-xs text-destructive hover:bg-destructive/10 h-7"
                                 onClick={() => handleUpdateSubscription(sub.user_id, { status: "blocked", blocked_at: new Date().toISOString(), blocked_reason: "Bloqueado pelo Super Admin" })}>
