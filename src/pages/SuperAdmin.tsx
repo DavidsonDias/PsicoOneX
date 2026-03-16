@@ -94,6 +94,7 @@ const SuperAdmin = () => {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [editingDates, setEditingDates] = useState<Record<string, { trial_start?: string; trial_end?: string; plan_started?: string; plan_expires?: string }>>({});
 
   useEffect(() => {
     if (!roleLoading && !isSuperAdmin) {
