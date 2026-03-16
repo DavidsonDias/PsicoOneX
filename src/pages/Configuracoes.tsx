@@ -28,7 +28,9 @@ import {
 
 export default function Configuracoes() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const defaultTab = searchParams.get("tab") || "profile";
+  // If returning from Google OAuth callback, auto-switch to integrations tab
+  const hasOAuthCode = searchParams.has("code") && searchParams.has("state");
+  const defaultTab = hasOAuthCode ? "integrations" : (searchParams.get("tab") || "profile");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<any>(null);
