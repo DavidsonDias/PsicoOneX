@@ -49,6 +49,9 @@ interface Patient {
   emergency_contact: string | null;
   emergency_phone: string | null;
   created_at?: string;
+  default_session_value?: number | null;
+  payment_day?: number | null;
+  monthly_plan_value?: number | null;
 }
 
 const formatPhone = (value: string): string => {
