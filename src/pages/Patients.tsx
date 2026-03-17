@@ -196,6 +196,10 @@ export default function Patients() {
       const userId = session.user.id;
       const fullName = formData.get("full_name") as string;
 
+      const sessionVal = formData.get("default_session_value") as string;
+      const payDay = formData.get("payment_day") as string;
+      const monthlyVal = formData.get("monthly_plan_value") as string;
+
       const { data: newPatient, error } = await supabase.from("patients").insert({
         psychologist_id: userId,
         full_name: fullName,
@@ -207,7 +211,10 @@ export default function Patients() {
         address: (formData.get("address") as string) || null,
         emergency_contact: (formData.get("emergency_contact") as string) || null,
         emergency_phone: emergencyPhone || null,
-      }).select().single();
+        default_session_value: sessionVal ? parseFloat(sessionVal) : null,
+        payment_day: payDay ? parseInt(payDay) : null,
+        monthly_plan_value: monthlyVal ? parseFloat(monthlyVal) : null,
+      } as any).select().single();
 
       if (error) throw error;
 
