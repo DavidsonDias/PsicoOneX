@@ -466,6 +466,7 @@ export type Database = {
           emergency_phone: string | null
           full_name: string
           id: string
+          monthly_plan_value: number | null
           notes: string | null
           payment_day: number | null
           phone: string | null
@@ -488,6 +489,7 @@ export type Database = {
           emergency_phone?: string | null
           full_name: string
           id?: string
+          monthly_plan_value?: number | null
           notes?: string | null
           payment_day?: number | null
           phone?: string | null
@@ -510,6 +512,7 @@ export type Database = {
           emergency_phone?: string | null
           full_name?: string
           id?: string
+          monthly_plan_value?: number | null
           notes?: string | null
           payment_day?: number | null
           phone?: string | null
