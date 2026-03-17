@@ -313,8 +313,8 @@ export default function Financeiro() {
   });
 
   const getStatusBadge = (status: string) => {
-    const v: Record<string, "default" | "secondary" | "destructive" | "outline"> = { paid: "default", pending: "secondary", overdue: "destructive", cancelled: "outline" };
-    const l: Record<string, string> = { paid: "Pago", pending: "Pendente", overdue: "Atrasado", cancelled: "Cancelado" };
+    const v: Record<string, "default" | "secondary" | "destructive" | "outline"> = { paid: "default", pending: "secondary", overdue: "destructive", cancelled: "outline", exempt: "outline" };
+    const l: Record<string, string> = { paid: "Pago", pending: "Pendente", overdue: "Atrasado", cancelled: "Cancelado", exempt: "Isento" };
     return <Badge variant={v[status] || "secondary"}>{l[status] || status}</Badge>;
   };
 
