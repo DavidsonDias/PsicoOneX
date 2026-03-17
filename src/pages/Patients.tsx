@@ -691,29 +691,25 @@ export default function Patients() {
           <DialogHeader><DialogTitle>Editar Paciente</DialogTitle><DialogDescription>Atualize os dados do paciente</DialogDescription></DialogHeader>
           {editingPatient && (
             <ScrollArea className="max-h-[calc(90vh-140px)] pr-4">
-              <form onSubmit={handleEditPatient} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Nome Completo *</Label><Input name="full_name" defaultValue={editingPatient.full_name} required /></div>
-                  <div className="space-y-2"><Label>CPF</Label><Input value={editCpf} onChange={(e) => setEditCpf(formatCPF(e.target.value))} maxLength={14} /></div>
-                  <div className="space-y-2"><Label>E-mail</Label><Input name="email" type="email" defaultValue={editingPatient.email || ""} /></div>
-                  <div className="space-y-2"><Label>Telefone *</Label><Input value={editPhone} onChange={(e) => setEditPhone(formatPhone(e.target.value))} maxLength={15} required /></div>
-                  <div className="space-y-2"><Label>Nascimento</Label><Input name="birth_date" type="date" defaultValue={editingPatient.birth_date || ""} /></div>
-                  <div className="space-y-2 md:col-span-2"><Label>Endereço</Label><Input name="address" defaultValue={editingPatient.address || ""} /></div>
-                  <div className="space-y-2"><Label>Contato Emergência</Label><Input name="emergency_contact" defaultValue={editingPatient.emergency_contact || ""} /></div>
-                  <div className="space-y-2"><Label>Tel. Emergência</Label><Input value={editEmergencyPhone} onChange={(e) => setEditEmergencyPhone(formatPhone(e.target.value))} maxLength={15} /></div>
-                </div>
-                <Separator />
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4" />Dados Financeiros</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2"><Label>Valor da Sessão (R$)</Label><Input name="default_session_value" type="number" step="0.01" defaultValue={editingPatient.default_session_value ?? ""} /></div>
-                    <div className="space-y-2"><Label>Dia de Pagamento</Label><Select name="payment_day" defaultValue={editingPatient.payment_day ? String(editingPatient.payment_day) : undefined}><SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger><SelectContent>{Array.from({length: 31}, (_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><Label>Plano Mensal (R$)</Label><Input name="monthly_plan_value" type="number" step="0.01" defaultValue={(editingPatient as any).monthly_plan_value ?? ""} /></div>
-                  </div>
-                </div>
-                <div className="space-y-2"><Label>Observações</Label><Textarea name="notes" rows={3} defaultValue={editingPatient.notes || ""} /></div>
-                <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditingPatient(null)}>Cancelar</Button><Button type="submit">Salvar</Button></div>
-              </form>
+              <PatientForm
+                initialData={{
+                  full_name: editingPatient.full_name,
+                  email: editingPatient.email || "",
+                  phone: editingPatient.phone || "",
+                  cpf: editingPatient.cpf || "",
+                  birth_date: editingPatient.birth_date || "",
+                  address: editingPatient.address || "",
+                  emergency_contact: editingPatient.emergency_contact || "",
+                  emergency_phone: editingPatient.emergency_phone || "",
+                  notes: editingPatient.notes || "",
+                  default_session_value: editingPatient.default_session_value != null ? String(editingPatient.default_session_value) : "",
+                  payment_day: editingPatient.payment_day != null ? String(editingPatient.payment_day) : "",
+                  monthly_plan_value: editingPatient.monthly_plan_value != null ? String(editingPatient.monthly_plan_value) : "",
+                }}
+                onSubmit={handleEditPatientFromForm}
+                submitLabel="Salvar"
+                onCancel={() => setEditingPatient(null)}
+              />
             </ScrollArea>
           )}
         </DialogContent>
