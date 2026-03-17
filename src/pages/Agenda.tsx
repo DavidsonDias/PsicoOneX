@@ -121,12 +121,12 @@ export default function Agenda() {
   const loadPatients = async (psychologistId: string) => {
     const { data } = await supabase
       .from("patients")
-      .select("id, full_name, email")
+      .select("id, full_name, email, default_session_value, payment_day, monthly_plan_value")
       .eq("psychologist_id", psychologistId)
       .eq("status", "active")
       .is("deleted_at", null)
       .order("full_name");
-    setPatients(data || []);
+    setPatients((data || []) as Patient[]);
   };
 
   const checkConflicts = useCallback((date: string, time: string, duration: number, excludeId?: string) => {
