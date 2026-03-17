@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkActions } from "@/components/patients/BulkActions";
+import { PatientForm, PatientFormData } from "@/components/patients/PatientForm";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
 import { format, addWeeks, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -181,39 +182,32 @@ export default function Patients() {
     return dates;
   };
 
-  const handleCreatePatient = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // Server-side subscription check before write
+  const handleCreatePatientFromForm = async (formValues: PatientFormData) => {
     const canProceed = await checkSubscriptionBeforeWrite();
     if (!canProceed) { setDialogOpen(false); return; }
     setCreating(true);
-    const formData = new FormData(e.currentTarget);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
       const userId = session.user.id;
-      const fullName = formData.get("full_name") as string;
-
-      const sessionVal = formData.get("default_session_value") as string;
-      const payDay = formData.get("payment_day") as string;
-      const monthlyVal = formData.get("monthly_plan_value") as string;
+      const fullName = formValues.full_name;
 
       const { data: newPatient, error } = await supabase.from("patients").insert({
         psychologist_id: userId,
         full_name: fullName,
-        email: (formData.get("email") as string) || null,
-        phone: phone || null,
-        birth_date: (formData.get("birth_date") as string) || null,
-        notes: (formData.get("notes") as string) || null,
-        cpf: cpf || null,
-        address: (formData.get("address") as string) || null,
-        emergency_contact: (formData.get("emergency_contact") as string) || null,
-        emergency_phone: emergencyPhone || null,
-        default_session_value: sessionVal ? parseFloat(sessionVal) : null,
-        payment_day: payDay ? parseInt(payDay) : null,
-        monthly_plan_value: monthlyVal ? parseFloat(monthlyVal) : null,
+        email: formValues.email || null,
+        phone: formValues.phone || null,
+        birth_date: formValues.birth_date || null,
+        notes: formValues.notes || null,
+        cpf: formValues.cpf || null,
+        address: formValues.address || null,
+        emergency_contact: formValues.emergency_contact || null,
+        emergency_phone: formValues.emergency_phone || null,
+        default_session_value: formValues.default_session_value ? parseFloat(formValues.default_session_value) : null,
+        payment_day: formValues.payment_day ? parseInt(formValues.payment_day) : null,
+        monthly_plan_value: formValues.monthly_plan_value ? parseFloat(formValues.monthly_plan_value) : null,
       } as any).select().single();
 
       if (error) throw error;
@@ -285,7 +279,6 @@ export default function Patients() {
 
       setDialogOpen(false);
       loadPatients();
-      (e.target as HTMLFormElement).reset();
       resetCreateForm();
     } catch {
       toast.error("Erro ao cadastrar paciente");
@@ -294,31 +287,24 @@ export default function Patients() {
     }
   };
 
-  const handleEditPatient = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleEditPatientFromForm = async (formValues: PatientFormData) => {
     if (!editingPatient) return;
-    // Server-side subscription check before write
     const canProceed = await checkSubscriptionBeforeWrite();
     if (!canProceed) { setEditingPatient(null); return; }
-    const formData = new FormData(e.currentTarget);
     try {
-      const editSessionVal = formData.get("default_session_value") as string;
-      const editPayDay = formData.get("payment_day") as string;
-      const editMonthlyVal = formData.get("monthly_plan_value") as string;
-
       const { error } = await supabase.from("patients").update({
-        full_name: formData.get("full_name") as string,
-        email: (formData.get("email") as string) || null,
-        phone: editPhone || null,
-        birth_date: (formData.get("birth_date") as string) || null,
-        notes: (formData.get("notes") as string) || null,
-        cpf: editCpf || null,
-        address: (formData.get("address") as string) || null,
-        emergency_contact: (formData.get("emergency_contact") as string) || null,
-        emergency_phone: editEmergencyPhone || null,
-        default_session_value: editSessionVal ? parseFloat(editSessionVal) : null,
-        payment_day: editPayDay ? parseInt(editPayDay) : null,
-        monthly_plan_value: editMonthlyVal ? parseFloat(editMonthlyVal) : null,
+        full_name: formValues.full_name,
+        email: formValues.email || null,
+        phone: formValues.phone || null,
+        birth_date: formValues.birth_date || null,
+        notes: formValues.notes || null,
+        cpf: formValues.cpf || null,
+        address: formValues.address || null,
+        emergency_contact: formValues.emergency_contact || null,
+        emergency_phone: formValues.emergency_phone || null,
+        default_session_value: formValues.default_session_value ? parseFloat(formValues.default_session_value) : null,
+        payment_day: formValues.payment_day ? parseInt(formValues.payment_day) : null,
+        monthly_plan_value: formValues.monthly_plan_value ? parseFloat(formValues.monthly_plan_value) : null,
       } as any).eq("id", editingPatient.id);
       if (error) throw error;
       toast.success("Paciente atualizado com sucesso!");
@@ -328,6 +314,8 @@ export default function Patients() {
       toast.error("Erro ao atualizar paciente");
     }
   };
+
+
 
   const handleDeletePatient = async (patientId: string) => {
     guardWrite(() => {
@@ -512,89 +500,63 @@ export default function Patients() {
                 <DialogDescription>Preencha os dados do paciente para criar o cadastro</DialogDescription>
               </DialogHeader>
               <ScrollArea className="max-h-[calc(90vh-140px)] pr-4">
-                <form onSubmit={handleCreatePatient} className="space-y-6">
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Dados Pessoais</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label htmlFor="full_name">Nome Completo *</Label><Input id="full_name" name="full_name" required /></div>
-                      <div className="space-y-2"><Label htmlFor="cpf">CPF</Label><Input id="cpf" name="cpf" value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))} placeholder="000.000.000-00" maxLength={14} /></div>
-                      <div className="space-y-2"><Label htmlFor="email">E-mail</Label><Input id="email" name="email" type="email" /></div>
-                      <div className="space-y-2"><Label htmlFor="phone">Telefone *</Label><Input id="phone" name="phone" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} required /></div>
-                      <div className="space-y-2"><Label htmlFor="birth_date">Data de Nascimento</Label><Input id="birth_date" name="birth_date" type="date" /></div>
-                      <div className="space-y-2 md:col-span-2"><Label htmlFor="address">Endereço</Label><Input id="address" name="address" placeholder="Rua, número, bairro, cidade - UF" /></div>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Contato de Emergência</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label htmlFor="emergency_contact">Nome do Contato</Label><Input id="emergency_contact" name="emergency_contact" /></div>
-                      <div className="space-y-2"><Label htmlFor="emergency_phone">Telefone de Emergência</Label><Input id="emergency_phone" name="emergency_phone" value={emergencyPhone} onChange={(e) => setEmergencyPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} /></div>
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4" />Dados Financeiros</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2"><Label htmlFor="default_session_value">Valor da Sessão (R$)</Label><Input id="default_session_value" name="default_session_value" type="number" step="0.01" placeholder="200.00" /></div>
-                      <div className="space-y-2"><Label htmlFor="payment_day">Dia de Pagamento</Label><Select name="payment_day"><SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger><SelectContent>{Array.from({length: 31}, (_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}</SelectContent></Select></div>
-                      <div className="space-y-2"><Label htmlFor="monthly_plan_value">Plano Mensal (R$)</Label><Input id="monthly_plan_value" name="monthly_plan_value" type="number" step="0.01" placeholder="0.00" /></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2"><Label htmlFor="notes">Observações</Label><Textarea id="notes" name="notes" rows={3} placeholder="Observações sobre o paciente..." /></div>
-                  <Separator />
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <h3 className="text-sm font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" />Criar agendamento recorrente agora?</h3>
-                        <p className="text-xs text-muted-foreground">Configure sessões semanais automáticas para este paciente</p>
-                      </div>
-                      <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
-                    </div>
-                    <AnimatePresence>
-                      {scheduleEnabled && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2"><Label className="text-xs">Dia da Semana</Label><Select value={scheduleWeekday} onValueChange={setScheduleWeekday}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{WEEKDAYS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent></Select></div>
-                              <div className="space-y-2"><Label className="text-xs">Horário</Label><Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} /></div>
-                              <div className="space-y-2"><Label className="text-xs">Duração</Label><Select value={scheduleDuration} onValueChange={setScheduleDuration}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="30">30 min</SelectItem><SelectItem value="50">50 min</SelectItem><SelectItem value="60">1 hora</SelectItem><SelectItem value="90">1h 30min</SelectItem><SelectItem value="120">2 horas</SelectItem></SelectContent></Select></div>
-                              <div className="space-y-2"><Label className="text-xs flex items-center gap-1"><DollarSign className="h-3 w-3" />Valor</Label><Input type="number" step="0.01" value={scheduleValue} onChange={(e) => setScheduleValue(e.target.value)} /></div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2"><Label className="text-xs">Data de Início</Label><Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} /></div>
-                              <div className="space-y-2"><Label className="text-xs">Tipo</Label><Select value={scheduleType} onValueChange={setScheduleType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="presential">Presencial</SelectItem><SelectItem value="online">Online</SelectItem></SelectContent></Select></div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs">Término</Label>
-                              <div className="flex gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="endType" checked={scheduleEndType === "indefinite"} onChange={() => setScheduleEndType("indefinite")} className="accent-primary" /><span className="text-sm">Indeterminado (12 semanas)</span></label>
-                                <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="endType" checked={scheduleEndType === "date"} onChange={() => setScheduleEndType("date")} className="accent-primary" /><span className="text-sm">Até data</span></label>
-                              </div>
-                              {scheduleEndType === "date" && <Input type="date" value={scheduleEndDate} onChange={(e) => setScheduleEndDate(e.target.value)} className="mt-2 w-[200px]" />}
-                            </div>
-                            {scheduleSummary && (
-                              <div className="p-3 rounded-lg bg-background border border-border">
-                                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1"><Repeat className="h-3 w-3" /> Resumo</div>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                  <div><span className="text-muted-foreground">Dia:</span> <span className="font-medium">{scheduleSummary.weekdayLabel}</span></div>
-                                  <div><span className="text-muted-foreground">Horário:</span> <span className="font-medium">{scheduleSummary.time}</span></div>
-                                  <div><span className="text-muted-foreground">Valor:</span> <span className="font-medium text-green-600">R$ {scheduleSummary.value.toFixed(2)}</span></div>
-                                  <div><span className="text-muted-foreground">Tipo:</span> <span className="font-medium">{scheduleSummary.type}</span></div>
-                                </div>
-                              </div>
-                            )}
+                <PatientForm
+                  onSubmit={handleCreatePatientFromForm}
+                  submitLabel={scheduleEnabled ? "Cadastrar e Agendar" : "Cadastrar Paciente"}
+                  loading={creating}
+                  onCancel={() => setDialogOpen(false)}
+                  extraContent={
+                    <>
+                      <Separator />
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <h3 className="text-sm font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" />Criar agendamento recorrente agora?</h3>
+                            <p className="text-xs text-muted-foreground">Configure sessões semanais automáticas para este paciente</p>
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-                    <Button type="submit" disabled={creating} className="gap-2">
-                      {creating ? <span className="animate-pulse">Processando...</span> : <><CheckCircle2 className="h-4 w-4" />{scheduleEnabled ? "Cadastrar e Agendar" : "Cadastrar Paciente"}</>}
-                    </Button>
-                  </div>
-                </form>
+                          <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
+                        </div>
+                        <AnimatePresence>
+                          {scheduleEnabled && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                              <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2"><Label className="text-xs">Dia da Semana</Label><Select value={scheduleWeekday} onValueChange={setScheduleWeekday}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{WEEKDAYS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent></Select></div>
+                                  <div className="space-y-2"><Label className="text-xs">Horário</Label><Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} /></div>
+                                  <div className="space-y-2"><Label className="text-xs">Duração</Label><Select value={scheduleDuration} onValueChange={setScheduleDuration}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="30">30 min</SelectItem><SelectItem value="50">50 min</SelectItem><SelectItem value="60">1 hora</SelectItem><SelectItem value="90">1h 30min</SelectItem><SelectItem value="120">2 horas</SelectItem></SelectContent></Select></div>
+                                  <div className="space-y-2"><Label className="text-xs flex items-center gap-1"><DollarSign className="h-3 w-3" />Valor</Label><Input type="number" step="0.01" value={scheduleValue} onChange={(e) => setScheduleValue(e.target.value)} /></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2"><Label className="text-xs">Data de Início</Label><Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} /></div>
+                                  <div className="space-y-2"><Label className="text-xs">Tipo</Label><Select value={scheduleType} onValueChange={setScheduleType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="presential">Presencial</SelectItem><SelectItem value="online">Online</SelectItem></SelectContent></Select></div>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Término</Label>
+                                  <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="endType" checked={scheduleEndType === "indefinite"} onChange={() => setScheduleEndType("indefinite")} className="accent-primary" /><span className="text-sm">Indeterminado (12 semanas)</span></label>
+                                    <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="endType" checked={scheduleEndType === "date"} onChange={() => setScheduleEndType("date")} className="accent-primary" /><span className="text-sm">Até data</span></label>
+                                  </div>
+                                  {scheduleEndType === "date" && <Input type="date" value={scheduleEndDate} onChange={(e) => setScheduleEndDate(e.target.value)} className="mt-2 w-[200px]" />}
+                                </div>
+                                {scheduleSummary && (
+                                  <div className="p-3 rounded-lg bg-background border border-border">
+                                    <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1"><Repeat className="h-3 w-3" /> Resumo</div>
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                      <div><span className="text-muted-foreground">Dia:</span> <span className="font-medium">{scheduleSummary.weekdayLabel}</span></div>
+                                      <div><span className="text-muted-foreground">Horário:</span> <span className="font-medium">{scheduleSummary.time}</span></div>
+                                      <div><span className="text-muted-foreground">Valor:</span> <span className="font-medium text-green-600">R$ {scheduleSummary.value.toFixed(2)}</span></div>
+                                      <div><span className="text-muted-foreground">Tipo:</span> <span className="font-medium">{scheduleSummary.type}</span></div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </>
+                  }
+                />
               </ScrollArea>
             </DialogContent>
           </Dialog>
@@ -717,29 +679,25 @@ export default function Patients() {
           <DialogHeader><DialogTitle>Editar Paciente</DialogTitle><DialogDescription>Atualize os dados do paciente</DialogDescription></DialogHeader>
           {editingPatient && (
             <ScrollArea className="max-h-[calc(90vh-140px)] pr-4">
-              <form onSubmit={handleEditPatient} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Nome Completo *</Label><Input name="full_name" defaultValue={editingPatient.full_name} required /></div>
-                  <div className="space-y-2"><Label>CPF</Label><Input value={editCpf} onChange={(e) => setEditCpf(formatCPF(e.target.value))} maxLength={14} /></div>
-                  <div className="space-y-2"><Label>E-mail</Label><Input name="email" type="email" defaultValue={editingPatient.email || ""} /></div>
-                  <div className="space-y-2"><Label>Telefone *</Label><Input value={editPhone} onChange={(e) => setEditPhone(formatPhone(e.target.value))} maxLength={15} required /></div>
-                  <div className="space-y-2"><Label>Nascimento</Label><Input name="birth_date" type="date" defaultValue={editingPatient.birth_date || ""} /></div>
-                  <div className="space-y-2 md:col-span-2"><Label>Endereço</Label><Input name="address" defaultValue={editingPatient.address || ""} /></div>
-                  <div className="space-y-2"><Label>Contato Emergência</Label><Input name="emergency_contact" defaultValue={editingPatient.emergency_contact || ""} /></div>
-                  <div className="space-y-2"><Label>Tel. Emergência</Label><Input value={editEmergencyPhone} onChange={(e) => setEditEmergencyPhone(formatPhone(e.target.value))} maxLength={15} /></div>
-                </div>
-                <Separator />
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4" />Dados Financeiros</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2"><Label>Valor da Sessão (R$)</Label><Input name="default_session_value" type="number" step="0.01" defaultValue={editingPatient.default_session_value ?? ""} /></div>
-                    <div className="space-y-2"><Label>Dia de Pagamento</Label><Select name="payment_day" defaultValue={editingPatient.payment_day ? String(editingPatient.payment_day) : undefined}><SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger><SelectContent>{Array.from({length: 31}, (_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><Label>Plano Mensal (R$)</Label><Input name="monthly_plan_value" type="number" step="0.01" defaultValue={(editingPatient as any).monthly_plan_value ?? ""} /></div>
-                  </div>
-                </div>
-                <div className="space-y-2"><Label>Observações</Label><Textarea name="notes" rows={3} defaultValue={editingPatient.notes || ""} /></div>
-                <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditingPatient(null)}>Cancelar</Button><Button type="submit">Salvar</Button></div>
-              </form>
+              <PatientForm
+                initialData={{
+                  full_name: editingPatient.full_name,
+                  email: editingPatient.email || "",
+                  phone: editingPatient.phone || "",
+                  cpf: editingPatient.cpf || "",
+                  birth_date: editingPatient.birth_date || "",
+                  address: editingPatient.address || "",
+                  emergency_contact: editingPatient.emergency_contact || "",
+                  emergency_phone: editingPatient.emergency_phone || "",
+                  notes: editingPatient.notes || "",
+                  default_session_value: editingPatient.default_session_value != null ? String(editingPatient.default_session_value) : "",
+                  payment_day: editingPatient.payment_day != null ? String(editingPatient.payment_day) : "",
+                  monthly_plan_value: editingPatient.monthly_plan_value != null ? String(editingPatient.monthly_plan_value) : "",
+                }}
+                onSubmit={handleEditPatientFromForm}
+                submitLabel="Salvar"
+                onCancel={() => setEditingPatient(null)}
+              />
             </ScrollArea>
           )}
         </DialogContent>

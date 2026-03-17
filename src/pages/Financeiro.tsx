@@ -313,8 +313,8 @@ export default function Financeiro() {
   });
 
   const getStatusBadge = (status: string) => {
-    const v: Record<string, "default" | "secondary" | "destructive" | "outline"> = { paid: "default", pending: "secondary", overdue: "destructive", cancelled: "outline" };
-    const l: Record<string, string> = { paid: "Pago", pending: "Pendente", overdue: "Atrasado", cancelled: "Cancelado" };
+    const v: Record<string, "default" | "secondary" | "destructive" | "outline"> = { paid: "default", pending: "secondary", overdue: "destructive", cancelled: "outline", exempt: "outline" };
+    const l: Record<string, string> = { paid: "Pago", pending: "Pendente", overdue: "Atrasado", cancelled: "Cancelado", exempt: "Isento" };
     return <Badge variant={v[status] || "secondary"}>{l[status] || status}</Badge>;
   };
 
@@ -518,32 +518,30 @@ export default function Financeiro() {
         </Card>
       )}
 
-      <Tabs defaultValue="overview" className="mb-6">
+      <Tabs defaultValue="resumo" className="mb-6">
         <TabsList className="bg-muted/50 mb-6">
-          <TabsTrigger value="overview" className="gap-2"><TrendingUp className="h-4 w-4" />Visão Geral</TabsTrigger>
-          <TabsTrigger value="dre" className="gap-2"><BarChart3 className="h-4 w-4" />DRE</TabsTrigger>
-          <TabsTrigger value="projections" className="gap-2"><Target className="h-4 w-4" />Projeções</TabsTrigger>
-          <TabsTrigger value="categories" className="gap-2"><PieChart className="h-4 w-4" />Categorias</TabsTrigger>
+          <TabsTrigger value="resumo" className="gap-2"><TrendingUp className="h-4 w-4" />Resumo</TabsTrigger>
+          <TabsTrigger value="pagamentos" className="gap-2"><Receipt className="h-4 w-4" />Pagamentos</TabsTrigger>
+          <TabsTrigger value="notas" className="gap-2"><FileText className="h-4 w-4" />Notas Fiscais</TabsTrigger>
+          <TabsTrigger value="relatorios" className="gap-2"><BarChart3 className="h-4 w-4" />Relatórios</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="resumo" className="space-y-6">
           <FinancialChart data={chartData} />
-        </TabsContent>
-
-        <TabsContent value="dre" className="space-y-6">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" />DRE Simplificada</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* DRE Simplificada */}
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" />DRE Simplificada</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
                 <div className="flex justify-between items-center p-3 rounded-lg bg-green-500/5 border border-green-500/20">
                   <span className="font-medium text-green-600">Receita Bruta</span>
                   <span className="font-bold text-green-600">R$ {metrics.income.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-lg bg-red-500/5 border border-red-500/20">
-                  <span className="font-medium text-red-600">(-) Despesas Operacionais</span>
+                  <span className="font-medium text-red-600">(-) Despesas</span>
                   <span className="font-bold text-red-600">R$ {metrics.expense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="border-t border-border pt-3">
+                <div className="border-t pt-3">
                   <div className="flex justify-between items-center p-3 rounded-lg bg-primary/5 border border-primary/20">
                     <span className="font-bold text-lg">Lucro Líquido</span>
                     <span className={`font-bold text-lg ${metrics.balance >= 0 ? "text-green-600" : "text-red-600"}`}>
@@ -555,12 +553,21 @@ export default function Financeiro() {
                   <span className="text-sm text-muted-foreground">Margem de Lucro</span>
                   <span className="font-bold">{metrics.income > 0 ? Math.round((metrics.balance / metrics.income) * 100) : 0}%</span>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </CardContent>
+            </Card>
 
-        <TabsContent value="projections" className="space-y-6">
+            {/* Categorias */}
+            <div className="space-y-6">
+              <CategoryAnalysis
+                type="income"
+                categories={incomeCategories.length > 0 ? incomeCategories : [{ name: "Consultas", value: 0, percentage: 0, trend: "stable" as const, color: "hsl(142, 76%, 36%)" }]}
+              />
+              <CategoryAnalysis
+                type="expense"
+                categories={expenseCategories.length > 0 ? expenseCategories : [{ name: "Sem despesas", value: 0, percentage: 0, trend: "stable" as const, color: "hsl(0, 84%, 60%)" }]}
+              />
+            </div>
+          </div>
           <FinancialProjections
             data={{
               currentMonth: metrics.income,
@@ -572,195 +579,250 @@ export default function Financeiro() {
               trend: metrics.incomeChange > 0 ? "up" : metrics.incomeChange < 0 ? "down" : "stable",
               insights: [
                 metrics.incomeChange > 0
-                  ? `📈 Sua receita cresceu ${metrics.incomeChange}% em relação ao mês anterior`
-                  : `📉 Sua receita caiu ${Math.abs(metrics.incomeChange)}% em relação ao mês anterior`,
-                `💰 Ticket médio por paciente: R$ ${metrics.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`,
+                  ? `📈 Receita cresceu ${metrics.incomeChange}% vs mês anterior`
+                  : `📉 Receita caiu ${Math.abs(metrics.incomeChange)}% vs mês anterior`,
+                `💰 Ticket médio: R$ ${metrics.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`,
                 metrics.delinquencyRate > 10
-                  ? `⚠️ Inadimplência em ${metrics.delinquencyRate}% — considere revisar cobranças`
+                  ? `⚠️ Inadimplência em ${metrics.delinquencyRate}%`
                   : `✅ Inadimplência controlada em ${metrics.delinquencyRate}%`,
-                `🎯 Faltam R$ ${Math.max(0, 15000 - metrics.income).toLocaleString("pt-BR")} para a meta mensal`,
+                `🎯 Faltam R$ ${Math.max(0, 15000 - metrics.income).toLocaleString("pt-BR")} para a meta`,
               ],
             }}
           />
         </TabsContent>
 
-        <TabsContent value="categories" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <CategoryAnalysis
-              type="income"
-              categories={incomeCategories.length > 0 ? incomeCategories : [{ name: "Consultas", value: 0, percentage: 0, trend: "stable", color: "hsl(142, 76%, 36%)" }]}
-            />
-            <CategoryAnalysis
-              type="expense"
-              categories={expenseCategories.length > 0 ? expenseCategories : [{ name: "Sem despesas", value: 0, percentage: 0, trend: "stable", color: "hsl(0, 84%, 60%)" }]}
-            />
+        <TabsContent value="pagamentos" className="space-y-6">
+          {/* Filters & Actions for Pagamentos */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between">
+            <div className="flex flex-wrap gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 w-[200px]" />
+              </div>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-[140px]"><Filter className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="income">Receitas</SelectItem>
+                  <SelectItem value="expense">Despesas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Status</SelectItem>
+                  <SelectItem value="paid">Pago</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="overdue">Atrasado</SelectItem>
+                  <SelectItem value="exempt">Isento</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterPatient} onValueChange={setFilterPatient}>
+                <SelectTrigger className="w-[180px]">
+                  <User className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filtrar paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos pacientes</SelectItem>
+                  {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2"><Download className="h-4 w-4" />Exportar</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                    const data = filteredTransactions.map(t => ({
+                      descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
+                      valor: t.amount, status: t.payment_status, paciente: t.patient_name || "-",
+                      categoria: t.category, vencimento: t.due_date, pagamento: t.paid_date || "-",
+                    }));
+                    const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
+                    exportToCSV(data, "financeiro", h);
+                    toast.success("CSV exportado!");
+                  }}>CSV</DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                    const data = filteredTransactions.map(t => ({
+                      descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
+                      valor: t.amount, status: t.payment_status, paciente: t.patient_name || "-",
+                      categoria: t.category, vencimento: t.due_date, pagamento: t.paid_date || "-",
+                    }));
+                    const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
+                    exportToExcel(data, "financeiro", "Financeiro", h);
+                    toast.success("Excel exportado!");
+                  }}>Excel (.xlsx)</DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                    const data = filteredTransactions.map(t => ({
+                      descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
+                      valor: `R$ ${Number(t.amount).toFixed(2)}`, status: t.payment_status,
+                      paciente: t.patient_name || "-", categoria: t.category,
+                      vencimento: t.due_date, pagamento: t.paid_date || "-",
+                    }));
+                    const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
+                    exportToPDF(data, "financeiro", "Relatório Financeiro", h);
+                    toast.success("PDF exportado!");
+                  }}>PDF</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); } }}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2"><Plus className="h-4 w-4" />Nova Transação</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader><DialogTitle>Nova Transação</DialogTitle></DialogHeader>
+                  <TransactionForm onSubmit={handleCreateTransaction} />
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
+
+          {/* Transactions List */}
+          <Card>
+            <CardHeader><CardTitle>Transações</CardTitle></CardHeader>
+            <CardContent>
+              <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                const txId = fileInputRef.current?.dataset.txId;
+                if (file && txId) handleUploadAttachment(txId, file);
+              }} />
+
+              {filteredTransactions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhuma transação encontrada</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredTransactions.map((transaction, index) => (
+                    <motion.div key={transaction.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}
+                      className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2 rounded-lg ${transaction.type === "income" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
+                          {transaction.type === "income" ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+                        </div>
+                        <div>
+                          <p className="font-medium">{transaction.description}</p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            {transaction.patient_id && transaction.patient_name ? (
+                              <button className="flex items-center gap-1 text-primary hover:underline"
+                                onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${transaction.patient_id}`); }}>
+                                <User className="h-3 w-3" />{transaction.patient_name}<ExternalLink className="h-3 w-3" />
+                              </button>
+                            ) : (<span>{transaction.category}</span>)}
+                            <span>•</span>
+                            <span>{transaction.due_date && format(new Date(transaction.due_date), "dd/MM/yyyy")}</span>
+                            {transaction.cost_center && <Badge variant="outline" className="text-xs ml-1">{transaction.cost_center}</Badge>}
+                            {transaction.attachment_url && <Paperclip className="h-3 w-3 text-primary" />}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className={`font-semibold ${transaction.type === "income" ? "text-green-500" : "text-red-500"}`}>
+                            {transaction.type === "income" ? "+" : "-"} R$ {Number(transaction.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </p>
+                          {getStatusBadge(transaction.payment_status)}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                            if (fileInputRef.current) { fileInputRef.current.dataset.txId = transaction.id; fileInputRef.current.click(); }
+                          }} title="Anexar comprovante"><Upload className="h-4 w-4" /></Button>
+                          <ActionMenu onEdit={() => openEditDialog(transaction)} onDelete={() => handleDeleteTransaction(transaction.id)}
+                            deleteTitle="Excluir Transação" deleteDescription="Tem certeza que deseja excluir esta transação?" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notas" className="space-y-6">
+          <Card>
+            <CardContent className="py-16 text-center">
+              <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-30" />
+              <h3 className="text-lg font-semibold mb-2">Emissão de Notas Fiscais</h3>
+              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                A emissão de NFS-e será integrada com serviços como Focus NFe ou eNotas. 
+                Quando um pagamento for marcado como "Pago", o botão para emitir nota fiscal estará disponível.
+              </p>
+              <div className="flex flex-col gap-2 max-w-sm mx-auto">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-left">
+                  <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+                    <span className="text-green-600 text-sm font-bold">1</span>
+                  </div>
+                  <span className="text-sm">Pagamento marcado como <strong>Pago</strong></span>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-left">
+                  <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                    <span className="text-blue-600 text-sm font-bold">2</span>
+                  </div>
+                  <span className="text-sm">Botão <strong>"Emitir Nota Fiscal"</strong> disponível</span>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-left">
+                  <div className="h-8 w-8 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0">
+                    <span className="text-purple-600 text-sm font-bold">3</span>
+                  </div>
+                  <span className="text-sm">PDF da nota salvo e disponível para download</span>
+                </div>
+              </div>
+              <Badge variant="secondary" className="mt-6">Em breve</Badge>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="relatorios" className="space-y-6">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />Relatórios Financeiros</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { title: "Faturamento Mensal", desc: "Receitas e despesas do mês atual", action: () => {
+                    const data = filteredTransactions.map(t => ({ descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa", valor: `R$ ${Number(t.amount).toFixed(2)}`, status: t.payment_status, paciente: t.patient_name || "-" }));
+                    const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente" };
+                    exportToPDF(data, "faturamento-mensal", "Faturamento Mensal", h);
+                    toast.success("Relatório gerado!");
+                  }},
+                  { title: "Pagamentos Pendentes", desc: "Lista de pagamentos em aberto", action: () => {
+                    const pending = transactions.filter(t => t.payment_status === "pending");
+                    const data = pending.map(t => ({ descricao: t.description, valor: `R$ ${Number(t.amount).toFixed(2)}`, vencimento: t.due_date, paciente: t.patient_name || "-" }));
+                    const h = { descricao: "Descrição", valor: "Valor", vencimento: "Vencimento", paciente: "Paciente" };
+                    exportToPDF(data, "pendentes", "Pagamentos Pendentes", h);
+                    toast.success("Relatório gerado!");
+                  }},
+                  { title: "Pacientes Inadimplentes", desc: "Pacientes com pagamentos atrasados", action: () => {
+                    const overdue = transactions.filter(t => t.payment_status === "pending" && t.due_date && isAfter(new Date(), new Date(t.due_date)));
+                    const data = overdue.map(t => ({ paciente: t.patient_name || "-", valor: `R$ ${Number(t.amount).toFixed(2)}`, vencimento: t.due_date, dias_atraso: Math.ceil((new Date().getTime() - new Date(t.due_date).getTime()) / 86400000) }));
+                    const h = { paciente: "Paciente", valor: "Valor", vencimento: "Vencimento", dias_atraso: "Dias Atraso" };
+                    exportToPDF(data, "inadimplentes", "Pacientes Inadimplentes", h);
+                    toast.success("Relatório gerado!");
+                  }},
+                  { title: "Exportação Completa", desc: "Todas as transações em Excel", action: () => {
+                    const data = transactions.map(t => ({ descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa", valor: t.amount, status: t.payment_status, paciente: t.patient_name || "-", categoria: t.category, vencimento: t.due_date, pagamento: t.paid_date || "-" }));
+                    const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
+                    exportToExcel(data, "financeiro-completo", "Financeiro Completo", h);
+                    toast.success("Excel exportado!");
+                  }},
+                ].map((report, i) => (
+                  <Card key={i} className="cursor-pointer hover:border-primary/30 transition-colors" onClick={report.action}>
+                    <CardContent className="py-6 text-center">
+                      <Download className="h-8 w-8 mx-auto mb-3 text-primary" />
+                      <p className="font-medium text-sm">{report.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{report.desc}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Filters & Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
-        <div className="flex flex-wrap gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 w-[200px]" />
-          </div>
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[140px]"><Filter className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="income">Receitas</SelectItem>
-              <SelectItem value="expense">Despesas</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Status</SelectItem>
-              <SelectItem value="paid">Pago</SelectItem>
-              <SelectItem value="pending">Pendente</SelectItem>
-              <SelectItem value="overdue">Atrasado</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterPatient} onValueChange={setFilterPatient}>
-            <SelectTrigger className="w-[180px]">
-              <User className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filtrar paciente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos pacientes</SelectItem>
-              {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2"><Download className="h-4 w-4" />Exportar</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                const data = filteredTransactions.map(t => ({
-                  descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
-                  valor: t.amount, status: t.payment_status, paciente: t.patient_name || "-",
-                  categoria: t.category, vencimento: t.due_date, pagamento: t.paid_date || "-",
-                }));
-                const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
-                exportToCSV(data, "financeiro", h);
-                toast.success("CSV exportado!");
-              }}>CSV</DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                const data = filteredTransactions.map(t => ({
-                  descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
-                  valor: t.amount, status: t.payment_status, paciente: t.patient_name || "-",
-                  categoria: t.category, vencimento: t.due_date, pagamento: t.paid_date || "-",
-                }));
-                const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
-                exportToExcel(data, "financeiro", "Financeiro", h);
-                toast.success("Excel exportado!");
-              }}>Excel (.xlsx)</DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                const data = filteredTransactions.map(t => ({
-                  descricao: t.description, tipo: t.type === "income" ? "Receita" : "Despesa",
-                  valor: `R$ ${Number(t.amount).toFixed(2)}`, status: t.payment_status,
-                  paciente: t.patient_name || "-", categoria: t.category,
-                  vencimento: t.due_date, pagamento: t.paid_date || "-",
-                }));
-                const h = { descricao: "Descrição", tipo: "Tipo", valor: "Valor", status: "Status", paciente: "Paciente", categoria: "Categoria", vencimento: "Vencimento", pagamento: "Pago em" };
-                exportToPDF(data, "financeiro", "Relatório Financeiro", h);
-                toast.success("PDF exportado!");
-              }}>PDF</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); } }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2"><Plus className="h-4 w-4" />Nova Transação</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Nova Transação</DialogTitle></DialogHeader>
-            <TransactionForm onSubmit={handleCreateTransaction} />
-          </DialogContent>
-        </Dialog>
-        </div>
-      </div>
-
-      {/* Transactions List */}
-      <Card>
-        <CardHeader><CardTitle>Transações</CardTitle></CardHeader>
-        <CardContent>
-          <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => {
-            const file = e.target.files?.[0];
-            const txId = fileInputRef.current?.dataset.txId;
-            if (file && txId) handleUploadAttachment(txId, file);
-          }} />
-
-          {filteredTransactions.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>Nenhuma transação encontrada</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredTransactions.map((transaction, index) => (
-                <motion.div key={transaction.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}
-                  className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-lg ${transaction.type === "income" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
-                      {transaction.type === "income" ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
-                    </div>
-                    <div>
-                      <p className="font-medium">{transaction.description}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {transaction.patient_id && transaction.patient_name ? (
-                          <button 
-                            className="flex items-center gap-1 text-primary hover:underline"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${transaction.patient_id}`); }}
-                          >
-                            <User className="h-3 w-3" />
-                            {transaction.patient_name}
-                            <ExternalLink className="h-3 w-3" />
-                          </button>
-                        ) : (
-                          <span>{transaction.category}</span>
-                        )}
-                        <span>•</span>
-                        <span>{transaction.due_date && format(new Date(transaction.due_date), "dd/MM/yyyy")}</span>
-                        {transaction.cost_center && (
-                          <Badge variant="outline" className="text-xs ml-1">{transaction.cost_center}</Badge>
-                        )}
-                        {transaction.attachment_url && (
-                          <Paperclip className="h-3 w-3 text-primary" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className={`font-semibold ${transaction.type === "income" ? "text-green-500" : "text-red-500"}`}>
-                        {transaction.type === "income" ? "+" : "-"} R$ {Number(transaction.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </p>
-                      {getStatusBadge(transaction.payment_status)}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                        if (fileInputRef.current) {
-                          fileInputRef.current.dataset.txId = transaction.id;
-                          fileInputRef.current.click();
-                        }
-                      }} title="Anexar comprovante">
-                        <Upload className="h-4 w-4" />
-                      </Button>
-                      <ActionMenu onEdit={() => openEditDialog(transaction)} onDelete={() => handleDeleteTransaction(transaction.id)}
-                        deleteTitle="Excluir Transação" deleteDescription="Tem certeza que deseja excluir esta transação?" />
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Edit Dialog */}
       <Dialog open={!!editingTransaction} onOpenChange={(open) => { if (!open) { setEditingTransaction(null); resetForm(); } }}>

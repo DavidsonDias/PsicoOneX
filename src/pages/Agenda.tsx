@@ -608,14 +608,41 @@ export default function Agenda() {
           <SelectContent>
             {patients.map(patient => (
               <SelectItem key={patient.id} value={patient.id}>
-                {patient.full_name}
-                {patient.default_session_value && (
-                  <span className="text-muted-foreground ml-2">• R$ {patient.default_session_value}</span>
-                )}
+                <span className="flex items-center gap-2">
+                  {patient.full_name}
+                  {patient.default_session_value && (
+                    <span className="text-muted-foreground text-xs">R$ {patient.default_session_value}</span>
+                  )}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {/* Patient financial context */}
+        {formData.patient_id && (() => {
+          const sp = patients.find(p => p.id === formData.patient_id);
+          if (!sp) return null;
+          const hasFinancial = sp.default_session_value || sp.monthly_plan_value || sp.payment_day;
+          if (!hasFinancial) return null;
+          return (
+            <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-1">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <DollarSign className="h-3 w-3" /> Contexto financeiro
+              </p>
+              <div className="flex flex-wrap gap-3 text-xs">
+                {sp.default_session_value && (
+                  <span>Sessão: <strong className="text-green-600">R$ {sp.default_session_value}</strong></span>
+                )}
+                {sp.monthly_plan_value && (
+                  <span>Plano: <strong>R$ {sp.monthly_plan_value}</strong></span>
+                )}
+                {sp.payment_day && (
+                  <span>Pgto dia: <strong>{sp.payment_day}</strong></span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
