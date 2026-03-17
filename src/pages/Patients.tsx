@@ -302,6 +302,10 @@ export default function Patients() {
     if (!canProceed) { setEditingPatient(null); return; }
     const formData = new FormData(e.currentTarget);
     try {
+      const editSessionVal = formData.get("default_session_value") as string;
+      const editPayDay = formData.get("payment_day") as string;
+      const editMonthlyVal = formData.get("monthly_plan_value") as string;
+
       const { error } = await supabase.from("patients").update({
         full_name: formData.get("full_name") as string,
         email: (formData.get("email") as string) || null,
@@ -312,7 +316,10 @@ export default function Patients() {
         address: (formData.get("address") as string) || null,
         emergency_contact: (formData.get("emergency_contact") as string) || null,
         emergency_phone: editEmergencyPhone || null,
-      }).eq("id", editingPatient.id);
+        default_session_value: editSessionVal ? parseFloat(editSessionVal) : null,
+        payment_day: editPayDay ? parseInt(editPayDay) : null,
+        monthly_plan_value: editMonthlyVal ? parseFloat(editMonthlyVal) : null,
+      } as any).eq("id", editingPatient.id);
       if (error) throw error;
       toast.success("Paciente atualizado com sucesso!");
       setEditingPatient(null);
