@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkActions } from "@/components/patients/BulkActions";
+import { PatientForm, PatientFormData } from "@/components/patients/PatientForm";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
 import { format, addWeeks, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
