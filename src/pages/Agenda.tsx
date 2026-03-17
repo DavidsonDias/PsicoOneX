@@ -58,6 +58,9 @@ interface Patient {
   id: string;
   full_name: string;
   email?: string;
+  default_session_value?: number | null;
+  payment_day?: number | null;
+  monthly_plan_value?: number | null;
 }
 
 export default function Agenda() {
