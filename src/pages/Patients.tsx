@@ -721,6 +721,15 @@ export default function Patients() {
                   <div className="space-y-2"><Label>Contato Emergência</Label><Input name="emergency_contact" defaultValue={editingPatient.emergency_contact || ""} /></div>
                   <div className="space-y-2"><Label>Tel. Emergência</Label><Input value={editEmergencyPhone} onChange={(e) => setEditEmergencyPhone(formatPhone(e.target.value))} maxLength={15} /></div>
                 </div>
+                <Separator />
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4" />Dados Financeiros</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2"><Label>Valor da Sessão (R$)</Label><Input name="default_session_value" type="number" step="0.01" defaultValue={editingPatient.default_session_value ?? ""} /></div>
+                    <div className="space-y-2"><Label>Dia de Pagamento</Label><Select name="payment_day" defaultValue={editingPatient.payment_day ? String(editingPatient.payment_day) : undefined}><SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger><SelectContent>{Array.from({length: 31}, (_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><Label>Plano Mensal (R$)</Label><Input name="monthly_plan_value" type="number" step="0.01" defaultValue={(editingPatient as any).monthly_plan_value ?? ""} /></div>
+                  </div>
+                </div>
                 <div className="space-y-2"><Label>Observações</Label><Textarea name="notes" rows={3} defaultValue={editingPatient.notes || ""} /></div>
                 <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditingPatient(null)}>Cancelar</Button><Button type="submit">Salvar</Button></div>
               </form>
