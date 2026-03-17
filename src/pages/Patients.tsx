@@ -512,89 +512,63 @@ export default function Patients() {
                 <DialogDescription>Preencha os dados do paciente para criar o cadastro</DialogDescription>
               </DialogHeader>
               <ScrollArea className="max-h-[calc(90vh-140px)] pr-4">
-                <form onSubmit={handleCreatePatient} className="space-y-6">
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Dados Pessoais</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label htmlFor="full_name">Nome Completo *</Label><Input id="full_name" name="full_name" required /></div>
-                      <div className="space-y-2"><Label htmlFor="cpf">CPF</Label><Input id="cpf" name="cpf" value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))} placeholder="000.000.000-00" maxLength={14} /></div>
-                      <div className="space-y-2"><Label htmlFor="email">E-mail</Label><Input id="email" name="email" type="email" /></div>
-                      <div className="space-y-2"><Label htmlFor="phone">Telefone *</Label><Input id="phone" name="phone" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} required /></div>
-                      <div className="space-y-2"><Label htmlFor="birth_date">Data de Nascimento</Label><Input id="birth_date" name="birth_date" type="date" /></div>
-                      <div className="space-y-2 md:col-span-2"><Label htmlFor="address">Endereço</Label><Input id="address" name="address" placeholder="Rua, número, bairro, cidade - UF" /></div>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Contato de Emergência</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label htmlFor="emergency_contact">Nome do Contato</Label><Input id="emergency_contact" name="emergency_contact" /></div>
-                      <div className="space-y-2"><Label htmlFor="emergency_phone">Telefone de Emergência</Label><Input id="emergency_phone" name="emergency_phone" value={emergencyPhone} onChange={(e) => setEmergencyPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} /></div>
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4" />Dados Financeiros</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2"><Label htmlFor="default_session_value">Valor da Sessão (R$)</Label><Input id="default_session_value" name="default_session_value" type="number" step="0.01" placeholder="200.00" /></div>
-                      <div className="space-y-2"><Label htmlFor="payment_day">Dia de Pagamento</Label><Select name="payment_day"><SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger><SelectContent>{Array.from({length: 31}, (_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}</SelectContent></Select></div>
-                      <div className="space-y-2"><Label htmlFor="monthly_plan_value">Plano Mensal (R$)</Label><Input id="monthly_plan_value" name="monthly_plan_value" type="number" step="0.01" placeholder="0.00" /></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2"><Label htmlFor="notes">Observações</Label><Textarea id="notes" name="notes" rows={3} placeholder="Observações sobre o paciente..." /></div>
-                  <Separator />
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <h3 className="text-sm font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" />Criar agendamento recorrente agora?</h3>
-                        <p className="text-xs text-muted-foreground">Configure sessões semanais automáticas para este paciente</p>
-                      </div>
-                      <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
-                    </div>
-                    <AnimatePresence>
-                      {scheduleEnabled && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2"><Label className="text-xs">Dia da Semana</Label><Select value={scheduleWeekday} onValueChange={setScheduleWeekday}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{WEEKDAYS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent></Select></div>
-                              <div className="space-y-2"><Label className="text-xs">Horário</Label><Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} /></div>
-                              <div className="space-y-2"><Label className="text-xs">Duração</Label><Select value={scheduleDuration} onValueChange={setScheduleDuration}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="30">30 min</SelectItem><SelectItem value="50">50 min</SelectItem><SelectItem value="60">1 hora</SelectItem><SelectItem value="90">1h 30min</SelectItem><SelectItem value="120">2 horas</SelectItem></SelectContent></Select></div>
-                              <div className="space-y-2"><Label className="text-xs flex items-center gap-1"><DollarSign className="h-3 w-3" />Valor</Label><Input type="number" step="0.01" value={scheduleValue} onChange={(e) => setScheduleValue(e.target.value)} /></div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2"><Label className="text-xs">Data de Início</Label><Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} /></div>
-                              <div className="space-y-2"><Label className="text-xs">Tipo</Label><Select value={scheduleType} onValueChange={setScheduleType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="presential">Presencial</SelectItem><SelectItem value="online">Online</SelectItem></SelectContent></Select></div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs">Término</Label>
-                              <div className="flex gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="endType" checked={scheduleEndType === "indefinite"} onChange={() => setScheduleEndType("indefinite")} className="accent-primary" /><span className="text-sm">Indeterminado (12 semanas)</span></label>
-                                <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="endType" checked={scheduleEndType === "date"} onChange={() => setScheduleEndType("date")} className="accent-primary" /><span className="text-sm">Até data</span></label>
-                              </div>
-                              {scheduleEndType === "date" && <Input type="date" value={scheduleEndDate} onChange={(e) => setScheduleEndDate(e.target.value)} className="mt-2 w-[200px]" />}
-                            </div>
-                            {scheduleSummary && (
-                              <div className="p-3 rounded-lg bg-background border border-border">
-                                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1"><Repeat className="h-3 w-3" /> Resumo</div>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                  <div><span className="text-muted-foreground">Dia:</span> <span className="font-medium">{scheduleSummary.weekdayLabel}</span></div>
-                                  <div><span className="text-muted-foreground">Horário:</span> <span className="font-medium">{scheduleSummary.time}</span></div>
-                                  <div><span className="text-muted-foreground">Valor:</span> <span className="font-medium text-green-600">R$ {scheduleSummary.value.toFixed(2)}</span></div>
-                                  <div><span className="text-muted-foreground">Tipo:</span> <span className="font-medium">{scheduleSummary.type}</span></div>
-                                </div>
-                              </div>
-                            )}
+                <PatientForm
+                  onSubmit={handleCreatePatientFromForm}
+                  submitLabel={scheduleEnabled ? "Cadastrar e Agendar" : "Cadastrar Paciente"}
+                  loading={creating}
+                  onCancel={() => setDialogOpen(false)}
+                  extraContent={
+                    <>
+                      <Separator />
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <h3 className="text-sm font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" />Criar agendamento recorrente agora?</h3>
+                            <p className="text-xs text-muted-foreground">Configure sessões semanais automáticas para este paciente</p>
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-                    <Button type="submit" disabled={creating} className="gap-2">
-                      {creating ? <span className="animate-pulse">Processando...</span> : <><CheckCircle2 className="h-4 w-4" />{scheduleEnabled ? "Cadastrar e Agendar" : "Cadastrar Paciente"}</>}
-                    </Button>
-                  </div>
-                </form>
+                          <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
+                        </div>
+                        <AnimatePresence>
+                          {scheduleEnabled && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                              <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2"><Label className="text-xs">Dia da Semana</Label><Select value={scheduleWeekday} onValueChange={setScheduleWeekday}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{WEEKDAYS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent></Select></div>
+                                  <div className="space-y-2"><Label className="text-xs">Horário</Label><Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} /></div>
+                                  <div className="space-y-2"><Label className="text-xs">Duração</Label><Select value={scheduleDuration} onValueChange={setScheduleDuration}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="30">30 min</SelectItem><SelectItem value="50">50 min</SelectItem><SelectItem value="60">1 hora</SelectItem><SelectItem value="90">1h 30min</SelectItem><SelectItem value="120">2 horas</SelectItem></SelectContent></Select></div>
+                                  <div className="space-y-2"><Label className="text-xs flex items-center gap-1"><DollarSign className="h-3 w-3" />Valor</Label><Input type="number" step="0.01" value={scheduleValue} onChange={(e) => setScheduleValue(e.target.value)} /></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2"><Label className="text-xs">Data de Início</Label><Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} /></div>
+                                  <div className="space-y-2"><Label className="text-xs">Tipo</Label><Select value={scheduleType} onValueChange={setScheduleType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="presential">Presencial</SelectItem><SelectItem value="online">Online</SelectItem></SelectContent></Select></div>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Término</Label>
+                                  <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="endType" checked={scheduleEndType === "indefinite"} onChange={() => setScheduleEndType("indefinite")} className="accent-primary" /><span className="text-sm">Indeterminado (12 semanas)</span></label>
+                                    <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="endType" checked={scheduleEndType === "date"} onChange={() => setScheduleEndType("date")} className="accent-primary" /><span className="text-sm">Até data</span></label>
+                                  </div>
+                                  {scheduleEndType === "date" && <Input type="date" value={scheduleEndDate} onChange={(e) => setScheduleEndDate(e.target.value)} className="mt-2 w-[200px]" />}
+                                </div>
+                                {scheduleSummary && (
+                                  <div className="p-3 rounded-lg bg-background border border-border">
+                                    <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1"><Repeat className="h-3 w-3" /> Resumo</div>
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                      <div><span className="text-muted-foreground">Dia:</span> <span className="font-medium">{scheduleSummary.weekdayLabel}</span></div>
+                                      <div><span className="text-muted-foreground">Horário:</span> <span className="font-medium">{scheduleSummary.time}</span></div>
+                                      <div><span className="text-muted-foreground">Valor:</span> <span className="font-medium text-green-600">R$ {scheduleSummary.value.toFixed(2)}</span></div>
+                                      <div><span className="text-muted-foreground">Tipo:</span> <span className="font-medium">{scheduleSummary.type}</span></div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </>
+                  }
+                />
               </ScrollArea>
             </DialogContent>
           </Dialog>
