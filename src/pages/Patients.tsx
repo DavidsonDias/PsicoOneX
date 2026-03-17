@@ -182,7 +182,138 @@ export default function Patients() {
     return dates;
   };
 
-  const handleCreatePatient = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreatePatientFromForm = async (formValues: PatientFormData) => {
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setDialogOpen(false); return; }
+    setCreating(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const userId = session.user.id;
+      const fullName = formValues.full_name;
+
+      const { data: newPatient, error } = await supabase.from("patients").insert({
+        psychologist_id: userId,
+        full_name: fullName,
+        email: formValues.email || null,
+        phone: formValues.phone || null,
+        birth_date: formValues.birth_date || null,
+        notes: formValues.notes || null,
+        cpf: formValues.cpf || null,
+        address: formValues.address || null,
+        emergency_contact: formValues.emergency_contact || null,
+        emergency_phone: formValues.emergency_phone || null,
+        default_session_value: formValues.default_session_value ? parseFloat(formValues.default_session_value) : null,
+        payment_day: formValues.payment_day ? parseInt(formValues.payment_day) : null,
+        monthly_plan_value: formValues.monthly_plan_value ? parseFloat(formValues.monthly_plan_value) : null,
+      } as any).select().single();
+
+      if (error) throw error;
+
+      if (scheduleEnabled && newPatient) {
+        const weekday = parseInt(scheduleWeekday);
+        const sessionValue = parseFloat(scheduleValue) || 200;
+        const duration = parseInt(scheduleDuration) || 50;
+        const endDt = scheduleEndType === "date" && scheduleEndDate ? scheduleEndDate : undefined;
+        const dates = generateWeeklyDates(scheduleStartDate, weekday, endDt);
+
+        if (dates.length > 0) {
+          const { data: existingApts } = await supabase
+            .from("appointments")
+            .select("scheduled_at, duration_minutes, patients(full_name)")
+            .eq("psychologist_id", userId)
+            .is("deleted_at", null)
+            .neq("status", "cancelled");
+
+          const conflicts: string[] = [];
+          const validDates: Date[] = [];
+
+          for (const date of dates) {
+            const scheduledAt = new Date(`${format(date, "yyyy-MM-dd")}T${scheduleTime}:00`);
+            const newEnd = new Date(scheduledAt.getTime() + duration * 60000);
+            const hasConflict = (existingApts || []).some((apt: any) => {
+              const aptStart = new Date(apt.scheduled_at);
+              const aptEnd = new Date(aptStart.getTime() + (apt.duration_minutes || 50) * 60000);
+              return scheduledAt < aptEnd && newEnd > aptStart;
+            });
+            if (hasConflict) conflicts.push(format(date, "dd/MM"));
+            else validDates.push(date);
+          }
+
+          let parentId: string | null = null;
+          for (let i = 0; i < validDates.length; i++) {
+            const date = validDates[i];
+            const scheduledAt = new Date(`${format(date, "yyyy-MM-dd")}T${scheduleTime}:00`).toISOString();
+            const aptData: any = {
+              patient_id: newPatient.id, psychologist_id: userId, scheduled_at: scheduledAt,
+              status: "scheduled", type: scheduleType, duration_minutes: duration,
+              session_value: sessionValue, recurrence_type: "weekly",
+            };
+            if (i > 0 && parentId) aptData.recurrence_parent_id = parentId;
+
+            const { data: apt, error: aptError } = await supabase.from("appointments").insert(aptData).select().single();
+            if (aptError) continue;
+            if (i === 0 && apt) parentId = apt.id;
+            if (apt) {
+              await supabase.from("financial_transactions").insert({
+                psychologist_id: userId, patient_id: newPatient.id, type: "income",
+                amount: sessionValue, description: `Sessão - ${fullName}`, category: "Consulta",
+                payment_method: "pix", status: "pending", due_date: format(date, "yyyy-MM-dd"),
+                appointment_id: apt.id,
+              });
+            }
+          }
+          if (conflicts.length > 0) toast.warning(`${conflicts.length} horário(s) com conflito ignorados`);
+          toast.success(`Paciente criado e ${validDates.length} agendamentos configurados!`, { duration: 5000 });
+        }
+      } else {
+        toast.success("Paciente cadastrado com sucesso!");
+      }
+
+      await supabase.from("audit_logs").insert({
+        user_id: session.user.id, action_type: "create", entity_type: "patient",
+        entity_id: newPatient?.id, new_data: { schedule_enabled: scheduleEnabled, full_name: fullName },
+      } as any);
+
+      setDialogOpen(false);
+      loadPatients();
+      resetCreateForm();
+    } catch {
+      toast.error("Erro ao cadastrar paciente");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleEditPatientFromForm = async (formValues: PatientFormData) => {
+    if (!editingPatient) return;
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) { setEditingPatient(null); return; }
+    try {
+      const { error } = await supabase.from("patients").update({
+        full_name: formValues.full_name,
+        email: formValues.email || null,
+        phone: formValues.phone || null,
+        birth_date: formValues.birth_date || null,
+        notes: formValues.notes || null,
+        cpf: formValues.cpf || null,
+        address: formValues.address || null,
+        emergency_contact: formValues.emergency_contact || null,
+        emergency_phone: formValues.emergency_phone || null,
+        default_session_value: formValues.default_session_value ? parseFloat(formValues.default_session_value) : null,
+        payment_day: formValues.payment_day ? parseInt(formValues.payment_day) : null,
+        monthly_plan_value: formValues.monthly_plan_value ? parseFloat(formValues.monthly_plan_value) : null,
+      } as any).eq("id", editingPatient.id);
+      if (error) throw error;
+      toast.success("Paciente atualizado com sucesso!");
+      setEditingPatient(null);
+      loadPatients();
+    } catch {
+      toast.error("Erro ao atualizar paciente");
+    }
+  };
     e.preventDefault();
     // Server-side subscription check before write
     const canProceed = await checkSubscriptionBeforeWrite();
