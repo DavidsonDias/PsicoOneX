@@ -517,6 +517,15 @@ export default function Patients() {
                       <div className="space-y-2"><Label htmlFor="emergency_phone">Telefone de Emergência</Label><Input id="emergency_phone" name="emergency_phone" value={emergencyPhone} onChange={(e) => setEmergencyPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} /></div>
                     </div>
                   </div>
+                  <Separator />
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4" />Dados Financeiros</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2"><Label htmlFor="default_session_value">Valor da Sessão (R$)</Label><Input id="default_session_value" name="default_session_value" type="number" step="0.01" placeholder="200.00" /></div>
+                      <div className="space-y-2"><Label htmlFor="payment_day">Dia de Pagamento</Label><Select name="payment_day"><SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger><SelectContent>{Array.from({length: 31}, (_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}</SelectContent></Select></div>
+                      <div className="space-y-2"><Label htmlFor="monthly_plan_value">Plano Mensal (R$)</Label><Input id="monthly_plan_value" name="monthly_plan_value" type="number" step="0.01" placeholder="0.00" /></div>
+                    </div>
+                  </div>
                   <div className="space-y-2"><Label htmlFor="notes">Observações</Label><Textarea id="notes" name="notes" rows={3} placeholder="Observações sobre o paciente..." /></div>
                   <Separator />
                   <div className="space-y-4">
