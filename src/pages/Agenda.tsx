@@ -58,6 +58,9 @@ interface Patient {
   id: string;
   full_name: string;
   email?: string;
+  default_session_value?: number | null;
+  payment_day?: number | null;
+  monthly_plan_value?: number | null;
 }
 
 export default function Agenda() {
@@ -118,12 +121,12 @@ export default function Agenda() {
   const loadPatients = async (psychologistId: string) => {
     const { data } = await supabase
       .from("patients")
-      .select("id, full_name, email")
+      .select("id, full_name, email, default_session_value, payment_day, monthly_plan_value")
       .eq("psychologist_id", psychologistId)
       .eq("status", "active")
       .is("deleted_at", null)
       .order("full_name");
-    setPatients(data || []);
+    setPatients((data || []) as Patient[]);
   };
 
   const checkConflicts = useCallback((date: string, time: string, duration: number, excludeId?: string) => {
@@ -592,13 +595,24 @@ export default function Agenda() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label>Paciente *</Label>
-        <Select value={formData.patient_id} onValueChange={(value) => setFormData({...formData, patient_id: value})}>
+        <Select value={formData.patient_id} onValueChange={(value) => {
+          const selectedPatient = patients.find(p => p.id === value);
+          const sessionValue = selectedPatient?.default_session_value 
+            ? String(selectedPatient.default_session_value) 
+            : formData.session_value;
+          setFormData({...formData, patient_id: value, session_value: sessionValue});
+        }}>
           <SelectTrigger>
             <SelectValue placeholder="Selecione o paciente" />
           </SelectTrigger>
           <SelectContent>
             {patients.map(patient => (
-              <SelectItem key={patient.id} value={patient.id}>{patient.full_name}</SelectItem>
+              <SelectItem key={patient.id} value={patient.id}>
+                {patient.full_name}
+                {patient.default_session_value && (
+                  <span className="text-muted-foreground ml-2">• R$ {patient.default_session_value}</span>
+                )}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>

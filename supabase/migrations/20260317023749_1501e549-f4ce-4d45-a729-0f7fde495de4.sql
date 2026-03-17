@@ -1,0 +1,1 @@
+ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS monthly_plan_value numeric DEFAULT NULL;
