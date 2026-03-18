@@ -354,6 +354,19 @@ export default function Financeiro() {
     return "Avulso";
   };
 
+  const periodSummary = useMemo(() => {
+    const incomeTotal = periodTransactions.filter(t => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
+    const incomePaid = periodTransactions.filter(t => t.type === "income" && t.payment_status === "paid").reduce((s, t) => s + Number(t.amount), 0);
+    const incomePending = periodTransactions.filter(t => t.type === "income" && t.payment_status === "pending").reduce((s, t) => s + Number(t.amount), 0);
+    const expenseTotal = periodTransactions.filter(t => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
+    const countPaid = periodTransactions.filter(t => t.payment_status === "paid").length;
+    const countPending = periodTransactions.filter(t => t.payment_status === "pending").length;
+    const countOverdue = periodTransactions.filter(t => t.payment_status === "pending" && t.due_date && isAfter(new Date(), new Date(t.due_date))).length;
+    return { incomeTotal, incomePaid, incomePending, expenseTotal, countPaid, countPending, countOverdue };
+  }, [periodTransactions]);
+
+  const fmtCurrency = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
   if (loading) return (
     <AppLayout>
       <div className="space-y-6">
@@ -377,20 +390,6 @@ export default function Financeiro() {
     const colors = ["hsl(0, 84%, 60%)", "hsl(45, 93%, 47%)", "hsl(262, 83%, 58%)", "hsl(var(--muted-foreground))"];
     return { name, value, percentage: Math.round((value / total) * 100), trend: "stable" as const, color: colors[i % colors.length] };
   });
-
-  // Period summary for Pagamentos tab
-  const periodSummary = useMemo(() => {
-    const incomeTotal = periodTransactions.filter(t => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
-    const incomePaid = periodTransactions.filter(t => t.type === "income" && t.payment_status === "paid").reduce((s, t) => s + Number(t.amount), 0);
-    const incomePending = periodTransactions.filter(t => t.type === "income" && t.payment_status === "pending").reduce((s, t) => s + Number(t.amount), 0);
-    const expenseTotal = periodTransactions.filter(t => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
-    const countPaid = periodTransactions.filter(t => t.payment_status === "paid").length;
-    const countPending = periodTransactions.filter(t => t.payment_status === "pending").length;
-    const countOverdue = periodTransactions.filter(t => t.payment_status === "pending" && t.due_date && isAfter(new Date(), new Date(t.due_date))).length;
-    return { incomeTotal, incomePaid, incomePending, expenseTotal, countPaid, countPending, countOverdue };
-  }, [periodTransactions]);
-
-  const fmtCurrency = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
   const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent<HTMLFormElement>) => void; isEdit?: boolean }) => (
     <form onSubmit={onSubmit} className="space-y-4">
