@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,15 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter, Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText, Paperclip, Download, User, ExternalLink } from "lucide-react";
+import {
+  Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter,
+  Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText,
+  Paperclip, Download, User, ExternalLink, CheckCircle2, Clock, XCircle,
+  Eye, CreditCard, ChevronLeft, ChevronRight, Settings
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { format, subMonths, startOfMonth, endOfMonth, isAfter } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isAfter, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -31,6 +33,7 @@ import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
+import { cn } from "@/lib/utils";
 
 interface Transaction {
   id: string;
@@ -81,6 +84,7 @@ export default function Financeiro() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPatient, setFilterPatient] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
   const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -123,16 +127,23 @@ export default function Financeiro() {
     if (data) setPatients(data);
   };
 
+  // Period-filtered transactions
+  const periodTransactions = useMemo(() => {
+    const ms = startOfMonth(selectedMonth);
+    const me = endOfMonth(selectedMonth);
+    return transactions.filter(t => {
+      const d = new Date(t.due_date);
+      return d >= ms && d <= me;
+    });
+  }, [transactions, selectedMonth]);
+
   const metrics = useMemo(() => {
     const now = new Date();
-    const thisMonth = transactions.filter(t => {
-      const d = new Date(t.due_date);
-      return d >= startOfMonth(now) && d <= endOfMonth(now);
-    });
+    const thisMonth = periodTransactions;
+    const lastMonthDate = subMonths(selectedMonth, 1);
     const lastMonth = transactions.filter(t => {
       const d = new Date(t.due_date);
-      const lm = subMonths(now, 1);
-      return d >= startOfMonth(lm) && d <= endOfMonth(lm);
+      return d >= startOfMonth(lastMonthDate) && d <= endOfMonth(lastMonthDate);
     });
 
     const income = thisMonth.filter(t => t.type === "income" && t.payment_status === "paid").reduce((s, t) => s + Number(t.amount), 0);
@@ -143,11 +154,16 @@ export default function Financeiro() {
     const lastIncome = lastMonth.filter(t => t.type === "income" && t.payment_status === "paid").reduce((s, t) => s + Number(t.amount), 0);
     const incomeChange = lastIncome > 0 ? Math.round(((income - lastIncome) / lastIncome) * 100) : 0;
 
+    const lastExpense = lastMonth.filter(t => t.type === "expense" && t.payment_status === "paid").reduce((s, t) => s + Number(t.amount), 0);
+    const expenseChange = lastExpense > 0 ? Math.round(((expense - lastExpense) / lastExpense) * 100) : 0;
+
     const uniquePatients = new Set(thisMonth.filter(t => t.type === "income" && t.payment_status === "paid" && t.patient_id).map(t => t.patient_id));
     const ticketMedio = uniquePatients.size > 0 ? income / uniquePatients.size : 0;
     const mrr = income;
 
     const totalReceivable = thisMonth.filter(t => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
+    const totalIncome = thisMonth.filter(t => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
+    const totalExpenseAll = thisMonth.filter(t => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
     const delinquencyRate = totalReceivable > 0 ? Math.round((overdue / totalReceivable) * 100) : 0;
 
     const categoryMap: Record<string, number> = {};
@@ -160,9 +176,12 @@ export default function Financeiro() {
       if (t.cost_center) costCenterMap[t.cost_center] = (costCenterMap[t.cost_center] || 0) + Number(t.amount);
     });
 
-    return { income, expense, pending, overdue, incomeChange, ticketMedio, mrr, delinquencyRate,
-      balance: income - expense, uniquePatients: uniquePatients.size, categoryMap, expenseCategoryMap, costCenterMap, totalReceivable };
-  }, [transactions]);
+    return {
+      income, expense, pending, overdue, incomeChange, expenseChange, ticketMedio, mrr, delinquencyRate,
+      balance: income - expense, uniquePatients: uniquePatients.size, categoryMap, expenseCategoryMap,
+      costCenterMap, totalReceivable, totalIncome, totalExpenseAll,
+    };
+  }, [transactions, periodTransactions, selectedMonth]);
 
   const chartData = useMemo(() => {
     const months = [];
@@ -184,18 +203,25 @@ export default function Financeiro() {
     const path = `${userId}/${transactionId}/${file.name}`;
     const { error: uploadError } = await supabase.storage.from("financial-attachments").upload(path, file);
     if (uploadError) { toast.error("Erro ao enviar arquivo"); setUploading(false); return; }
-
-    const { data: urlData } = supabase.storage.from("financial-attachments").getPublicUrl(path);
-
     await supabase.from("financial_transactions").update({ attachment_url: path } as any).eq("id", transactionId);
     toast.success("Comprovante anexado!");
     setUploading(false);
     await loadTransactions(userId);
   };
 
+  const handleMarkAsPaid = async (transaction: Transaction) => {
+    const canProceed = await checkSubscriptionBeforeWrite();
+    if (!canProceed) return;
+    const { error } = await supabase.from("financial_transactions").update({
+      status: "paid", paid_date: new Date().toISOString().split("T")[0],
+    } as any).eq("id", transaction.id);
+    if (error) { toast.error("Erro ao atualizar"); return; }
+    toast.success("Pagamento confirmado!");
+    loadTransactions(userId);
+  };
+
   const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Server-side subscription check before write
     const canProceed = await checkSubscriptionBeforeWrite();
     if (!canProceed) { setDialogOpen(false); return; }
     const fd = new FormData(e.currentTarget);
@@ -213,7 +239,6 @@ export default function Financeiro() {
     };
     const pid = fd.get("patient_id");
     if (pid) txData.patient_id = pid;
-
     if (txData.status === "paid") txData.paid_date = new Date().toISOString().split("T")[0];
 
     const { error } = await supabase.from("financial_transactions").insert(txData);
@@ -232,7 +257,6 @@ export default function Financeiro() {
   const handleEditTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingTransaction) return;
-    // Server-side subscription check before write
     const canProceed = await checkSubscriptionBeforeWrite();
     if (!canProceed) { setEditingTransaction(null); return; }
 
@@ -304,7 +328,7 @@ export default function Financeiro() {
     patient_id: "", cost_center: "", tax_rate: "0",
   });
 
-  const filteredTransactions = transactions.filter(t => {
+  const filteredTransactions = periodTransactions.filter(t => {
     if (filterType !== "all" && t.type !== filterType) return false;
     if (filterStatus !== "all" && t.payment_status !== filterStatus) return false;
     if (filterPatient !== "all" && t.patient_id !== filterPatient) return false;
@@ -312,11 +336,36 @@ export default function Financeiro() {
     return true;
   });
 
-  const getStatusBadge = (status: string) => {
-    const v: Record<string, "default" | "secondary" | "destructive" | "outline"> = { paid: "default", pending: "secondary", overdue: "destructive", cancelled: "outline", exempt: "outline" };
-    const l: Record<string, string> = { paid: "Pago", pending: "Pendente", overdue: "Atrasado", cancelled: "Cancelado", exempt: "Isento" };
-    return <Badge variant={v[status] || "secondary"}>{l[status] || status}</Badge>;
+  const getStatusConfig = (status: string) => {
+    const configs: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
+      paid: { color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-500/10", border: "border-emerald-200 dark:border-emerald-500/20", label: "Pago", icon: CheckCircle2 },
+      pending: { color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-500/10", border: "border-amber-200 dark:border-amber-500/20", label: "Pendente", icon: Clock },
+      overdue: { color: "text-red-700 dark:text-red-400", bg: "bg-red-50 dark:bg-red-500/10", border: "border-red-200 dark:border-red-500/20", label: "Vencido", icon: AlertTriangle },
+      cancelled: { color: "text-muted-foreground", bg: "bg-muted/50", border: "border-border", label: "Cancelado", icon: XCircle },
+      exempt: { color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-500/10", border: "border-blue-200 dark:border-blue-500/20", label: "Isento", icon: CheckCircle2 },
+    };
+    return configs[status] || configs.pending;
   };
+
+  const getTypeLabel = (t: Transaction) => {
+    if (t.type === "expense") return "Despesa";
+    if (t.category === "Consulta") return "Consulta";
+    if (t.description?.toLowerCase().includes("plano")) return "Plano mensal";
+    return "Avulso";
+  };
+
+  const periodSummary = useMemo(() => {
+    const incomeTotal = periodTransactions.filter(t => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
+    const incomePaid = periodTransactions.filter(t => t.type === "income" && t.payment_status === "paid").reduce((s, t) => s + Number(t.amount), 0);
+    const incomePending = periodTransactions.filter(t => t.type === "income" && t.payment_status === "pending").reduce((s, t) => s + Number(t.amount), 0);
+    const expenseTotal = periodTransactions.filter(t => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
+    const countPaid = periodTransactions.filter(t => t.payment_status === "paid").length;
+    const countPending = periodTransactions.filter(t => t.payment_status === "pending").length;
+    const countOverdue = periodTransactions.filter(t => t.payment_status === "pending" && t.due_date && isAfter(new Date(), new Date(t.due_date))).length;
+    return { incomeTotal, incomePaid, incomePending, expenseTotal, countPaid, countPending, countOverdue };
+  }, [periodTransactions]);
+
+  const fmtCurrency = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
   if (loading) return (
     <AppLayout>
@@ -414,12 +463,19 @@ export default function Financeiro() {
           {isEdit ? (
             <Select value={formData.payment_status} onValueChange={(v) => setFormData({...formData, payment_status: v})}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem><SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="cancelled">Cancelado</SelectItem></SelectContent>
+              <SelectContent>
+                <SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem>
+                <SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="cancelled">Cancelado</SelectItem>
+                <SelectItem value="exempt">Isento</SelectItem>
+              </SelectContent>
             </Select>
           ) : (
             <Select name="payment_status" required defaultValue="pending">
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent><SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem><SelectItem value="overdue">Atrasado</SelectItem></SelectContent>
+              <SelectContent>
+                <SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem>
+                <SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="exempt">Isento</SelectItem>
+              </SelectContent>
             </Select>
           )}
         </div>
@@ -469,38 +525,54 @@ export default function Financeiro() {
     </form>
   );
 
+  // Month navigation
+  const MonthNavigator = () => (
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <div className="px-4 py-2 rounded-lg border border-border bg-background min-w-[180px] text-center font-medium capitalize">
+        {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
+      </div>
+      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   return (
     <AppLayout title="PsicoBank Enterprise" description="Gestão financeira completa com insights e automações">
+      {/* Top Dashboard Cards */}
       <StatsOverview
         stats={[
-          { label: "Receitas", value: `R$ ${metrics.income.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: "green", change: metrics.incomeChange },
-          { label: "Despesas", value: `R$ ${metrics.expense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingDown, color: "red" },
-          { label: "Saldo Líquido", value: `R$ ${metrics.balance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: DollarSign, color: "blue" },
-          { label: "Pendente", value: `R$ ${metrics.pending.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: Calendar, color: "amber" },
+          { label: "Receitas", value: fmtCurrency(metrics.income), icon: TrendingUp, color: "green", change: metrics.incomeChange },
+          { label: "Despesas", value: fmtCurrency(metrics.expense), icon: TrendingDown, color: "red", change: metrics.expenseChange },
+          { label: "Saldo Líquido", value: fmtCurrency(metrics.balance), icon: DollarSign, color: "blue" },
+          { label: "Pendente", value: fmtCurrency(metrics.pending), icon: Calendar, color: "amber" },
         ]}
         className="mb-6"
       />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <Card className="p-3">
+        <Card className="p-3 hover:shadow-md transition-shadow">
           <div className="text-xs text-muted-foreground mb-1">Ticket Médio</div>
-          <div className="text-lg font-bold">R$ {metrics.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}</div>
+          <div className="text-lg font-bold">{fmtCurrency(metrics.ticketMedio)}</div>
         </Card>
-        <Card className="p-3">
+        <Card className="p-3 hover:shadow-md transition-shadow">
           <div className="text-xs text-muted-foreground mb-1">MRR Clínico</div>
-          <div className="text-lg font-bold text-green-500">R$ {metrics.mrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}</div>
+          <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{fmtCurrency(metrics.mrr)}</div>
         </Card>
-        <Card className="p-3">
+        <Card className="p-3 hover:shadow-md transition-shadow">
           <div className="text-xs text-muted-foreground mb-1">Inadimplência</div>
-          <div className={`text-lg font-bold ${metrics.delinquencyRate > 20 ? "text-red-500" : "text-green-500"}`}>{metrics.delinquencyRate}%</div>
+          <div className={cn("text-lg font-bold", metrics.delinquencyRate > 20 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>{metrics.delinquencyRate}%</div>
         </Card>
-        <Card className="p-3">
+        <Card className="p-3 hover:shadow-md transition-shadow">
           <div className="text-xs text-muted-foreground mb-1">Pacientes Ativos</div>
           <div className="text-lg font-bold">{metrics.uniquePatients}</div>
         </Card>
-        <Card className="p-3">
+        <Card className="p-3 hover:shadow-md transition-shadow">
           <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-red-500" />Vencidos</div>
-          <div className="text-lg font-bold text-red-500">R$ {metrics.overdue.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}</div>
+          <div className="text-lg font-bold text-red-600 dark:text-red-400">{fmtCurrency(metrics.overdue)}</div>
         </Card>
       </div>
 
@@ -511,124 +583,26 @@ export default function Financeiro() {
           <div className="flex flex-wrap gap-3">
             {Object.entries(metrics.costCenterMap).map(([center, value]) => (
               <Badge key={center} variant="outline" className="py-1.5 px-3">
-                {center}: R$ {value.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                {center}: {fmtCurrency(value)}
               </Badge>
             ))}
           </div>
         </Card>
       )}
 
-      <Tabs defaultValue="resumo" className="mb-6">
+      <Tabs defaultValue="pagamentos" className="mb-6">
         <TabsList className="bg-muted/50 mb-6">
-          <TabsTrigger value="resumo" className="gap-2"><TrendingUp className="h-4 w-4" />Resumo</TabsTrigger>
           <TabsTrigger value="pagamentos" className="gap-2"><Receipt className="h-4 w-4" />Pagamentos</TabsTrigger>
+          <TabsTrigger value="resumo" className="gap-2"><TrendingUp className="h-4 w-4" />Resumo</TabsTrigger>
           <TabsTrigger value="notas" className="gap-2"><FileText className="h-4 w-4" />Notas Fiscais</TabsTrigger>
           <TabsTrigger value="relatorios" className="gap-2"><BarChart3 className="h-4 w-4" />Relatórios</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="resumo" className="space-y-6">
-          <FinancialChart data={chartData} />
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* DRE Simplificada */}
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" />DRE Simplificada</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-center p-3 rounded-lg bg-green-500/5 border border-green-500/20">
-                  <span className="font-medium text-green-600">Receita Bruta</span>
-                  <span className="font-bold text-green-600">R$ {metrics.income.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 rounded-lg bg-red-500/5 border border-red-500/20">
-                  <span className="font-medium text-red-600">(-) Despesas</span>
-                  <span className="font-bold text-red-600">R$ {metrics.expense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="border-t pt-3">
-                  <div className="flex justify-between items-center p-3 rounded-lg bg-primary/5 border border-primary/20">
-                    <span className="font-bold text-lg">Lucro Líquido</span>
-                    <span className={`font-bold text-lg ${metrics.balance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      R$ {metrics.balance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
-                  <span className="text-sm text-muted-foreground">Margem de Lucro</span>
-                  <span className="font-bold">{metrics.income > 0 ? Math.round((metrics.balance / metrics.income) * 100) : 0}%</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Categorias */}
-            <div className="space-y-6">
-              <CategoryAnalysis
-                type="income"
-                categories={incomeCategories.length > 0 ? incomeCategories : [{ name: "Consultas", value: 0, percentage: 0, trend: "stable" as const, color: "hsl(142, 76%, 36%)" }]}
-              />
-              <CategoryAnalysis
-                type="expense"
-                categories={expenseCategories.length > 0 ? expenseCategories : [{ name: "Sem despesas", value: 0, percentage: 0, trend: "stable" as const, color: "hsl(0, 84%, 60%)" }]}
-              />
-            </div>
-          </div>
-          <FinancialProjections
-            data={{
-              currentMonth: metrics.income,
-              projectedMonth: Math.round(metrics.income * 1.15),
-              yearToDate: metrics.income * 6,
-              projectedYear: Math.round(metrics.income * 12 * 1.1),
-              avgSessionValue: metrics.ticketMedio || 200,
-              monthlyTarget: 15000,
-              trend: metrics.incomeChange > 0 ? "up" : metrics.incomeChange < 0 ? "down" : "stable",
-              insights: [
-                metrics.incomeChange > 0
-                  ? `📈 Receita cresceu ${metrics.incomeChange}% vs mês anterior`
-                  : `📉 Receita caiu ${Math.abs(metrics.incomeChange)}% vs mês anterior`,
-                `💰 Ticket médio: R$ ${metrics.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`,
-                metrics.delinquencyRate > 10
-                  ? `⚠️ Inadimplência em ${metrics.delinquencyRate}%`
-                  : `✅ Inadimplência controlada em ${metrics.delinquencyRate}%`,
-                `🎯 Faltam R$ ${Math.max(0, 15000 - metrics.income).toLocaleString("pt-BR")} para a meta`,
-              ],
-            }}
-          />
-        </TabsContent>
-
+        {/* ========== PAGAMENTOS TAB ========== */}
         <TabsContent value="pagamentos" className="space-y-6">
-          {/* Filters & Actions for Pagamentos */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-between">
-            <div className="flex flex-wrap gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 w-[200px]" />
-              </div>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[140px]"><Filter className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="income">Receitas</SelectItem>
-                  <SelectItem value="expense">Despesas</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="overdue">Atrasado</SelectItem>
-                  <SelectItem value="exempt">Isento</SelectItem>
-                  <SelectItem value="cancelled">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterPatient} onValueChange={setFilterPatient}>
-                <SelectTrigger className="w-[180px]">
-                  <User className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filtrar paciente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos pacientes</SelectItem>
-                  {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Period Controls */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+            <MonthNavigator />
             <div className="flex gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -680,103 +654,313 @@ export default function Financeiro() {
             </div>
           </div>
 
-          {/* Transactions List */}
-          <Card>
-            <CardHeader><CardTitle>Transações</CardTitle></CardHeader>
-            <CardContent>
-              <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => {
-                const file = e.target.files?.[0];
-                const txId = fileInputRef.current?.dataset.txId;
-                if (file && txId) handleUploadAttachment(txId, file);
-              }} />
+          {/* Period Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}
+              className="rounded-xl border border-border bg-card p-4 space-y-1">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Target className="h-4 w-4" />Total Previsto
+              </div>
+              <p className="text-2xl font-bold">{fmtCurrency(periodSummary.incomeTotal)}</p>
+              <p className="text-xs text-muted-foreground">{periodTransactions.filter(t => t.type === "income").length} recebimentos e {periodTransactions.filter(t => t.type === "expense").length} despesas</p>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+              className="rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/5 p-4 space-y-1">
+              <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" />Já Recebido
+              </div>
+              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{fmtCurrency(periodSummary.incomePaid)}</p>
+              <p className="text-xs text-muted-foreground">{periodSummary.countPaid} pagamentos confirmados</p>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+              className="rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 p-4 space-y-1">
+              <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                <Clock className="h-4 w-4" />Pendente
+              </div>
+              <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{fmtCurrency(periodSummary.incomePending)}</p>
+              <p className="text-xs text-muted-foreground">
+                {periodSummary.countPending} pendentes
+                {periodSummary.countOverdue > 0 && <span className="text-red-500"> · {periodSummary.countOverdue} vencidos</span>}
+              </p>
+            </motion.div>
+          </div>
 
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 w-[200px]" />
+            </div>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[130px]"><Filter className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="income">Receitas</SelectItem>
+                <SelectItem value="expense">Despesas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Status</SelectItem>
+                <SelectItem value="paid">Pago</SelectItem>
+                <SelectItem value="pending">Pendente</SelectItem>
+                <SelectItem value="overdue">Vencido</SelectItem>
+                <SelectItem value="exempt">Isento</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterPatient} onValueChange={setFilterPatient}>
+              <SelectTrigger className="w-[180px]"><User className="h-4 w-4 mr-2" /><SelectValue placeholder="Todos pacientes" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos pacientes</SelectItem>
+                {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Transactions Table */}
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => {
+              const file = e.target.files?.[0];
+              const txId = fileInputRef.current?.dataset.txId;
+              if (file && txId) handleUploadAttachment(txId, file);
+            }} />
+
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Tipo</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Descrição</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Paciente</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Categoria</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Vencimento</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <AnimatePresence mode="popLayout">
+                    {filteredTransactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-16 text-center text-muted-foreground">
+                          <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                          <p className="font-medium">Nenhuma transação encontrada</p>
+                          <p className="text-sm mt-1">Nenhum registro para {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTransactions.map((t, index) => {
+                        const sc = getStatusConfig(t.payment_status);
+                        const StatusIcon = sc.icon;
+                        return (
+                          <motion.tr key={t.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            transition={{ delay: index * 0.02 }}
+                            className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                            <td className="px-4 py-3">
+                              <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border", sc.bg, sc.color, sc.border)}>
+                                <StatusIcon className="h-3 w-3" />
+                                {sc.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className={cn("p-1 rounded", t.type === "income" ? "bg-emerald-500/10" : "bg-red-500/10")}>
+                                  {t.type === "income" ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+                                </div>
+                                <span className="text-sm">{getTypeLabel(t)}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="text-sm font-medium truncate max-w-[200px]">{t.description}</p>
+                              {t.attachment_url && <Paperclip className="h-3 w-3 text-primary inline ml-1" />}
+                            </td>
+                            <td className="px-4 py-3">
+                              {t.patient_id && t.patient_name ? (
+                                <button className="text-sm text-primary hover:underline flex items-center gap-1"
+                                  onClick={() => navigate(`/pacientes/${t.patient_id}`)}>
+                                  {t.patient_name}<ExternalLink className="h-3 w-3" />
+                                </button>
+                              ) : <span className="text-sm text-muted-foreground">—</span>}
+                            </td>
+                            <td className="px-4 py-3"><span className="text-sm">{t.category || "—"}</span></td>
+                            <td className="px-4 py-3"><span className="text-sm">{t.due_date && format(new Date(t.due_date), "dd/MM/yyyy")}</span></td>
+                            <td className="px-4 py-3 text-right">
+                              <span className={cn("text-sm font-semibold", t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                {t.type === "income" ? "+" : "-"} {fmtCurrency(Number(t.amount))}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-end gap-1">
+                                {t.payment_status === "pending" && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                                    onClick={() => handleMarkAsPaid(t)} title="Marcar como pago">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                  if (fileInputRef.current) { fileInputRef.current.dataset.txId = t.id; fileInputRef.current.click(); }
+                                }} title="Anexar comprovante"><Upload className="h-4 w-4" /></Button>
+                                <ActionMenu onEdit={() => openEditDialog(t)} onDelete={() => handleDeleteTransaction(t.id)}
+                                  deleteTitle="Excluir Transação" deleteDescription="Tem certeza que deseja excluir esta transação?" />
+                              </div>
+                            </td>
+                          </motion.tr>
+                        );
+                      })
+                    )}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile List */}
+            <div className="md:hidden">
               {filteredTransactions.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhuma transação encontrada</p>
+                <div className="py-16 text-center text-muted-foreground">
+                  <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">Nenhuma transação encontrada</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {filteredTransactions.map((transaction, index) => (
-                    <motion.div key={transaction.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}
-                      className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-lg ${transaction.type === "income" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
-                          {transaction.type === "income" ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+                <div className="divide-y divide-border">
+                  {filteredTransactions.map((t, index) => {
+                    const sc = getStatusConfig(t.payment_status);
+                    const StatusIcon = sc.icon;
+                    return (
+                      <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.03 }} className="p-4 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <p className="font-medium text-sm">{t.description}</p>
+                            <div className="flex items-center gap-2">
+                              <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border", sc.bg, sc.color, sc.border)}>
+                                <StatusIcon className="h-3 w-3" />{sc.label}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{getTypeLabel(t)}</span>
+                            </div>
+                          </div>
+                          <span className={cn("text-sm font-bold", t.type === "income" ? "text-emerald-600" : "text-red-600")}>
+                            {t.type === "income" ? "+" : "-"}{fmtCurrency(Number(t.amount))}
+                          </span>
                         </div>
-                        <div>
-                          <p className="font-medium">{transaction.description}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            {transaction.patient_id && transaction.patient_name ? (
-                              <button className="flex items-center gap-1 text-primary hover:underline"
-                                onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${transaction.patient_id}`); }}>
-                                <User className="h-3 w-3" />{transaction.patient_name}<ExternalLink className="h-3 w-3" />
-                              </button>
-                            ) : (<span>{transaction.category}</span>)}
-                            <span>•</span>
-                            <span>{transaction.due_date && format(new Date(transaction.due_date), "dd/MM/yyyy")}</span>
-                            {transaction.cost_center && <Badge variant="outline" className="text-xs ml-1">{transaction.cost_center}</Badge>}
-                            {transaction.attachment_url && <Paperclip className="h-3 w-3 text-primary" />}
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-3">
+                            {t.patient_name && <span className="text-primary">{t.patient_name}</span>}
+                            <span>{t.due_date && format(new Date(t.due_date), "dd/MM/yyyy")}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {t.payment_status === "pending" && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => handleMarkAsPaid(t)}>
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <ActionMenu onEdit={() => openEditDialog(t)} onDelete={() => handleDeleteTransaction(t.id)}
+                              deleteTitle="Excluir" deleteDescription="Excluir esta transação?" />
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className={`font-semibold ${transaction.type === "income" ? "text-green-500" : "text-red-500"}`}>
-                            {transaction.type === "income" ? "+" : "-"} R$ {Number(transaction.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                          </p>
-                          {getStatusBadge(transaction.payment_status)}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                            if (fileInputRef.current) { fileInputRef.current.dataset.txId = transaction.id; fileInputRef.current.click(); }
-                          }} title="Anexar comprovante"><Upload className="h-4 w-4" /></Button>
-                          <ActionMenu onEdit={() => openEditDialog(transaction)} onDelete={() => handleDeleteTransaction(transaction.id)}
-                            deleteTitle="Excluir Transação" deleteDescription="Tem certeza que deseja excluir esta transação?" />
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    );
+                  })}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
+        {/* ========== RESUMO TAB ========== */}
+        <TabsContent value="resumo" className="space-y-6">
+          <FinancialChart data={chartData} />
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" />DRE Simplificada</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                  <span className="font-medium text-emerald-600">Receita Bruta</span>
+                  <span className="font-bold text-emerald-600">{fmtCurrency(metrics.income)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+                  <span className="font-medium text-red-600">(-) Despesas</span>
+                  <span className="font-bold text-red-600">{fmtCurrency(metrics.expense)}</span>
+                </div>
+                <div className="border-t pt-3">
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-primary/5 border border-primary/20">
+                    <span className="font-bold text-lg">Lucro Líquido</span>
+                    <span className={cn("font-bold text-lg", metrics.balance >= 0 ? "text-emerald-600" : "text-red-600")}>
+                      {fmtCurrency(metrics.balance)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
+                  <span className="text-sm text-muted-foreground">Margem de Lucro</span>
+                  <span className="font-bold">{metrics.income > 0 ? Math.round((metrics.balance / metrics.income) * 100) : 0}%</span>
+                </div>
+              </CardContent>
+            </Card>
+            <div className="space-y-6">
+              <CategoryAnalysis type="income"
+                categories={incomeCategories.length > 0 ? incomeCategories : [{ name: "Consultas", value: 0, percentage: 0, trend: "stable" as const, color: "hsl(142, 76%, 36%)" }]}
+              />
+              <CategoryAnalysis type="expense"
+                categories={expenseCategories.length > 0 ? expenseCategories : [{ name: "Sem despesas", value: 0, percentage: 0, trend: "stable" as const, color: "hsl(0, 84%, 60%)" }]}
+              />
+            </div>
+          </div>
+          <FinancialProjections
+            data={{
+              currentMonth: metrics.income,
+              projectedMonth: Math.round(metrics.income * 1.15),
+              yearToDate: metrics.income * 6,
+              projectedYear: Math.round(metrics.income * 12 * 1.1),
+              avgSessionValue: metrics.ticketMedio || 200,
+              monthlyTarget: 15000,
+              trend: metrics.incomeChange > 0 ? "up" : metrics.incomeChange < 0 ? "down" : "stable",
+              insights: [
+                metrics.incomeChange > 0
+                  ? `📈 Receita cresceu ${metrics.incomeChange}% vs mês anterior`
+                  : `📉 Receita caiu ${Math.abs(metrics.incomeChange)}% vs mês anterior`,
+                `💰 Ticket médio: ${fmtCurrency(metrics.ticketMedio)}`,
+                metrics.delinquencyRate > 10
+                  ? `⚠️ Inadimplência em ${metrics.delinquencyRate}%`
+                  : `✅ Inadimplência controlada em ${metrics.delinquencyRate}%`,
+                `🎯 Faltam ${fmtCurrency(Math.max(0, 15000 - metrics.income))} para a meta`,
+              ],
+            }}
+          />
+        </TabsContent>
+
+        {/* ========== NOTAS FISCAIS TAB ========== */}
         <TabsContent value="notas" className="space-y-6">
           <Card>
             <CardContent className="py-16 text-center">
               <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-30" />
               <h3 className="text-lg font-semibold mb-2">Emissão de Notas Fiscais</h3>
               <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                A emissão de NFS-e será integrada com serviços como Focus NFe ou eNotas. 
+                A emissão de NFS-e será integrada com serviços como Focus NFe ou eNotas.
                 Quando um pagamento for marcado como "Pago", o botão para emitir nota fiscal estará disponível.
               </p>
               <div className="flex flex-col gap-2 max-w-sm mx-auto">
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-left">
-                  <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
-                    <span className="text-green-600 text-sm font-bold">1</span>
+                {[
+                  { num: "1", color: "emerald", text: <>Pagamento marcado como <strong>Pago</strong></> },
+                  { num: "2", color: "blue", text: <>Botão <strong>"Emitir Nota Fiscal"</strong> disponível</> },
+                  { num: "3", color: "purple", text: <>PDF da nota salvo e disponível para download</> },
+                ].map(step => (
+                  <div key={step.num} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-left">
+                    <div className={`h-8 w-8 rounded-full bg-${step.color}-500/10 flex items-center justify-center shrink-0`}>
+                      <span className={`text-${step.color}-600 text-sm font-bold`}>{step.num}</span>
+                    </div>
+                    <span className="text-sm">{step.text}</span>
                   </div>
-                  <span className="text-sm">Pagamento marcado como <strong>Pago</strong></span>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-left">
-                  <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
-                    <span className="text-blue-600 text-sm font-bold">2</span>
-                  </div>
-                  <span className="text-sm">Botão <strong>"Emitir Nota Fiscal"</strong> disponível</span>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-left">
-                  <div className="h-8 w-8 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0">
-                    <span className="text-purple-600 text-sm font-bold">3</span>
-                  </div>
-                  <span className="text-sm">PDF da nota salvo e disponível para download</span>
-                </div>
+                ))}
               </div>
               <Badge variant="secondary" className="mt-6">Em breve</Badge>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* ========== RELATÓRIOS TAB ========== */}
         <TabsContent value="relatorios" className="space-y-6">
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />Relatórios Financeiros</CardTitle></CardHeader>
@@ -810,7 +994,7 @@ export default function Financeiro() {
                     toast.success("Excel exportado!");
                   }},
                 ].map((report, i) => (
-                  <Card key={i} className="cursor-pointer hover:border-primary/30 transition-colors" onClick={report.action}>
+                  <Card key={i} className="cursor-pointer hover:border-primary/30 hover:shadow-md transition-all" onClick={report.action}>
                     <CardContent className="py-6 text-center">
                       <Download className="h-8 w-8 mx-auto mb-3 text-primary" />
                       <p className="font-medium text-sm">{report.title}</p>
