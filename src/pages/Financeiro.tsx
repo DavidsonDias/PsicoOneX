@@ -10,18 +10,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter,
   Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText,
   Paperclip, Download, User, ExternalLink, CheckCircle2, Clock, XCircle,
-  Eye, CreditCard, ChevronLeft, ChevronRight, Settings
+  CreditCard, Settings, Sparkles
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format, subMonths, startOfMonth, endOfMonth, isAfter, addMonths } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isAfter, addMonths, setMonth, setYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -34,6 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface Transaction {
   id: string;
@@ -58,8 +60,22 @@ interface Transaction {
   appointment_id?: string;
 }
 
-const INCOME_CATEGORIES = ["Consulta", "Avaliação", "Laudo", "Supervisão", "Workshop", "Outros"];
-const EXPENSE_CATEGORIES = ["Aluguel", "Marketing", "Software", "Materiais", "Impostos", "Estrutura", "Outros"];
+interface PatientFull {
+  id: string;
+  full_name: string;
+  default_session_value?: number | null;
+  monthly_plan_value?: number | null;
+  payment_day?: number | null;
+}
+
+const INCOME_CATEGORIES = [
+  "Consulta psicológica", "Pacote mensal", "Atendimento online",
+  "Atendimento presencial", "Avaliação", "Laudo", "Supervisão", "Workshop", "Outros"
+];
+const EXPENSE_CATEGORIES = [
+  "Aluguel consultório", "Marketing clínico", "Plataforma / software",
+  "Impostos", "Equipamentos", "Materiais", "Estrutura", "Outros"
+];
 const COST_CENTERS = ["Clínica", "Marketing", "Software", "Estrutura", "Impostos", "Pessoal", "Outros"];
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -71,12 +87,17 @@ const PAYMENT_METHODS = [
   { value: "link", label: "Link de Pagamento" },
 ];
 
+const MONTHS = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
+
 export default function Financeiro() {
   const { guardWrite } = useWriteGuard();
   const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<PatientFull[]>([]);
   const [userId, setUserId] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -88,6 +109,7 @@ export default function Financeiro() {
   const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     type: "income", amount: "", description: "", category: "",
@@ -122,9 +144,30 @@ export default function Financeiro() {
   };
 
   const loadPatients = async (uid: string) => {
-    const { data } = await supabase.from("patients").select("id, full_name")
+    const { data } = await supabase.from("patients")
+      .select("id, full_name, default_session_value, monthly_plan_value, payment_day")
       .eq("psychologist_id", uid).eq("status", "active").is("deleted_at", null).order("full_name");
     if (data) setPatients(data);
+  };
+
+  // Auto-fill when patient is selected in NEW transaction form
+  const handlePatientSelect = (patientId: string, isEdit: boolean) => {
+    if (isEdit) {
+      setFormData(prev => ({ ...prev, patient_id: patientId }));
+      return;
+    }
+    const patient = patients.find(p => p.id === patientId);
+    if (patient) {
+      setFormData(prev => ({
+        ...prev,
+        patient_id: patientId,
+        amount: patient.default_session_value ? String(patient.default_session_value) : prev.amount,
+        category: prev.category || "Consulta psicológica",
+        description: prev.description || "Sessão de atendimento",
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, patient_id: patientId }));
+    }
   };
 
   // Period-filtered transactions
@@ -162,8 +205,6 @@ export default function Financeiro() {
     const mrr = income;
 
     const totalReceivable = thisMonth.filter(t => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
-    const totalIncome = thisMonth.filter(t => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
-    const totalExpenseAll = thisMonth.filter(t => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
     const delinquencyRate = totalReceivable > 0 ? Math.round((overdue / totalReceivable) * 100) : 0;
 
     const categoryMap: Record<string, number> = {};
@@ -179,7 +220,7 @@ export default function Financeiro() {
     return {
       income, expense, pending, overdue, incomeChange, expenseChange, ticketMedio, mrr, delinquencyRate,
       balance: income - expense, uniquePatients: uniquePatients.size, categoryMap, expenseCategoryMap,
-      costCenterMap, totalReceivable, totalIncome, totalExpenseAll,
+      costCenterMap, totalReceivable,
     };
   }, [transactions, periodTransactions, selectedMonth]);
 
@@ -251,6 +292,7 @@ export default function Financeiro() {
 
     toast.success("Transação criada!");
     setDialogOpen(false);
+    resetForm();
     loadTransactions(userId);
   };
 
@@ -278,13 +320,6 @@ export default function Financeiro() {
     const { error } = await supabase.from("financial_transactions").update(updateData).eq("id", editingTransaction.id);
     if (error) { toast.error("Erro ao atualizar"); return; }
 
-    await supabase.from("audit_logs").insert({
-      user_id: userId, action_type: "update", entity_type: "financial_transaction",
-      entity_id: editingTransaction.id,
-      old_data: { amount: editingTransaction.amount, status: editingTransaction.payment_status },
-      new_data: { amount, status: formData.payment_status },
-    } as any);
-
     toast.success("Transação atualizada!");
     setEditingTransaction(null);
     resetForm();
@@ -298,11 +333,6 @@ export default function Financeiro() {
           .update({ deleted_at: new Date().toISOString(), deleted_by: userId, deleted_reason: "Excluído pelo usuário" })
           .eq("id", id);
         if (error) { toast.error("Erro ao excluir"); return; }
-
-        await supabase.from("audit_logs").insert({
-          user_id: userId, action_type: "soft_delete", entity_type: "financial_transaction", entity_id: id,
-        } as any);
-
         toast.success("Transação excluída!");
         loadTransactions(userId);
       })();
@@ -349,8 +379,8 @@ export default function Financeiro() {
 
   const getTypeLabel = (t: Transaction) => {
     if (t.type === "expense") return "Despesa";
-    if (t.category === "Consulta") return "Consulta";
-    if (t.description?.toLowerCase().includes("plano")) return "Plano mensal";
+    if (t.category?.includes("Consulta")) return "Consulta";
+    if (t.category?.includes("Pacote") || t.description?.toLowerCase().includes("plano")) return "Plano mensal";
     return "Avulso";
   };
 
@@ -371,13 +401,12 @@ export default function Financeiro() {
     <AppLayout>
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
         <Skeleton className="h-64 rounded-xl" />
       </div>
     </AppLayout>
   );
 
-  const categories = formData.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const currentCategories = formData.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   const incomeCategories = Object.entries(metrics.categoryMap).map(([name, value], i) => {
     const total = Object.values(metrics.categoryMap).reduce((s, v) => s + v, 0) || 1;
@@ -391,158 +420,231 @@ export default function Financeiro() {
     return { name, value, percentage: Math.round((value / total) * 100), trend: "stable" as const, color: colors[i % colors.length] };
   });
 
-  const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent<HTMLFormElement>) => void; isEdit?: boolean }) => (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Tipo</Label>
-          {isEdit ? (
-            <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v, category: ""})}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="income">Receita</SelectItem><SelectItem value="expense">Despesa</SelectItem></SelectContent>
-            </Select>
-          ) : (
-            <Select name="type" required defaultValue="income">
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent><SelectItem value="income">Receita</SelectItem><SelectItem value="expense">Despesa</SelectItem></SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <Label>Valor (R$)</Label>
-          {isEdit ? (
-            <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
-          ) : (
-            <Input name="amount" type="number" step="0.01" placeholder="0.00" required />
-          )}
-        </div>
-        <div>
-          <Label>Paciente</Label>
-          {isEdit ? (
-            <Select value={formData.patient_id} onValueChange={(v) => setFormData({...formData, patient_id: v})}>
-              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-              <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : (
-            <Select name="patient_id">
-              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-              <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <Label>Categoria</Label>
-          {isEdit ? (
-            <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v})}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : (
-            <Select name="category" required>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>{INCOME_CATEGORIES.concat(EXPENSE_CATEGORIES).filter((v, i, a) => a.indexOf(v) === i).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <Label>Pagamento</Label>
-          {isEdit ? (
-            <Select value={formData.payment_method} onValueChange={(v) => setFormData({...formData, payment_method: v})}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : (
-            <Select name="payment_method" required>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <Label>Status</Label>
-          {isEdit ? (
-            <Select value={formData.payment_status} onValueChange={(v) => setFormData({...formData, payment_status: v})}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem>
-                <SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="cancelled">Cancelado</SelectItem>
-                <SelectItem value="exempt">Isento</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : (
-            <Select name="payment_status" required defaultValue="pending">
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem>
-                <SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="exempt">Isento</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <Label>Vencimento</Label>
-          {isEdit ? (
-            <Input type="date" value={formData.due_date} onChange={(e) => setFormData({...formData, due_date: e.target.value})} required />
-          ) : (
-            <Input name="due_date" type="date" required />
-          )}
-        </div>
-        <div>
-          <Label>Centro de Custo</Label>
-          {isEdit ? (
-            <Select value={formData.cost_center} onValueChange={(v) => setFormData({...formData, cost_center: v})}>
-              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-              <SelectContent>{COST_CENTERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : (
-            <Select name="cost_center">
-              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-              <SelectContent>{COST_CENTERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <Label>Taxa (%)</Label>
-          {isEdit ? (
-            <Input type="number" step="0.01" value={formData.tax_rate} onChange={(e) => setFormData({...formData, tax_rate: e.target.value})} />
-          ) : (
-            <Input name="tax_rate" type="number" step="0.01" defaultValue="0" placeholder="0" />
-          )}
-        </div>
-        <div className="col-span-2">
-          <Label>Descrição</Label>
-          {isEdit ? (
-            <Textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} required />
-          ) : (
-            <Textarea name="description" placeholder="Descreva a transação" required />
-          )}
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => { isEdit ? setEditingTransaction(null) : setDialogOpen(false); resetForm(); }}>Cancelar</Button>
-        <Button type="submit">{isEdit ? "Salvar" : "Criar"}</Button>
-      </div>
-    </form>
-  );
+  // Transaction form — used for both create and edit
+  const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent<HTMLFormElement>) => void; isEdit?: boolean }) => {
+    const selectedPatient = patients.find(p => p.id === (isEdit ? formData.patient_id : formData.patient_id));
 
-  // Month navigation
-  const MonthNavigator = () => (
-    <div className="flex items-center gap-2">
-      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      <div className="px-4 py-2 rounded-lg border border-border bg-background min-w-[180px] text-center font-medium capitalize">
-        {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
-      </div>
-      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
+    return (
+      <form onSubmit={onSubmit} className="space-y-6">
+        {/* Section 1: Dados Principais */}
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Dados Principais</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Tipo</Label>
+              {isEdit ? (
+                <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v, category: ""})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="income">Receita</SelectItem><SelectItem value="expense">Despesa</SelectItem></SelectContent>
+                </Select>
+              ) : (
+                <Select name="type" required defaultValue="income">
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent><SelectItem value="income">Receita</SelectItem><SelectItem value="expense">Despesa</SelectItem></SelectContent>
+                </Select>
+              )}
+            </div>
+            <div>
+              <Label>Valor (R$)</Label>
+              {isEdit ? (
+                <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
+              ) : (
+                <Input name="amount" type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Paciente</Label>
+              {isEdit ? (
+                <Select value={formData.patient_id} onValueChange={(v) => handlePatientSelect(v, true)}>
+                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                  <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
+                </Select>
+              ) : (
+                <Select name="patient_id" value={formData.patient_id} onValueChange={(v) => handlePatientSelect(v, false)}>
+                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                  <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+            <div>
+              <Label>Categoria</Label>
+              {isEdit ? (
+                <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{currentCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              ) : (
+                <Select name="category" required value={formData.category} onValueChange={(v) => setFormData({...formData, category: v})}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>{currentCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          {/* Smart fill indicator */}
+          {selectedPatient && !isEdit && selectedPatient.default_session_value && (
+            <div className="bg-muted/30 rounded-lg p-3 flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Preenchimento automático</p>
+                <p className="text-sm font-medium truncate">
+                  {selectedPatient.full_name} — Sessão R$ {selectedPatient.default_session_value}
+                  {selectedPatient.payment_day && ` · Pgto dia ${selectedPatient.payment_day}`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="col-span-2">
+            <Label>Descrição</Label>
+            {isEdit ? (
+              <Textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} required />
+            ) : (
+              <Input name="description" placeholder="Sessão de atendimento" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} required />
+            )}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Section 2: Pagamento */}
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pagamento</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Forma de Pagamento</Label>
+              {isEdit ? (
+                <Select value={formData.payment_method} onValueChange={(v) => setFormData({...formData, payment_method: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                </Select>
+              ) : (
+                <Select name="payment_method" required>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+            <div>
+              <Label>Status</Label>
+              {isEdit ? (
+                <Select value={formData.payment_status} onValueChange={(v) => setFormData({...formData, payment_status: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem>
+                    <SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="cancelled">Cancelado</SelectItem>
+                    <SelectItem value="exempt">Isento</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select name="payment_status" required defaultValue="pending">
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem>
+                    <SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="exempt">Isento</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div>
+              <Label>Vencimento</Label>
+              {isEdit ? (
+                <Input type="date" value={formData.due_date} onChange={(e) => setFormData({...formData, due_date: e.target.value})} required />
+              ) : (
+                <Input name="due_date" type="date" required />
+              )}
+            </div>
+            <div>
+              <Label>Taxa (%)</Label>
+              {isEdit ? (
+                <Input type="number" step="0.01" value={formData.tax_rate} onChange={(e) => setFormData({...formData, tax_rate: e.target.value})} />
+              ) : (
+                <Input name="tax_rate" type="number" step="0.01" defaultValue="0" placeholder="0" />
+              )}
+            </div>
+          </div>
+          <div>
+            <Label>Centro de Custo</Label>
+            {isEdit ? (
+              <Select value={formData.cost_center} onValueChange={(v) => setFormData({...formData, cost_center: v})}>
+                <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                <SelectContent>{COST_CENTERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            ) : (
+              <Select name="cost_center">
+                <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                <SelectContent>{COST_CENTERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => { isEdit ? setEditingTransaction(null) : setDialogOpen(false); resetForm(); }}>Cancelar</Button>
+          <Button type="submit">{isEdit ? "Salvar" : "Criar"}</Button>
+        </div>
+      </form>
+    );
+  };
+
+  // Month/Year Picker
+  const MonthYearPicker = () => {
+    const currentYear = selectedMonth.getFullYear();
+    const currentMonthIdx = selectedMonth.getMonth();
+
+    return (
+      <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="min-w-[200px] justify-center font-medium capitalize gap-2">
+            <Calendar className="h-4 w-4" />
+            {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[320px] p-4 pointer-events-auto" align="start">
+          <div className="space-y-4">
+            {/* Year selector */}
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedMonth(setYear(selectedMonth, currentYear - 1))}>←</Button>
+              <span className="font-bold text-lg">{currentYear}</span>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedMonth(setYear(selectedMonth, currentYear + 1))}>→</Button>
+            </div>
+            {/* Month grid */}
+            <div className="grid grid-cols-3 gap-2">
+              {MONTHS.map((month, idx) => (
+                <Button
+                  key={month}
+                  variant={idx === currentMonthIdx ? "default" : "ghost"}
+                  size="sm"
+                  className="text-xs h-9"
+                  onClick={() => {
+                    setSelectedMonth(setMonth(selectedMonth, idx));
+                    setMonthPickerOpen(false);
+                  }}
+                >
+                  {month.slice(0, 3)}
+                </Button>
+              ))}
+            </div>
+            <Button variant="outline" size="sm" className="w-full" onClick={() => {
+              setSelectedMonth(new Date());
+              setMonthPickerOpen(false);
+            }}>
+              Mês atual
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
 
   return (
     <AppLayout title="PsicoBank Enterprise" description="Gestão financeira completa com insights e automações">
-      {/* Top Dashboard Cards */}
+      {/* Top Dashboard — Reduced to essential 4 cards */}
       <StatsOverview
         stats={[
           { label: "Receitas", value: fmtCurrency(metrics.income), icon: TrendingUp, color: "green", change: metrics.incomeChange },
@@ -553,42 +655,25 @@ export default function Financeiro() {
         className="mb-6"
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <Card className="p-3 hover:shadow-md transition-shadow">
+      {/* Secondary metrics — condensed row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <Card className="p-3">
           <div className="text-xs text-muted-foreground mb-1">Ticket Médio</div>
           <div className="text-lg font-bold">{fmtCurrency(metrics.ticketMedio)}</div>
         </Card>
-        <Card className="p-3 hover:shadow-md transition-shadow">
-          <div className="text-xs text-muted-foreground mb-1">MRR Clínico</div>
-          <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{fmtCurrency(metrics.mrr)}</div>
-        </Card>
-        <Card className="p-3 hover:shadow-md transition-shadow">
-          <div className="text-xs text-muted-foreground mb-1">Inadimplência</div>
-          <div className={cn("text-lg font-bold", metrics.delinquencyRate > 20 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>{metrics.delinquencyRate}%</div>
-        </Card>
-        <Card className="p-3 hover:shadow-md transition-shadow">
+        <Card className="p-3">
           <div className="text-xs text-muted-foreground mb-1">Pacientes Ativos</div>
           <div className="text-lg font-bold">{metrics.uniquePatients}</div>
         </Card>
-        <Card className="p-3 hover:shadow-md transition-shadow">
+        <Card className="p-3">
+          <div className="text-xs text-muted-foreground mb-1">Inadimplência</div>
+          <div className={cn("text-lg font-bold", metrics.delinquencyRate > 20 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>{metrics.delinquencyRate}%</div>
+        </Card>
+        <Card className="p-3">
           <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-red-500" />Vencidos</div>
           <div className="text-lg font-bold text-red-600 dark:text-red-400">{fmtCurrency(metrics.overdue)}</div>
         </Card>
       </div>
-
-      {/* Cost Center Summary */}
-      {Object.keys(metrics.costCenterMap).length > 0 && (
-        <Card className="mb-6 p-4">
-          <div className="text-sm font-medium mb-3 flex items-center gap-2"><PieChart className="h-4 w-4 text-primary" />Centro de Custo</div>
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(metrics.costCenterMap).map(([center, value]) => (
-              <Badge key={center} variant="outline" className="py-1.5 px-3">
-                {center}: {fmtCurrency(value)}
-              </Badge>
-            ))}
-          </div>
-        </Card>
-      )}
 
       <Tabs defaultValue="pagamentos" className="mb-6">
         <TabsList className="bg-muted/50 mb-6">
@@ -602,7 +687,7 @@ export default function Financeiro() {
         <TabsContent value="pagamentos" className="space-y-6">
           {/* Period Controls */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-            <MonthNavigator />
+            <MonthYearPicker />
             <div className="flex gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -642,7 +727,7 @@ export default function Financeiro() {
                   }}>PDF</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); } }}>
+              <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); resetForm(); } }}>
                 <DialogTrigger asChild>
                   <Button className="gap-2"><Plus className="h-4 w-4" />Nova Transação</Button>
                 </DialogTrigger>
@@ -658,25 +743,19 @@ export default function Financeiro() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}
               className="rounded-xl border border-border bg-card p-4 space-y-1">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Target className="h-4 w-4" />Total Previsto
-              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground"><Target className="h-4 w-4" />Total Previsto</div>
               <p className="text-2xl font-bold">{fmtCurrency(periodSummary.incomeTotal)}</p>
               <p className="text-xs text-muted-foreground">{periodTransactions.filter(t => t.type === "income").length} recebimentos e {periodTransactions.filter(t => t.type === "expense").length} despesas</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
               className="rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/5 p-4 space-y-1">
-              <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-                <CheckCircle2 className="h-4 w-4" />Já Recebido
-              </div>
+              <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" />Já Recebido</div>
               <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{fmtCurrency(periodSummary.incomePaid)}</p>
               <p className="text-xs text-muted-foreground">{periodSummary.countPaid} pagamentos confirmados</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
               className="rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 p-4 space-y-1">
-              <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
-                <Clock className="h-4 w-4" />Pendente
-              </div>
+              <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400"><Clock className="h-4 w-4" />Pendente</div>
               <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{fmtCurrency(periodSummary.incomePending)}</p>
               <p className="text-xs text-muted-foreground">
                 {periodSummary.countPending} pendentes
@@ -762,8 +841,7 @@ export default function Financeiro() {
                             className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                             <td className="px-4 py-3">
                               <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border", sc.bg, sc.color, sc.border)}>
-                                <StatusIcon className="h-3 w-3" />
-                                {sc.label}
+                                <StatusIcon className="h-3 w-3" />{sc.label}
                               </span>
                             </td>
                             <td className="px-4 py-3">
@@ -939,17 +1017,16 @@ export default function Financeiro() {
               <h3 className="text-lg font-semibold mb-2">Emissão de Notas Fiscais</h3>
               <p className="text-muted-foreground mb-4 max-w-md mx-auto">
                 A emissão de NFS-e será integrada com serviços como Focus NFe ou eNotas.
-                Quando um pagamento for marcado como "Pago", o botão para emitir nota fiscal estará disponível.
               </p>
               <div className="flex flex-col gap-2 max-w-sm mx-auto">
                 {[
-                  { num: "1", color: "emerald", text: <>Pagamento marcado como <strong>Pago</strong></> },
-                  { num: "2", color: "blue", text: <>Botão <strong>"Emitir Nota Fiscal"</strong> disponível</> },
-                  { num: "3", color: "purple", text: <>PDF da nota salvo e disponível para download</> },
+                  { num: "1", text: <>Pagamento marcado como <strong>Pago</strong></> },
+                  { num: "2", text: <>Botão <strong>"Emitir Nota Fiscal"</strong> disponível</> },
+                  { num: "3", text: <>PDF da nota salvo e disponível para download</> },
                 ].map(step => (
                   <div key={step.num} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-left">
-                    <div className={`h-8 w-8 rounded-full bg-${step.color}-500/10 flex items-center justify-center shrink-0`}>
-                      <span className={`text-${step.color}-600 text-sm font-bold`}>{step.num}</span>
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <span className="text-primary text-sm font-bold">{step.num}</span>
                     </div>
                     <span className="text-sm">{step.text}</span>
                   </div>

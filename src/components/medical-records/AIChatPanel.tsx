@@ -51,16 +51,16 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
     setInput("");
     setIsLoading(true);
 
-    // Build context-aware messages for the API
+    // Build context-aware messages — always inject current text as system context
     const apiMessages: ChatMessage[] = [];
     if (currentText?.trim() && messages.length === 0) {
+      // First message: inject prontuário context
       apiMessages.push({
         role: "user",
-        content: `Contexto do prontuário atual:\n\n${currentText}\n\n---\n\n${msg}`,
+        content: `Contexto do prontuário atual (use como base para suas respostas):\n\n${currentText}\n\n---\n\nSolicitação do profissional: ${msg}`,
       });
-    } else if (currentText?.trim() && messages.length === 0) {
-      apiMessages.push(...allMessages);
     } else {
+      // Subsequent messages: send full history, AI already has context
       apiMessages.push(...allMessages);
     }
 
