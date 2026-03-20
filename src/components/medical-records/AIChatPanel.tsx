@@ -19,9 +19,11 @@ interface AIChatPanelProps {
   currentText: string;
   approach: string;
   onApplyText?: (text: string) => void;
+  patientName?: string;
+  sessionDate?: string;
 }
 
-export function AIChatPanel({ open, onOpenChange, currentText, approach, onApplyText }: AIChatPanelProps) {
+export function AIChatPanel({ open, onOpenChange, currentText, approach, onApplyText, patientName, sessionDate }: AIChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -41,6 +43,15 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
     }
   }, [messages]);
 
+  const buildContextPrefix = useCallback(() => {
+    const parts: string[] = [];
+    if (patientName) parts.push(`Paciente: ${patientName}`);
+    if (sessionDate) parts.push(`Data da sessão: ${sessionDate}`);
+    if (approach && approach !== "neutral") parts.push(`Abordagem clínica: ${approach}`);
+    if (currentText?.trim()) parts.push(`Conteúdo do prontuário:\n${currentText}`);
+    return parts.length > 0 ? parts.join("\n") + "\n\n---\n\n" : "";
+  }, [currentText, patientName, sessionDate, approach]);
+
   const sendMessage = useCallback(async (userMessage?: string) => {
     const msg = userMessage || input.trim();
     if (!msg || isLoading) return;
@@ -51,16 +62,14 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
     setInput("");
     setIsLoading(true);
 
-    // Build context-aware messages — always inject current text as system context
     const apiMessages: ChatMessage[] = [];
-    if (currentText?.trim() && messages.length === 0) {
-      // First message: inject prontuário context
+    if (messages.length === 0) {
+      const ctx = buildContextPrefix();
       apiMessages.push({
         role: "user",
-        content: `Contexto do prontuário atual (use como base para suas respostas):\n\n${currentText}\n\n---\n\nSolicitação do profissional: ${msg}`,
+        content: ctx ? `${ctx}Solicitação do profissional: ${msg}` : msg,
       });
     } else {
-      // Subsequent messages: send full history, AI already has context
       apiMessages.push(...allMessages);
     }
 
@@ -75,10 +84,7 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
             "Content-Type": "application/json",
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({
-            chatMessages: apiMessages,
-            approach,
-          }),
+          body: JSON.stringify({ chatMessages: apiMessages, approach }),
         }
       );
 
@@ -86,7 +92,6 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
         const errorData = await resp.json().catch(() => ({}));
         throw new Error(errorData.error || "Erro na comunicação com a IA");
       }
-
       if (!resp.body) throw new Error("No response body");
 
       const reader = resp.body.getReader();
@@ -136,7 +141,7 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
     } finally {
       setIsLoading(false);
     }
-  }, [input, messages, currentText, approach, isLoading]);
+  }, [input, messages, buildContextPrefix, approach, isLoading]);
 
   const handleCopy = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
@@ -149,7 +154,6 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
     if (messages.length < 2) return;
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
     if (!lastUserMsg) return;
-    // Remove last assistant message
     setMessages((prev) => {
       const idx = prev.length - 1;
       if (prev[idx]?.role === "assistant") return prev.slice(0, idx);
@@ -159,10 +163,12 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
   };
 
   const quickActions = [
-    "Reescreva esse prontuário de forma mais profissional",
-    "Resuma os pontos principais da sessão",
-    "Transforme anotações em prontuário clínico",
-    "Expanda a análise clínica",
+    "Reescreva de forma mais profissional",
+    "Resuma os pontos principais",
+    "Corrigir ortografia e gramática",
+    "Simplificar a linguagem",
+    "Deixar mais técnico",
+    "Gerar resumo para prontuário",
   ];
 
   return (
@@ -174,6 +180,11 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
             Assistente IA
             <Badge variant="secondary" className="text-xs">Chat</Badge>
           </SheetTitle>
+          {patientName && (
+            <p className="text-xs text-muted-foreground">
+              Paciente: {patientName} {sessionDate ? `• ${sessionDate}` : ""}
+            </p>
+          )}
         </SheetHeader>
 
         <ScrollArea className="flex-1 p-4" ref={scrollRef as any}>
@@ -191,13 +202,7 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
                 </div>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {quickActions.map((action) => (
-                    <Button
-                      key={action}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => sendMessage(action)}
-                    >
+                    <Button key={action} variant="outline" size="sm" className="text-xs" onClick={() => sendMessage(action)}>
                       {action}
                     </Button>
                   ))}
@@ -212,13 +217,7 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
                     <Bot className="h-4 w-4 text-primary" />
                   </div>
                 )}
-                <div
-                  className={`rounded-lg px-3 py-2 max-w-[85%] ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  }`}
-                >
+                <div className={`rounded-lg px-3 py-2 max-w-[85%] ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -228,25 +227,12 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
                   )}
                   {msg.role === "assistant" && msg.content && (
                     <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs gap-1"
-                        onClick={() => handleCopy(msg.content, idx)}
-                      >
+                      <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => handleCopy(msg.content, idx)}>
                         {copiedIdx === idx ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                         {copiedIdx === idx ? "Copiado" : "Copiar"}
                       </Button>
                       {onApplyText && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs gap-1"
-                          onClick={() => {
-                            onApplyText(msg.content);
-                            toast.success("Texto aplicado ao prontuário!");
-                          }}
-                        >
+                        <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => { onApplyText(msg.content); toast.success("Texto aplicado ao prontuário!"); }}>
                           Aplicar no prontuário
                         </Button>
                       )}
@@ -281,21 +267,8 @@ export function AIChatPanel({ open, onOpenChange, currentText, approach, onApply
               Regenerar resposta
             </Button>
           )}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              sendMessage();
-            }}
-            className="flex gap-2"
-          >
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ex: Reescreva com linguagem psicanalítica..."
-              disabled={isLoading}
-              className="flex-1"
-            />
+          <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">
+            <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ex: Reescreva com linguagem psicanalítica..." disabled={isLoading} className="flex-1" />
             <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
