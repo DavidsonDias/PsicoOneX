@@ -26,6 +26,8 @@ import { StatsOverview } from "@/components/ui/stats-overview";
 import { ProntuarioEditor } from "@/components/medical-records/ProntuarioEditor";
 import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
+import { useAutosave } from "@/hooks/useAutosave";
+import { AutosaveIndicator } from "@/components/medical-records/AutosaveIndicator";
 
 interface MedicalRecord {
   id: string;
@@ -203,6 +205,43 @@ const MedicalRecords = () => {
       setFormData(prev => ({ ...prev, session_number: nextSession }));
     }
   }, [formData.patient_id, calculateNextSessionNumber, editingRecord]);
+
+  // Autosave for edit mode — saves to DB every 3s when editing an existing record
+  const autosaveData = useMemo(() => {
+    if (!editingRecord) return null;
+    return { formData, freeFormNotes, recordId: editingRecord.id };
+  }, [formData, freeFormNotes, editingRecord]);
+
+  const handleAutosave = useCallback(async (data: any, signal: AbortSignal) => {
+    if (!data?.recordId) return;
+    const combinedObservations = data.freeFormNotes
+      ? (data.formData.observations ? `${data.formData.observations}\n\n--- Anotações Livres ---\n${data.freeFormNotes}` : data.freeFormNotes)
+      : data.formData.observations;
+
+    const { error } = await supabase
+      .from("medical_records")
+      .update({
+        patient_id: data.formData.patient_id,
+        session_date: data.formData.session_date,
+        session_number: data.formData.session_number,
+        complaints: data.formData.complaints || null,
+        observations: combinedObservations || null,
+        techniques_used: data.formData.techniques_used || null,
+        evolution: data.formData.evolution || null,
+        next_steps: data.formData.next_steps || null,
+      })
+      .eq("id", data.recordId);
+
+    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+    if (error) throw error;
+  }, []);
+
+  const { status: autosaveStatus } = useAutosave({
+    data: autosaveData,
+    onSave: handleAutosave,
+    interval: 3000,
+    enabled: !!editingRecord,
+  });
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -1035,7 +1074,10 @@ const MedicalRecords = () => {
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Prontuário</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Editar Prontuário</DialogTitle>
+              <AutosaveIndicator status={autosaveStatus} />
+            </div>
           </DialogHeader>
           <form onSubmit={handleEditRecord}>
             <ProntuarioEditor
