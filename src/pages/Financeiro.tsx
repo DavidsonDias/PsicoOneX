@@ -137,9 +137,17 @@ export default function Financeiro() {
 
     if (error) { toast.error("Erro ao carregar transações"); return; }
 
-    const formatted = (data || []).map((t: any) => ({
-      ...t, patient_name: t.patients?.full_name, payment_status: t.status,
-    }));
+    const now = new Date();
+    const formatted = (data || []).map((t: any) => {
+      // Auto-compute overdue: pending + past due date → overdue
+      let computedStatus = t.status;
+      if (t.status === "pending" && t.due_date && isAfter(now, new Date(t.due_date))) {
+        computedStatus = "overdue";
+      }
+      return {
+        ...t, patient_name: t.patients?.full_name, payment_status: computedStatus,
+      };
+    });
     setTransactions(formatted);
   };
 
