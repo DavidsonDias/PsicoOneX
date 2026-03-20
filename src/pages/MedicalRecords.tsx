@@ -1037,7 +1037,10 @@ const MedicalRecords = () => {
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Prontuário</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Editar Prontuário</DialogTitle>
+              <AutosaveIndicator status={autosaveStatus} />
+            </div>
           </DialogHeader>
           <form onSubmit={handleEditRecord}>
             <ProntuarioEditor
