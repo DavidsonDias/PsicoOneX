@@ -26,6 +26,8 @@ import { StatsOverview } from "@/components/ui/stats-overview";
 import { ProntuarioEditor } from "@/components/medical-records/ProntuarioEditor";
 import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
+import { useAutosave } from "@/hooks/useAutosave";
+import { AutosaveIndicator } from "@/components/medical-records/AutosaveIndicator";
 
 interface MedicalRecord {
   id: string;
