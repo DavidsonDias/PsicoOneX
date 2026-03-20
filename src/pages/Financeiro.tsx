@@ -137,9 +137,17 @@ export default function Financeiro() {
 
     if (error) { toast.error("Erro ao carregar transações"); return; }
 
-    const formatted = (data || []).map((t: any) => ({
-      ...t, patient_name: t.patients?.full_name, payment_status: t.status,
-    }));
+    const now = new Date();
+    const formatted = (data || []).map((t: any) => {
+      // Auto-compute overdue: pending + past due date → overdue
+      let computedStatus = t.status;
+      if (t.status === "pending" && t.due_date && isAfter(now, new Date(t.due_date))) {
+        computedStatus = "overdue";
+      }
+      return {
+        ...t, patient_name: t.patients?.full_name, payment_status: computedStatus,
+      };
+    });
     setTransactions(formatted);
   };
 
@@ -270,15 +278,27 @@ export default function Financeiro() {
     const amount = parseFloat(fd.get("amount") as string);
     const taxRate = parseFloat(fd.get("tax_rate") as string) || 0;
     const taxAmount = amount * (taxRate / 100);
+    const pid = fd.get("patient_id") as string;
+    const dueDate = fd.get("due_date") as string;
+
+    // Duplicate detection: same patient + same due_date + same amount
+    if (pid && dueDate) {
+      const duplicate = transactions.find(t =>
+        t.patient_id === pid && t.due_date === dueDate && Number(t.amount) === amount && t.payment_status !== "cancelled"
+      );
+      if (duplicate) {
+        const confirmed = window.confirm("⚠️ Já existe uma cobrança para este paciente nesta data com o mesmo valor. Deseja criar mesmo assim?");
+        if (!confirmed) return;
+      }
+    }
 
     const txData: any = {
       psychologist_id: userId, type: fd.get("type"), amount,
       description: fd.get("description"), category: fd.get("category"),
       payment_method: fd.get("payment_method"), status: fd.get("payment_status"),
-      due_date: fd.get("due_date"), cost_center: fd.get("cost_center") || null,
+      due_date: dueDate, cost_center: fd.get("cost_center") || null,
       tax_rate: taxRate, tax_amount: taxAmount,
     };
-    const pid = fd.get("patient_id");
     if (pid) txData.patient_id = pid;
     if (txData.status === "paid") txData.paid_date = new Date().toISOString().split("T")[0];
 
