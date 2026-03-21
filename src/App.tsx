@@ -9,6 +9,7 @@ import { PatientProvider } from "@/contexts/PatientContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { HelmetProvider } from "react-helmet-async";
 import { useAuthRedirect } from "./hooks/useAuthRedirect";
+import { useOfflineSync } from "./hooks/useOfflineSync";
 import { Loader2 } from "lucide-react";
 
 // Eagerly load critical routes
