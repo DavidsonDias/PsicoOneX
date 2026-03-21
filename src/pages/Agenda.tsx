@@ -918,68 +918,97 @@ export default function Agenda() {
               />
             ) : (
               <div className="space-y-3">
-                {filteredAppointments.map((appointment, index) => (
-                  <motion.div
-                    key={appointment.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="border border-border rounded-lg p-4 hover:bg-muted/30 hover:border-primary/30 transition-all"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-primary" />
-                          <button 
-                            className="font-medium text-primary hover:underline"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${appointment.patient_id}`); }}
-                          >
-                            {appointment.patients.full_name}
-                          </button>
-                          {appointment.recurrence_type && (
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Repeat className="h-3 w-3" />
-                              {appointment.recurrence_type === "weekly" ? "Semanal" : appointment.recurrence_type === "biweekly" ? "Quinzenal" : "Mensal"}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>{format(new Date(appointment.scheduled_at), "HH:mm")}</span>
-                          <span className="text-xs">({appointment.duration_minutes || 50}min)</span>
-                          {appointment.type === "online" ? (
-                            <Badge variant="outline" className="text-xs"><Video className="h-3 w-3 mr-1" />Online</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs"><MapPin className="h-3 w-3 mr-1" />Presencial</Badge>
-                          )}
-                          {appointment.session_value && (
-                            <span className="text-xs text-green-600 font-medium">R$ {Number(appointment.session_value).toFixed(0)}</span>
-                          )}
-                        </div>
-                      </div>
-                      <ActionMenu
-                        onEdit={() => openEditDialog(appointment)}
-                        onDelete={() => handleDeleteAppointment(appointment.id)}
-                        deleteTitle="Excluir Agendamento"
-                        deleteDescription="Tem certeza que deseja excluir este agendamento?"
-                      />
-                    </div>
-                    <div className="mt-3 flex items-center gap-3">
-                      <Select value={appointment.status || "scheduled"} onValueChange={(value) => handleStatusChange(appointment.id, value)}>
-                        <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="scheduled">Agendado</SelectItem>
-                          <SelectItem value="confirmed">Confirmado</SelectItem>
-                          <SelectItem value="completed">Realizado</SelectItem>
-                          <SelectItem value="cancelled">Cancelado</SelectItem>
-                          <SelectItem value="rescheduled">Remarcado</SelectItem>
-                          <SelectItem value="no_show">Não compareceu</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {appointment.notes && (
-                        <p className="text-xs text-muted-foreground truncate flex-1">{appointment.notes}</p>
+                {filteredAppointments.map((appointment, index) => {
+                  const statusMap: Record<string, { bg: string; text: string; label: string; border: string; dot: string }> = {
+                    scheduled: { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", label: "Agendado", border: "border-l-blue-500", dot: "bg-blue-500" },
+                    confirmed: { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", label: "Confirmado", border: "border-l-green-500", dot: "bg-green-500" },
+                    completed: { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", label: "Realizado", border: "border-l-purple-500", dot: "bg-purple-500" },
+                    cancelled: { bg: "bg-destructive/10", text: "text-destructive", label: "Cancelado", border: "border-l-destructive", dot: "bg-destructive" },
+                    rescheduled: { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", label: "Remarcado", border: "border-l-orange-500", dot: "bg-orange-500" },
+                    no_show: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", label: "Não compareceu", border: "border-l-amber-500", dot: "bg-amber-500" },
+                  };
+                  const sc = statusMap[appointment.status || "scheduled"] || statusMap.scheduled;
+
+                  return (
+                    <motion.div
+                      key={appointment.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={cn(
+                        "border border-l-4 rounded-lg p-4 hover:shadow-md transition-all",
+                        sc.bg, sc.border
                       )}
-                    </div>
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className={cn("h-2 w-2 rounded-full shrink-0", sc.dot)} />
+                            <button
+                              className="font-medium hover:underline text-left"
+                              onClick={(e) => { e.stopPropagation(); navigate(`/pacientes/${appointment.patient_id}`); }}
+                            >
+                              {appointment.patients.full_name}
+                            </button>
+                            <Badge className={cn("text-[10px] px-1.5 py-0 h-4 border-0", sc.bg, sc.text)}>
+                              {sc.label}
+                            </Badge>
+                            {appointment.recurrence_type && (
+                              <Badge variant="outline" className="text-xs gap-1">
+                                <Repeat className="h-3 w-3" />
+                                {appointment.recurrence_type === "weekly" ? "Semanal" : appointment.recurrence_type === "biweekly" ? "Quinzenal" : "Mensal"}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <span>{format(new Date(appointment.scheduled_at), "HH:mm")}</span>
+                            <span className="text-xs">({appointment.duration_minutes || 50}min)</span>
+                            {appointment.type === "online" ? (
+                              <Badge variant="outline" className="text-xs"><Video className="h-3 w-3 mr-1" />Online</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs"><MapPin className="h-3 w-3 mr-1" />Presencial</Badge>
+                            )}
+                            {appointment.session_value && (
+                              <span className="text-xs text-green-600 font-medium">R$ {Number(appointment.session_value).toFixed(0)}</span>
+                            )}
+                          </div>
+                        </div>
+                        <ActionMenu
+                          onEdit={() => openEditDialog(appointment)}
+                          onDelete={() => handleDeleteAppointment(appointment.id)}
+                          deleteTitle="Excluir Agendamento"
+                          deleteDescription="Tem certeza que deseja excluir este agendamento?"
+                          extraActions={[
+                            {
+                              label: "Marcar como Pago",
+                              icon: <DollarSign className="h-4 w-4" />,
+                              onClick: () => handleMarkPaid(appointment),
+                            },
+                          ]}
+                        />
+                      </div>
+                      <div className="mt-3 flex items-center gap-3">
+                        <Select value={appointment.status || "scheduled"} onValueChange={(value) => handleStatusChange(appointment.id, value)}>
+                          <SelectTrigger className={cn("w-[160px] h-8 text-xs border-0", sc.bg, sc.text)}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="scheduled">Agendado</SelectItem>
+                            <SelectItem value="confirmed">Confirmado</SelectItem>
+                            <SelectItem value="completed">Realizado</SelectItem>
+                            <SelectItem value="cancelled">Cancelado</SelectItem>
+                            <SelectItem value="rescheduled">Remarcado</SelectItem>
+                            <SelectItem value="no_show">Não compareceu</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {appointment.notes && (
+                          <p className="text-xs text-muted-foreground truncate flex-1">{appointment.notes}</p>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
                   </motion.div>
                 ))}
               </div>
