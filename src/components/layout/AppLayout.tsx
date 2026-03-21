@@ -43,6 +43,7 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
   const { canWrite } = useSubscription();
   const { unreadCount } = useNotifications();
   const { collapsed } = useSidebar();
+  const { isOnline, syncState, pendingCount, lastSyncedAt } = useSyncStatus();
   const { open: subscriptionOpen, setOpen: setSubscriptionOpen } = useSubscriptionCenter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
