@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import {
   Save, Bell, Palette, FileText, Database, Download, Lock, Loader2,
   Shield, Plug, HelpCircle, User, Package, CheckCircle2, FileJson, FileSpreadsheet, FileArchive,
-  KeyRound, LogOut
+  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw
 } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
