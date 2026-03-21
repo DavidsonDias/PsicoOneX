@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import {
   Save, Bell, Palette, FileText, Database, Download, Lock, Loader2,
   Shield, Plug, HelpCircle, User, Package, CheckCircle2, FileJson, FileSpreadsheet, FileArchive,
-  KeyRound, LogOut
+  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw
 } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
@@ -51,6 +51,15 @@ export default function Configuracoes() {
   const [exportModules, setExportModules] = useState<ExportModules>({
     patients: true, records: true, appointments: true, financial: true,
   });
+  // Import state
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importData, setImportData] = useState<Record<string, any[]> | null>(null);
+  const [importModules, setImportModules] = useState<ExportModules>({ patients: true, records: true, appointments: true, financial: true });
+  const [importStrategy, setImportStrategy] = useState<"skip" | "replace">("skip");
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
   const { isAdmin } = useUserRole();
   const { resetOnboarding } = useOnboarding();
 
@@ -273,6 +282,183 @@ export default function Configuracoes() {
       setExportPassword("");
     }
   }, [exportPassword, exportFormat, exportModules, selectedModuleCount]);
+
+  // ── IMPORT / RESTORE ──
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".json")) {
+      toast.error("Apenas arquivos .json exportados pelo PsicoOne são suportados");
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+
+      // Detect modules present
+      const detected: Record<string, any[]> = {};
+      if (Array.isArray(parsed.pacientes)) detected.patients = parsed.pacientes;
+      if (Array.isArray(parsed.prontuarios)) detected.records = parsed.prontuarios;
+      if (Array.isArray(parsed.agendamentos)) detected.appointments = parsed.agendamentos;
+      if (Array.isArray(parsed.financeiro)) detected.financial = parsed.financeiro;
+
+      if (Object.keys(detected).length === 0) {
+        toast.error("Nenhum dado reconhecido no arquivo. Use um backup gerado pelo PsicoOne.");
+        return;
+      }
+
+      setImportFile(file);
+      setImportData(detected);
+      setImportModules({
+        patients: !!detected.patients,
+        records: !!detected.records,
+        appointments: !!detected.appointments,
+        financial: !!detected.financial,
+      });
+      toast.success("Arquivo lido com sucesso! Revise os dados abaixo.");
+    } catch {
+      toast.error("Erro ao ler o arquivo. Verifique se é um JSON válido.");
+    }
+  }, []);
+
+  const handleImportRestore = useCallback(async () => {
+    if (!importData) return;
+    setImporting(true);
+    setImportDialogOpen(false);
+    setImportProgress(10);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+
+      let totalInserted = 0;
+      const steps = Object.entries(importModules).filter(([, v]) => v);
+      const stepSize = 80 / Math.max(steps.length, 1);
+
+      for (let i = 0; i < steps.length; i++) {
+        const [moduleKey] = steps[i];
+        const rows = importData[moduleKey];
+        if (!rows || rows.length === 0) continue;
+
+        setImportProgress(10 + Math.round(stepSize * i));
+
+        if (moduleKey === "patients" && importModules.patients) {
+          for (const p of rows) {
+            if (importStrategy === "skip") {
+              // Check if patient already exists by name
+              const { data: existing } = await supabase.from("patients")
+                .select("id").eq("full_name", p.nome).eq("psychologist_id", user.id).is("deleted_at", null).limit(1);
+              if (existing && existing.length > 0) continue;
+            }
+            await supabase.from("patients").insert({
+              psychologist_id: user.id,
+              full_name: p.nome || "Sem nome",
+              email: p.email || null,
+              phone: p.telefone || null,
+              cpf: p.cpf || null,
+              birth_date: p.nascimento || null,
+              status: p.status || "active",
+              address: p.endereco || null,
+              notes: p.observacoes || null,
+              default_session_value: p.valor_sessao || null,
+              payment_day: p.dia_pagamento || null,
+              monthly_plan_value: p.plano_mensal || null,
+            } as any);
+            totalInserted++;
+          }
+        }
+
+        if (moduleKey === "records" && importModules.records) {
+          for (const r of rows) {
+            // Find patient by name
+            const { data: pat } = await supabase.from("patients")
+              .select("id").eq("full_name", r.paciente).eq("psychologist_id", user.id).is("deleted_at", null).limit(1);
+            if (!pat || pat.length === 0) continue;
+
+            await supabase.from("medical_records").insert({
+              psychologist_id: user.id,
+              patient_id: pat[0].id,
+              session_date: r.data_sessao || new Date().toISOString().split("T")[0],
+              session_number: r.numero_sessao || null,
+              complaints: r.queixas || null,
+              evolution: r.evolucao || null,
+              techniques_used: r.tecnicas || null,
+              next_steps: r.proximos_passos || null,
+              observations: r.observacoes || null,
+            } as any);
+            totalInserted++;
+          }
+        }
+
+        if (moduleKey === "appointments" && importModules.appointments) {
+          for (const a of rows) {
+            const { data: pat } = await supabase.from("patients")
+              .select("id").eq("full_name", a.paciente).eq("psychologist_id", user.id).is("deleted_at", null).limit(1);
+            if (!pat || pat.length === 0) continue;
+
+            await supabase.from("appointments").insert({
+              psychologist_id: user.id,
+              patient_id: pat[0].id,
+              scheduled_at: a.data && a.horario ? `${a.data}T${a.horario}:00` : new Date().toISOString(),
+              status: a.status || "scheduled",
+              type: a.tipo || "presential",
+              session_value: a.valor || 200,
+              notes: a.observacoes || null,
+            } as any);
+            totalInserted++;
+          }
+        }
+
+        if (moduleKey === "financial" && importModules.financial) {
+          for (const t of rows) {
+            const { data: pat } = await supabase.from("patients")
+              .select("id").eq("full_name", t.paciente).eq("psychologist_id", user.id).is("deleted_at", null).limit(1);
+            if (!pat || pat.length === 0) continue;
+
+            await supabase.from("financial_transactions").insert({
+              psychologist_id: user.id,
+              patient_id: pat[0].id,
+              type: t.tipo === "Receita" ? "income" : "expense",
+              amount: t.valor || 0,
+              description: t.descricao || null,
+              status: t.status || "pending",
+              category: t.categoria || null,
+              due_date: t.vencimento || null,
+              paid_date: t.pagamento || null,
+              payment_method: t.metodo || null,
+            } as any);
+            totalInserted++;
+          }
+        }
+      }
+
+      setImportProgress(95);
+
+      await supabase.from("audit_logs").insert({
+        user_id: user.id,
+        action_type: "data_import",
+        entity_type: "system",
+        new_data: {
+          file_name: importFile?.name,
+          strategy: importStrategy,
+          modules: Object.entries(importModules).filter(([, v]) => v).map(([k]) => k),
+          total_inserted: totalInserted,
+        },
+      } as any);
+
+      setImportProgress(100);
+      toast.success(`${totalInserted} registro(s) importado(s) com sucesso!`);
+      setImportFile(null);
+      setImportData(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao importar dados. Verifique o console.");
+    } finally {
+      setTimeout(() => { setImporting(false); setImportProgress(0); }, 1000);
+    }
+  }, [importData, importModules, importStrategy, importFile]);
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
@@ -632,6 +818,164 @@ export default function Configuracoes() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* ── IMPORT / RESTORE CARD ── */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-secondary/10">
+                    <Upload className="h-6 w-6 text-secondary-foreground" />
+                  </div>
+                  <div>
+                    <CardTitle>Importar / Restaurar Backup</CardTitle>
+                    <CardDescription>Restaure dados a partir de um arquivo JSON exportado pelo PsicoOne</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* File upload */}
+                <div>
+                  <Label className="text-base font-semibold mb-3 block">Selecionar arquivo</Label>
+                  <label className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-dashed border-border hover:border-primary/40 cursor-pointer transition-colors bg-muted/20">
+                    <Upload className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-center">
+                      <p className="text-sm font-medium">
+                        {importFile ? importFile.name : "Clique para selecionar um arquivo .json"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Apenas arquivos JSON exportados pelo PsicoOne
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileSelect}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+
+                {/* Detected data summary */}
+                {importData && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      <p className="text-sm font-medium">
+                        Backup reconhecido — selecione o que deseja restaurar
+                      </p>
+                    </div>
+
+                    {/* Module selection with counts */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {([
+                        { key: "patients" as const, label: "Pacientes", icon: "👤" },
+                        { key: "records" as const, label: "Prontuários", icon: "📋" },
+                        { key: "appointments" as const, label: "Agendamentos", icon: "📅" },
+                        { key: "financial" as const, label: "Financeiro", icon: "💰" },
+                      ] as const).map(({ key, label, icon }) => {
+                        const rows = importData[key];
+                        if (!rows) return null;
+                        return (
+                          <label
+                            key={key}
+                            className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                              importModules[key]
+                                ? "border-primary bg-primary/5 shadow-sm"
+                                : "border-border hover:border-primary/30"
+                            }`}
+                          >
+                            <Checkbox
+                              checked={importModules[key]}
+                              onCheckedChange={(checked) =>
+                                setImportModules(prev => ({ ...prev, [key]: !!checked }))
+                              }
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span>{icon}</span>
+                                <span className="font-medium text-sm">{label}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {rows.length} registro{rows.length !== 1 ? "s" : ""} encontrado{rows.length !== 1 ? "s" : ""}
+                              </p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {/* Strategy */}
+                    <div>
+                      <Label className="text-base font-semibold mb-3 block">Estratégia de importação</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label
+                          className={`flex flex-col gap-1 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                            importStrategy === "skip"
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-border hover:border-primary/30"
+                          }`}
+                        >
+                          <input type="radio" name="importStrategy" value="skip" checked={importStrategy === "skip"} onChange={() => setImportStrategy("skip")} className="sr-only" />
+                          <span className="font-medium text-sm">Ignorar duplicados</span>
+                          <span className="text-xs text-muted-foreground">Pula registros que já existem (mais seguro)</span>
+                        </label>
+                        <label
+                          className={`flex flex-col gap-1 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                            importStrategy === "replace"
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-border hover:border-primary/30"
+                          }`}
+                        >
+                          <input type="radio" name="importStrategy" value="replace" checked={importStrategy === "replace"} onChange={() => setImportStrategy("replace")} className="sr-only" />
+                          <span className="font-medium text-sm">Importar tudo</span>
+                          <span className="text-xs text-muted-foreground">Insere todos os registros (pode duplicar)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Warning */}
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                      <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                      <p className="text-sm text-destructive">
+                        A importação é irreversível. Certifique-se de que o arquivo é confiável antes de continuar.
+                      </p>
+                    </div>
+
+                    {/* Import progress */}
+                    {importing && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Importando dados...</span>
+                          <span className="font-medium">{importProgress}%</span>
+                        </div>
+                        <Progress value={importProgress} className="h-2" />
+                      </div>
+                    )}
+
+                    {/* Action */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button
+                        className="gap-2 flex-1"
+                        onClick={() => setImportDialogOpen(true)}
+                        disabled={importing || !Object.values(importModules).some(Boolean)}
+                      >
+                        {importing
+                          ? <><Loader2 className="h-4 w-4 animate-spin" /> Importando...</>
+                          : <><RotateCcw className="h-4 w-4" /> Restaurar Dados</>
+                        }
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setImportFile(null); setImportData(null); }}
+                        disabled={importing}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -696,6 +1040,41 @@ export default function Configuracoes() {
             <AlertDialogCancel onClick={() => setExportPassword("")}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleExportBackup} disabled={!exportPassword || exportPassword.length < 4}>
               Exportar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Import confirmation dialog */}
+      <AlertDialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5" /> Confirmar Importação
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja importar os dados selecionados? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-3">
+            <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+              <p className="font-medium">Resumo da importação:</p>
+              <p className="text-muted-foreground">
+                {Object.entries(importModules).filter(([, v]) => v).map(([k]) => {
+                  const labels: Record<string, string> = { patients: "Pacientes", records: "Prontuários", appointments: "Agendamentos", financial: "Financeiro" };
+                  const count = importData?.[k]?.length || 0;
+                  return `${labels[k]} (${count})`;
+                }).join(", ")}
+              </p>
+              <p className="text-muted-foreground">
+                Estratégia: {importStrategy === "skip" ? "Ignorar duplicados" : "Importar tudo"}
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleImportRestore}>
+              Importar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
