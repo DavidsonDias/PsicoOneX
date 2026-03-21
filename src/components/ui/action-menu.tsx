@@ -41,6 +41,7 @@ export function ActionMenu({
   deleteDescription = "Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.",
   editLabel = "Editar",
   deleteLabel = "Excluir",
+  extraActions,
 }: ActionMenuProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
