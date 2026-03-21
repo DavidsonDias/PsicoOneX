@@ -1118,7 +1118,7 @@ const MedicalRecords = () => {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Editar Prontuário</DialogTitle>
-              <AutosaveIndicator status={autosaveStatus} />
+              <AutosaveIndicator status={autosaveEditStatus} lastSavedAt={editSavedAt} />
             </div>
           </DialogHeader>
           <form onSubmit={handleEditRecord}>
