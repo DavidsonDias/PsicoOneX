@@ -26,7 +26,7 @@ import { StatsOverview } from "@/components/ui/stats-overview";
 import { ProntuarioEditor } from "@/components/medical-records/ProntuarioEditor";
 import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
-import { useAutosave } from "@/hooks/useAutosave";
+import { useAutosave, recoverDraft, clearDraft } from "@/hooks/useAutosave";
 import { AutosaveIndicator } from "@/components/medical-records/AutosaveIndicator";
 
 interface MedicalRecord {
@@ -167,6 +167,8 @@ const MedicalRecords = () => {
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [freeFormNotes, setFreeFormNotes] = useState("");
+  const DRAFT_KEY_NEW = "psicoone-draft-new-record";
+  const DRAFT_KEY_EDIT = (id: string) => `psicoone-draft-edit-${id}`;
   const [quickPatientOpen, setQuickPatientOpen] = useState(false);
 
   // New filter states
@@ -206,13 +208,13 @@ const MedicalRecords = () => {
     }
   }, [formData.patient_id, calculateNextSessionNumber, editingRecord]);
 
-  // Autosave for edit mode — saves to DB every 3s when editing an existing record
-  const autosaveData = useMemo(() => {
+  // ── Autosave: EDIT mode (saves to DB) ──
+  const autosaveEditData = useMemo(() => {
     if (!editingRecord) return null;
     return { formData, freeFormNotes, recordId: editingRecord.id };
   }, [formData, freeFormNotes, editingRecord]);
 
-  const handleAutosave = useCallback(async (data: any, signal: AbortSignal) => {
+  const handleAutosaveEdit = useCallback(async (data: any, signal: AbortSignal) => {
     if (!data?.recordId) return;
     const combinedObservations = data.freeFormNotes
       ? (data.formData.observations ? `${data.formData.observations}\n\n--- Anotações Livres ---\n${data.freeFormNotes}` : data.freeFormNotes)
@@ -236,12 +238,47 @@ const MedicalRecords = () => {
     if (error) throw error;
   }, []);
 
-  const { status: autosaveStatus } = useAutosave({
-    data: autosaveData,
-    onSave: handleAutosave,
+  const { status: autosaveEditStatus, lastSavedAt: editSavedAt } = useAutosave({
+    data: autosaveEditData,
+    onSave: handleAutosaveEdit,
     interval: 3000,
     enabled: !!editingRecord,
+    localStorageKey: editingRecord ? DRAFT_KEY_EDIT(editingRecord.id) : undefined,
   });
+
+  // ── Autosave: NEW mode (saves to localStorage only) ──
+  const autosaveNewData = useMemo(() => {
+    if (editingRecord || !dialogOpen) return null;
+    return { formData, freeFormNotes };
+  }, [formData, freeFormNotes, editingRecord, dialogOpen]);
+
+  const handleAutosaveNew = useCallback(async (_data: any, _signal: AbortSignal) => {
+    // For new records we only persist via localStorageKey – no DB call
+    return;
+  }, []);
+
+  const { status: autosaveNewStatus, lastSavedAt: newSavedAt } = useAutosave({
+    data: autosaveNewData,
+    onSave: handleAutosaveNew,
+    interval: 3000,
+    enabled: dialogOpen && !editingRecord,
+    localStorageKey: DRAFT_KEY_NEW,
+  });
+
+  // Recover draft when opening new record dialog
+  useEffect(() => {
+    if (dialogOpen && !editingRecord) {
+      const draft = recoverDraft<{ formData: typeof formData; freeFormNotes: string }>(DRAFT_KEY_NEW);
+      if (draft?.formData?.patient_id || draft?.freeFormNotes) {
+        setFormData(prev => ({ ...prev, ...draft.formData }));
+        setFreeFormNotes(draft.freeFormNotes || "");
+        toast.info("Rascunho recuperado automaticamente");
+      }
+    }
+  }, [dialogOpen, editingRecord]);
+
+  const autosaveStatus = editingRecord ? autosaveEditStatus : autosaveNewStatus;
+  const lastSavedAt = editingRecord ? editSavedAt : newSavedAt;
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -407,6 +444,7 @@ const MedicalRecords = () => {
     }
 
     toast.success("Prontuário criado com sucesso!");
+    clearDraft(DRAFT_KEY_NEW);
     setDialogOpen(false);
     resetForm();
     await loadRecords(userId);
@@ -447,6 +485,7 @@ const MedicalRecords = () => {
     }
 
     toast.success("Prontuário atualizado com sucesso!");
+    if (editingRecord) clearDraft(DRAFT_KEY_EDIT(editingRecord.id));
     setEditingRecord(null);
     resetForm();
     await loadRecords(userId);
@@ -795,7 +834,10 @@ const MedicalRecords = () => {
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Novo Registro de Sessão</DialogTitle>
+                <div className="flex items-center justify-between">
+                  <DialogTitle>Novo Registro de Sessão</DialogTitle>
+                  <AutosaveIndicator status={autosaveNewStatus} lastSavedAt={newSavedAt} />
+                </div>
               </DialogHeader>
               <form onSubmit={handleCreateRecord}>
                 <ProntuarioEditor
@@ -1076,7 +1118,7 @@ const MedicalRecords = () => {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Editar Prontuário</DialogTitle>
-              <AutosaveIndicator status={autosaveStatus} />
+              <AutosaveIndicator status={autosaveEditStatus} lastSavedAt={editSavedAt} />
             </div>
           </DialogHeader>
           <form onSubmit={handleEditRecord}>
