@@ -444,6 +444,7 @@ const MedicalRecords = () => {
     }
 
     toast.success("Prontuário criado com sucesso!");
+    clearDraft(DRAFT_KEY_NEW);
     setDialogOpen(false);
     resetForm();
     await loadRecords(userId);
