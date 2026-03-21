@@ -914,6 +914,7 @@ export default function Agenda() {
                 onEdit={openEditDialog}
                 onDelete={handleDeleteAppointment}
                 onStatusChange={handleStatusChange}
+                onMarkPaid={handleMarkPaid}
               />
             ) : (
               <div className="space-y-3">
