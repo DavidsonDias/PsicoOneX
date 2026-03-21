@@ -1044,6 +1044,41 @@ export default function Configuracoes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import confirmation dialog */}
+      <AlertDialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5" /> Confirmar Importação
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja importar os dados selecionados? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-3">
+            <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+              <p className="font-medium">Resumo da importação:</p>
+              <p className="text-muted-foreground">
+                {Object.entries(importModules).filter(([, v]) => v).map(([k]) => {
+                  const labels: Record<string, string> = { patients: "Pacientes", records: "Prontuários", appointments: "Agendamentos", financial: "Financeiro" };
+                  const count = importData?.[k]?.length || 0;
+                  return `${labels[k]} (${count})`;
+                }).join(", ")}
+              </p>
+              <p className="text-muted-foreground">
+                Estratégia: {importStrategy === "skip" ? "Ignorar duplicados" : "Importar tudo"}
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleImportRestore}>
+              Importar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
