@@ -15,6 +15,8 @@ import { WriteBlockedProvider } from "@/components/subscription/WriteBlockedModa
 import { SevenDevXFooter } from "./SevenDevXFooter";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useSyncStatus } from "@/contexts/SyncContext";
+import { SystemStatusBar } from "./SystemStatusBar";
 import { cn } from "@/lib/utils";
 
 // Context to expose canWrite to child components
@@ -41,6 +43,7 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
   const { canWrite } = useSubscription();
   const { unreadCount } = useNotifications();
   const { collapsed } = useSidebar();
+  const { isOnline, syncState, pendingCount, lastSyncedAt } = useSyncStatus();
   const { open: subscriptionOpen, setOpen: setSubscriptionOpen } = useSubscriptionCenter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -171,6 +174,14 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
         )}
       >
         <div className="container mx-auto px-4 sm:px-6 py-6 lg:py-8 max-w-7xl">
+          {/* System Status Bar */}
+          <SystemStatusBar
+            isOnline={isOnline}
+            syncStatus={syncState}
+            pendingCount={pendingCount}
+            lastSyncedAt={lastSyncedAt}
+          />
+
           {/* Subscription Banner */}
           <SubscriptionBanner />
 

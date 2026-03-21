@@ -9,7 +9,7 @@ import { PatientProvider } from "@/contexts/PatientContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { HelmetProvider } from "react-helmet-async";
 import { useAuthRedirect } from "./hooks/useAuthRedirect";
-import { useOfflineSync } from "./hooks/useOfflineSync";
+import { SyncProvider } from "./contexts/SyncContext";
 import { Loader2 } from "lucide-react";
 
 // Eagerly load critical routes
@@ -42,7 +42,6 @@ const queryClient = new QueryClient();
 
 function AuthRedirectHandler() {
   useAuthRedirect();
-  useOfflineSync();
   return null;
 }
 
@@ -60,6 +59,7 @@ const App = () => (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <SidebarProvider>
+            <SyncProvider>
             <PatientProvider>
             <Toaster />
             <Sonner />
@@ -93,6 +93,7 @@ const App = () => (
               </Suspense>
             </BrowserRouter>
             </PatientProvider>
+            </SyncProvider>
           </SidebarProvider>
         </TooltipProvider>
       </QueryClientProvider>
