@@ -1007,6 +1007,7 @@ export default function Agenda() {
                         )}
                       </div>
                     </motion.div>
+                  );
                 })}
               </div>
             )}
