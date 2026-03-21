@@ -162,19 +162,19 @@ export default function Configuracoes() {
       const fetchKeys: string[] = [];
 
       if (exportModules.patients) {
-        fetches.push(supabase.from("patients").select("*").is("deleted_at", null));
+        fetches.push(supabase.from("patients").select("*").is("deleted_at", null).then(r => r));
         fetchKeys.push("patients");
       }
       if (exportModules.appointments) {
-        fetches.push(supabase.from("appointments").select("*, patients(full_name)").is("deleted_at", null));
+        fetches.push(supabase.from("appointments").select("*, patients(full_name)").is("deleted_at", null).then(r => r));
         fetchKeys.push("appointments");
       }
       if (exportModules.financial) {
-        fetches.push(supabase.from("financial_transactions").select("*, patients(full_name)").is("deleted_at", null));
+        fetches.push(supabase.from("financial_transactions").select("*, patients(full_name)").is("deleted_at", null).then(r => r));
         fetchKeys.push("financial");
       }
       if (exportModules.records) {
-        fetches.push(supabase.from("medical_records").select("*, patients(full_name)").is("deleted_at", null));
+        fetches.push(supabase.from("medical_records").select("*, patients(full_name)").is("deleted_at", null).then(r => r));
         fetchKeys.push("records");
       }
 
