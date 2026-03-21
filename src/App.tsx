@@ -42,6 +42,7 @@ const queryClient = new QueryClient();
 
 function AuthRedirectHandler() {
   useAuthRedirect();
+  useOfflineSync();
   return null;
 }
 
