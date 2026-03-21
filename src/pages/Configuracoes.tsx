@@ -51,6 +51,15 @@ export default function Configuracoes() {
   const [exportModules, setExportModules] = useState<ExportModules>({
     patients: true, records: true, appointments: true, financial: true,
   });
+  // Import state
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importData, setImportData] = useState<Record<string, any[]> | null>(null);
+  const [importModules, setImportModules] = useState<ExportModules>({ patients: true, records: true, appointments: true, financial: true });
+  const [importStrategy, setImportStrategy] = useState<"skip" | "replace">("skip");
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
   const { isAdmin } = useUserRole();
   const { resetOnboarding } = useOnboarding();
 
