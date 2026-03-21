@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,12 +26,13 @@ import { StatsOverview } from "@/components/ui/stats-overview";
 import { ProntuarioEditor } from "@/components/medical-records/ProntuarioEditor";
 import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal";
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
-import { useAutosave, recoverDraft, clearDraft } from "@/hooks/useAutosave";
+import { useAutosave } from "@/hooks/useAutosave";
 import { AutosaveIndicator } from "@/components/medical-records/AutosaveIndicator";
 
 interface MedicalRecord {
   id: string;
   patient_id: string;
+  updated_at?: string | null;
   session_date: string;
   session_number: number | null;
   complaints: string | null;
@@ -70,6 +71,23 @@ interface PreviewFile {
   size: number;
   url: string;
   createdAt?: string;
+}
+
+interface RecordFormState {
+  patient_id: string;
+  session_date: string;
+  session_number: number;
+  complaints: string;
+  observations: string;
+  techniques_used: string;
+  evolution: string;
+  next_steps: string;
+}
+
+interface RecordDraftPayload {
+  formData: RecordFormState;
+  freeFormNotes: string;
+  updatedAt: string;
 }
 
 // RecordFormContent is now the shared ProntuarioEditor component
@@ -167,9 +185,12 @@ const MedicalRecords = () => {
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [freeFormNotes, setFreeFormNotes] = useState("");
-  const DRAFT_KEY_NEW = "psicoone-draft-new-record";
-  const DRAFT_KEY_EDIT = (id: string) => `psicoone-draft-edit-${id}`;
+  const NEW_DRAFT_POINTER_KEY = "draft:prontuario:last-new-key";
   const [quickPatientOpen, setQuickPatientOpen] = useState(false);
+  const [newDraftTempId, setNewDraftTempId] = useState<string>(() => `temp-${Date.now()}`);
+  const [lastCommittedSnapshot, setLastCommittedSnapshot] = useState<string>("");
+  const [lastLocalDraftSavedAt, setLastLocalDraftSavedAt] = useState<Date | null>(null);
+  const lastNewDraftKeyRef = useRef<string | null>(null);
 
   // New filter states
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
@@ -177,7 +198,7 @@ const MedicalRecords = () => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RecordFormState>({
     patient_id: "",
     session_date: format(new Date(), "yyyy-MM-dd"),
     session_number: 1,
@@ -187,6 +208,53 @@ const MedicalRecords = () => {
     evolution: "",
     next_steps: ""
   });
+
+  const currentEditorSnapshot = useMemo(
+    () => JSON.stringify({ formData, freeFormNotes }),
+    [formData, freeFormNotes],
+  );
+
+  const isDirty = useMemo(() => {
+    const isEditorOpen = dialogOpen || !!editingRecord;
+    if (!isEditorOpen || !lastCommittedSnapshot) return false;
+    return currentEditorSnapshot !== lastCommittedSnapshot;
+  }, [dialogOpen, editingRecord, currentEditorSnapshot, lastCommittedSnapshot]);
+
+  const newDraftKey = useMemo(
+    () => `draft:prontuario:${formData.patient_id || newDraftTempId}`,
+    [formData.patient_id, newDraftTempId],
+  );
+
+  const saveDraftLocally = useCallback((key: string, payload: RecordDraftPayload) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(payload));
+      setLastLocalDraftSavedAt(new Date(payload.updatedAt));
+    } catch {
+      // ignore localStorage failures
+    }
+  }, []);
+
+  const readDraftLocally = useCallback((key: string): RecordDraftPayload | null => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      return JSON.parse(raw) as RecordDraftPayload;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const removeDraftLocally = useCallback((key: string) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore localStorage failures
+    }
+  }, []);
+
+  const markSnapshotCommitted = useCallback((nextSnapshot: string) => {
+    setLastCommittedSnapshot(nextSnapshot);
+  }, []);
 
   useEffect(() => {
     checkAuthAndLoadData();
@@ -216,6 +284,14 @@ const MedicalRecords = () => {
 
   const handleAutosaveEdit = useCallback(async (data: any, signal: AbortSignal) => {
     if (!data?.recordId) return;
+
+    const localPayload: RecordDraftPayload = {
+      formData: data.formData,
+      freeFormNotes: data.freeFormNotes || "",
+      updatedAt: new Date().toISOString(),
+    };
+    saveDraftLocally(`draft:prontuario:${data.recordId}`, localPayload);
+
     const combinedObservations = data.freeFormNotes
       ? (data.formData.observations ? `${data.formData.observations}\n\n--- Anotações Livres ---\n${data.freeFormNotes}` : data.freeFormNotes)
       : data.formData.observations;
@@ -236,14 +312,13 @@ const MedicalRecords = () => {
 
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
     if (error) throw error;
-  }, []);
+  }, [saveDraftLocally]);
 
-  const { status: autosaveEditStatus, lastSavedAt: editSavedAt } = useAutosave({
+  const { status: autosaveEditStatus, save: triggerAutosaveEdit, lastSavedAt: editSavedAt } = useAutosave({
     data: autosaveEditData,
     onSave: handleAutosaveEdit,
-    interval: 3000,
+    interval: 1500,
     enabled: !!editingRecord,
-    localStorageKey: editingRecord ? DRAFT_KEY_EDIT(editingRecord.id) : undefined,
   });
 
   // ── Autosave: NEW mode (saves to localStorage only) ──
@@ -252,33 +327,112 @@ const MedicalRecords = () => {
     return { formData, freeFormNotes };
   }, [formData, freeFormNotes, editingRecord, dialogOpen]);
 
-  const handleAutosaveNew = useCallback(async (_data: any, _signal: AbortSignal) => {
-    // For new records we only persist via localStorageKey – no DB call
-    return;
-  }, []);
+  const handleAutosaveNew = useCallback(async (data: any, _signal: AbortSignal) => {
+    if (!data) return;
 
-  const { status: autosaveNewStatus, lastSavedAt: newSavedAt } = useAutosave({
+    const localPayload: RecordDraftPayload = {
+      formData: data.formData,
+      freeFormNotes: data.freeFormNotes || "",
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveDraftLocally(newDraftKey, localPayload);
+
+    try {
+      localStorage.setItem(NEW_DRAFT_POINTER_KEY, newDraftKey);
+      if (lastNewDraftKeyRef.current && lastNewDraftKeyRef.current !== newDraftKey) {
+        removeDraftLocally(lastNewDraftKeyRef.current);
+      }
+      lastNewDraftKeyRef.current = newDraftKey;
+    } catch {
+      // ignore localStorage failures
+    }
+  }, [NEW_DRAFT_POINTER_KEY, newDraftKey, removeDraftLocally, saveDraftLocally]);
+
+  const { status: autosaveNewStatus, save: triggerAutosaveNew, lastSavedAt: newSavedAt } = useAutosave({
     data: autosaveNewData,
     onSave: handleAutosaveNew,
-    interval: 3000,
+    interval: 1500,
     enabled: dialogOpen && !editingRecord,
-    localStorageKey: DRAFT_KEY_NEW,
   });
+
+  useEffect(() => {
+    if (autosaveEditStatus === "saved" && editingRecord) {
+      markSnapshotCommitted(currentEditorSnapshot);
+    }
+  }, [autosaveEditStatus, editingRecord, currentEditorSnapshot, markSnapshotCommitted]);
+
+  useEffect(() => {
+    if (autosaveNewStatus === "saved" && dialogOpen && !editingRecord) {
+      markSnapshotCommitted(currentEditorSnapshot);
+    }
+  }, [autosaveNewStatus, dialogOpen, editingRecord, currentEditorSnapshot, markSnapshotCommitted]);
 
   // Recover draft when opening new record dialog
   useEffect(() => {
     if (dialogOpen && !editingRecord) {
-      const draft = recoverDraft<{ formData: typeof formData; freeFormNotes: string }>(DRAFT_KEY_NEW);
-      if (draft?.formData?.patient_id || draft?.freeFormNotes) {
-        setFormData(prev => ({ ...prev, ...draft.formData }));
+      const pointer = localStorage.getItem(NEW_DRAFT_POINTER_KEY);
+      if (!pointer) return;
+
+      const draft = readDraftLocally(pointer);
+      if (!draft) return;
+
+      const hasDraftContent = Boolean(
+        draft.freeFormNotes?.trim() ||
+        draft.formData?.patient_id ||
+        draft.formData?.complaints?.trim() ||
+        draft.formData?.observations?.trim() ||
+        draft.formData?.techniques_used?.trim() ||
+        draft.formData?.evolution?.trim() ||
+        draft.formData?.next_steps?.trim(),
+      );
+
+      if (!hasDraftContent) return;
+
+      const shouldRecover = window.confirm("📝 Rascunho encontrado\n\nVocê deseja recuperar o conteúdo não salvo?");
+
+      if (shouldRecover) {
+        setFormData(draft.formData);
         setFreeFormNotes(draft.freeFormNotes || "");
-        toast.info("Rascunho recuperado automaticamente");
+        markSnapshotCommitted(JSON.stringify({ formData: draft.formData, freeFormNotes: draft.freeFormNotes || "" }));
+        toast.success("Rascunho recuperado");
+      } else {
+        removeDraftLocally(pointer);
+        localStorage.removeItem(NEW_DRAFT_POINTER_KEY);
       }
     }
-  }, [dialogOpen, editingRecord]);
+  }, [dialogOpen, editingRecord, NEW_DRAFT_POINTER_KEY, markSnapshotCommitted, readDraftLocally, removeDraftLocally]);
+
+  useEffect(() => {
+    if (!(dialogOpen || editingRecord) || !isDirty) return;
+
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [dialogOpen, editingRecord, isDirty]);
+
+  useEffect(() => {
+    if (!(dialogOpen || editingRecord)) return;
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (editingRecord) {
+        void triggerAutosaveEdit();
+      } else {
+        void triggerAutosaveNew();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [dialogOpen, editingRecord, triggerAutosaveEdit, triggerAutosaveNew]);
 
   const autosaveStatus = editingRecord ? autosaveEditStatus : autosaveNewStatus;
-  const lastSavedAt = editingRecord ? editSavedAt : newSavedAt;
+  const lastSavedAt = editingRecord ? (editSavedAt || lastLocalDraftSavedAt) : (newSavedAt || lastLocalDraftSavedAt);
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
