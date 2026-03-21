@@ -18,13 +18,20 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 
-interface ActionMenuProps {
+interface ExtraAction {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+}
+
+export interface ActionMenuProps {
   onEdit?: () => void;
   onDelete?: () => void;
   deleteTitle?: string;
   deleteDescription?: string;
   editLabel?: string;
   deleteLabel?: string;
+  extraActions?: ExtraAction[];
 }
 
 export function ActionMenu({
