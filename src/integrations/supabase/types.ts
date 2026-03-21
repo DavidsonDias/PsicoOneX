@@ -657,6 +657,79 @@ export type Database = {
         }
         Relationships: []
       }
+      telehealth_sessions: {
+        Row: {
+          ai_summary: string | null
+          appointment_id: string | null
+          chat_messages: Json | null
+          created_at: string
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          medical_record_id: string | null
+          patient_id: string | null
+          psychologist_id: string
+          room_token: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ai_summary?: string | null
+          appointment_id?: string | null
+          chat_messages?: Json | null
+          created_at?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          medical_record_id?: string | null
+          patient_id?: string | null
+          psychologist_id: string
+          room_token?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_summary?: string | null
+          appointment_id?: string | null
+          chat_messages?: Json | null
+          created_at?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          medical_record_id?: string | null
+          patient_id?: string | null
+          psychologist_id?: string
+          room_token?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telehealth_sessions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telehealth_sessions_medical_record_id_fkey"
+            columns: ["medical_record_id"]
+            isOneToOne: false
+            referencedRelation: "medical_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telehealth_sessions_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
