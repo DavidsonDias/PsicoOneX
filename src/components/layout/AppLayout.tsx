@@ -15,6 +15,8 @@ import { WriteBlockedProvider } from "@/components/subscription/WriteBlockedModa
 import { SevenDevXFooter } from "./SevenDevXFooter";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useSyncStatus } from "@/contexts/SyncContext";
+import { SystemStatusBar } from "./SystemStatusBar";
 import { cn } from "@/lib/utils";
 
 // Context to expose canWrite to child components
