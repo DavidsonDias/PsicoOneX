@@ -93,6 +93,7 @@ const App = () => (
               </Suspense>
             </BrowserRouter>
             </PatientProvider>
+            </SyncProvider>
           </SidebarProvider>
         </TooltipProvider>
       </QueryClientProvider>
