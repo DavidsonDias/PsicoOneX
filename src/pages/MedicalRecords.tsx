@@ -485,6 +485,7 @@ const MedicalRecords = () => {
     }
 
     toast.success("Prontuário atualizado com sucesso!");
+    if (editingRecord) clearDraft(DRAFT_KEY_EDIT(editingRecord.id));
     setEditingRecord(null);
     resetForm();
     await loadRecords(userId);
