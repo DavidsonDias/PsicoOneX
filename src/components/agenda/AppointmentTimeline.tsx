@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, User, Video, MapPin, CalendarCheck2 } from "lucide-react";
+import { Clock, User, Video, MapPin, CalendarCheck2, FileText, DollarSign } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 interface Appointment {
   id: string;
@@ -16,6 +16,7 @@ interface Appointment {
   notes: string | null;
   type?: string;
   duration_minutes?: number;
+  session_value?: number;
   google_event_id?: string | null;
   patients: {
     full_name: string;
@@ -28,6 +29,7 @@ interface AppointmentTimelineProps {
   onEdit: (apt: Appointment) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: string) => void;
+  onMarkPaid?: (apt: Appointment) => void;
 }
 
 const timeSlots = Array.from({ length: 18 }, (_, i) => i + 6);
@@ -41,18 +43,19 @@ const STATUS_OPTIONS = [
   { value: "no_show", label: "Não compareceu" },
 ];
 
-export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusChange }: AppointmentTimelineProps) {
-  const getStatusConfig = (status: string) => {
-    const configs: Record<string, { bg: string; text: string; label: string; dot: string }> = {
-      scheduled: { bg: "bg-blue-500/10 border-blue-500/30", text: "text-blue-600", label: "Agendado", dot: "bg-blue-500" },
-      confirmed: { bg: "bg-green-500/10 border-green-500/30", text: "text-green-600", label: "Confirmado", dot: "bg-green-500" },
-      completed: { bg: "bg-purple-500/10 border-purple-500/30", text: "text-purple-600", label: "Realizado", dot: "bg-purple-500" },
-      cancelled: { bg: "bg-destructive/10 border-destructive/30", text: "text-destructive", label: "Cancelado", dot: "bg-destructive" },
-      rescheduled: { bg: "bg-orange-500/10 border-orange-500/30", text: "text-orange-600", label: "Remarcado", dot: "bg-orange-500" },
-      no_show: { bg: "bg-amber-500/10 border-amber-500/30", text: "text-amber-600", label: "Não compareceu", dot: "bg-amber-500" },
-    };
-    return configs[status] || configs.scheduled;
-  };
+const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string; dot: string; border: string }> = {
+  scheduled: { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", label: "Agendado", dot: "bg-blue-500", border: "border-l-blue-500" },
+  confirmed: { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", label: "Confirmado", dot: "bg-green-500", border: "border-l-green-500" },
+  completed: { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", label: "Realizado", dot: "bg-purple-500", border: "border-l-purple-500" },
+  cancelled: { bg: "bg-destructive/10", text: "text-destructive", label: "Cancelado", dot: "bg-destructive", border: "border-l-destructive" },
+  rescheduled: { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", label: "Remarcado", dot: "bg-orange-500", border: "border-l-orange-500" },
+  no_show: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", label: "Não compareceu", dot: "bg-amber-500", border: "border-l-amber-500" },
+};
+
+export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusChange, onMarkPaid }: AppointmentTimelineProps) {
+  const navigate = useNavigate();
+
+  const getStatusConfig = (status: string) => STATUS_CONFIG[status] || STATUS_CONFIG.scheduled;
 
   const getAppointmentForSlot = (hour: number) => {
     return appointments.filter((apt) => {
@@ -90,16 +93,24 @@ export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusCh
                       <div
                         key={apt.id}
                         className={cn(
-                          "p-3 rounded-lg border transition-all hover:shadow-md",
-                          config.bg
+                          "p-3 rounded-lg border border-l-4 transition-all hover:shadow-md group",
+                          config.bg,
+                          config.border
                         )}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <div className={cn("h-2 w-2 rounded-full", config.dot)} />
-                              <User className={cn("h-4 w-4", config.text)} />
-                              <span className="font-semibold truncate">{apt.patients.full_name}</span>
+                              <div className={cn("h-2 w-2 rounded-full shrink-0", config.dot)} />
+                              <button
+                                className="font-semibold truncate hover:underline text-left"
+                                onClick={() => navigate(`/pacientes/${apt.patient_id}`)}
+                              >
+                                {apt.patients.full_name}
+                              </button>
+                              <Badge className={cn("text-[10px] px-1.5 py-0 h-4 border-0", config.bg, config.text)}>
+                                {config.label}
+                              </Badge>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
@@ -108,11 +119,17 @@ export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusCh
                                 {apt.duration_minutes && ` (${apt.duration_minutes}min)`}
                               </span>
                               {apt.type === "online" ? (
-                                <span className="flex items-center gap-1"><Video className="h-3 w-3" />Online</span>
+                                <span className="flex items-center gap-1"><Video className="h-3 w-3 text-blue-500" />Online</span>
                               ) : (
-                                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />Presencial</span>
+                                <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-green-500" />Presencial</span>
                               )}
-                              {(apt as any).google_event_id && (
+                              {apt.session_value && (
+                                <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                                  <DollarSign className="h-3 w-3" />
+                                  R$ {Number(apt.session_value).toFixed(0)}
+                                </span>
+                              )}
+                              {apt.google_event_id && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <span className="flex items-center gap-1 text-primary">
@@ -147,6 +164,18 @@ export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusCh
                               onDelete={() => onDelete(apt.id)}
                               deleteTitle="Excluir Agendamento"
                               deleteDescription="Deseja excluir este agendamento?"
+                              extraActions={[
+                                {
+                                  label: "Abrir Prontuário",
+                                  icon: <FileText className="h-4 w-4" />,
+                                  onClick: () => navigate(`/prontuarios?patient=${apt.patient_id}`),
+                                },
+                                ...(onMarkPaid && apt.status !== "cancelled" ? [{
+                                  label: "Marcar como Pago",
+                                  icon: <DollarSign className="h-4 w-4" />,
+                                  onClick: () => onMarkPaid(apt),
+                                }] : []),
+                              ]}
                             />
                           </div>
                         </div>

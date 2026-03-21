@@ -18,13 +18,20 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 
-interface ActionMenuProps {
+interface ExtraAction {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+}
+
+export interface ActionMenuProps {
   onEdit?: () => void;
   onDelete?: () => void;
   deleteTitle?: string;
   deleteDescription?: string;
   editLabel?: string;
   deleteLabel?: string;
+  extraActions?: ExtraAction[];
 }
 
 export function ActionMenu({
@@ -34,6 +41,7 @@ export function ActionMenu({
   deleteDescription = "Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.",
   editLabel = "Editar",
   deleteLabel = "Excluir",
+  extraActions,
 }: ActionMenuProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -60,6 +68,12 @@ export function ActionMenu({
               {editLabel}
             </DropdownMenuItem>
           )}
+          {extraActions?.map((action, i) => (
+            <DropdownMenuItem key={i} onClick={action.onClick} className="gap-2 cursor-pointer">
+              {action.icon}
+              {action.label}
+            </DropdownMenuItem>
+          ))}
           {onDelete && (
             <DropdownMenuItem 
               onClick={() => setDeleteDialogOpen(true)} 
