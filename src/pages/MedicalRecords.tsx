@@ -1003,8 +1003,33 @@ const MedicalRecords = () => {
             </Select>
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => {
-            if (open) { guardWrite(() => setDialogOpen(true)); }
-            else { setDialogOpen(false); resetForm(); }
+            if (open) {
+              guardWrite(() => {
+                const defaultForm: RecordFormState = {
+                  patient_id: "",
+                  session_date: format(new Date(), "yyyy-MM-dd"),
+                  session_number: 1,
+                  complaints: "",
+                  observations: "",
+                  techniques_used: "",
+                  evolution: "",
+                  next_steps: "",
+                };
+                setNewDraftTempId(`temp-${Date.now()}`);
+                setFormData(defaultForm);
+                setFreeFormNotes("");
+                markSnapshotCommitted(JSON.stringify({ formData: defaultForm, freeFormNotes: "" }));
+                setDialogOpen(true);
+              });
+            } else {
+              if (isDirty) {
+                const leaveAnyway = window.confirm("⚠️ Você possui alterações não salvas.\n\nSair mesmo assim?");
+                if (!leaveAnyway) return;
+              }
+              void triggerAutosaveNew();
+              setDialogOpen(false);
+              resetForm();
+            }
           }}>
             <DialogTrigger asChild>
               <Button className="gap-2">
@@ -1016,10 +1041,26 @@ const MedicalRecords = () => {
               <DialogHeader>
                 <div className="flex items-center justify-between">
                   <DialogTitle>Novo Registro de Sessão</DialogTitle>
-                  <AutosaveIndicator status={autosaveNewStatus} lastSavedAt={newSavedAt} />
+                  <div className="flex flex-col items-end">
+                    <AutosaveIndicator status={autosaveNewStatus} lastSavedAt={newSavedAt || lastLocalDraftSavedAt} />
+                    <span className="text-[11px] text-muted-foreground">
+                      {autosaveNewStatus === "saved"
+                        ? "Salvo localmente"
+                        : autosaveNewStatus === "saving"
+                          ? "Salvando rascunho..."
+                          : autosaveNewStatus === "error"
+                            ? "Erro ao salvar rascunho"
+                            : "Rascunho"}
+                    </span>
+                  </div>
                 </div>
               </DialogHeader>
-              <form onSubmit={handleCreateRecord}>
+              <form
+                onSubmit={handleCreateRecord}
+                onBlurCapture={() => {
+                  void triggerAutosaveNew();
+                }}
+              >
                 <ProntuarioEditor
                   formData={formData}
                   setFormData={setFormData}
@@ -1290,6 +1331,11 @@ const MedicalRecords = () => {
       {/* Edit Dialog */}
       <Dialog open={!!editingRecord} onOpenChange={(open) => { 
         if (!open) { 
+          if (isDirty) {
+            const leaveAnyway = window.confirm("⚠️ Você possui alterações não salvas.\n\nSair mesmo assim?");
+            if (!leaveAnyway) return;
+          }
+          void triggerAutosaveEdit();
           setEditingRecord(null); 
           resetForm(); 
         } 
@@ -1298,10 +1344,26 @@ const MedicalRecords = () => {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Editar Prontuário</DialogTitle>
-              <AutosaveIndicator status={autosaveEditStatus} lastSavedAt={editSavedAt} />
+              <div className="flex flex-col items-end">
+                <AutosaveIndicator status={autosaveEditStatus} lastSavedAt={editSavedAt || lastLocalDraftSavedAt} />
+                <span className="text-[11px] text-muted-foreground">
+                  {autosaveEditStatus === "saved"
+                    ? "Sincronizado com servidor"
+                    : autosaveEditStatus === "saving"
+                      ? "Sincronizando..."
+                      : autosaveEditStatus === "error"
+                        ? "Erro de sincronização"
+                        : "Rascunho"}
+                </span>
+              </div>
             </div>
           </DialogHeader>
-          <form onSubmit={handleEditRecord}>
+          <form
+            onSubmit={handleEditRecord}
+            onBlurCapture={() => {
+              void triggerAutosaveEdit();
+            }}
+          >
             <ProntuarioEditor
               formData={formData}
               setFormData={setFormData}
