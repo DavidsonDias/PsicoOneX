@@ -179,11 +179,11 @@ export default function Configuracoes() {
       }
 
       setExportProgress(30);
-      const results = await Promise.all(fetches);
+      const results = await Promise.all(fetches.map(fn => fn()));
       setExportProgress(60);
 
       const dataMap: Record<string, any[]> = {};
-      fetchKeys.forEach((key, i) => { dataMap[key] = results[i].data || []; });
+      fetchKeys.forEach((key, i) => { dataMap[key] = (results[i] as any).data || []; });
 
       const patients = (dataMap.patients || []).map(p => ({
         nome: p.full_name, email: p.email || "", telefone: p.phone || "",
