@@ -11,9 +11,23 @@ import { toast } from "sonner";
  * Watches for network reconnection and replays queued offline writes.
  * Mount once at the app level.
  */
+export type SyncState = "synced" | "syncing" | "offline" | "error";
+
 export function useOfflineSync() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [syncState, setSyncState] = useState<SyncState>(navigator.onLine ? "synced" : "offline");
+  const [pendingCount, setPendingCount] = useState(0);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const syncingRef = useRef(false);
+
+  const refreshPendingCount = useCallback(async () => {
+    try {
+      const items = await getAllSyncQueue();
+      setPendingCount(items.length);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const processSyncQueue = useCallback(async () => {
     if (syncingRef.current) return;
@@ -21,11 +35,14 @@ export function useOfflineSync() {
 
     try {
       const items = await getAllSyncQueue();
+      setPendingCount(items.length);
       if (items.length === 0) {
+        setSyncState("synced");
         syncingRef.current = false;
         return;
       }
 
+      setSyncState("syncing");
       let successCount = 0;
 
       for (const item of items) {
@@ -35,14 +52,19 @@ export function useOfflineSync() {
           successCount++;
         } catch (err) {
           console.error("[OfflineSync] Failed to replay item:", item, err);
-          // Stop on first failure to preserve order
+          setSyncState("error");
           break;
         }
       }
 
       if (successCount > 0) {
         toast.success(`${successCount} alteração(ões) sincronizada(s)`);
+        setLastSyncedAt(new Date());
       }
+
+      const remaining = await getAllSyncQueue();
+      setPendingCount(remaining.length);
+      if (remaining.length === 0) setSyncState("synced");
     } finally {
       syncingRef.current = false;
     }
@@ -53,21 +75,28 @@ export function useOfflineSync() {
       setIsOnline(true);
       processSyncQueue();
     };
-    const handleOffline = () => setIsOnline(false);
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncState("offline");
+    };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // Try to flush on mount if already online
     if (navigator.onLine) processSyncQueue();
+    else refreshPendingCount();
+
+    // Poll pending count every 10s
+    const interval = setInterval(refreshPendingCount, 10000);
 
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      clearInterval(interval);
     };
-  }, [processSyncQueue]);
+  }, [processSyncQueue, refreshPendingCount]);
 
-  return { isOnline };
+  return { isOnline, syncState, pendingCount, lastSyncedAt };
 }
 
 async function processItem(item: SyncQueueItem) {
