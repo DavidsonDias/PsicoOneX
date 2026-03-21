@@ -834,7 +834,10 @@ const MedicalRecords = () => {
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Novo Registro de Sessão</DialogTitle>
+                <div className="flex items-center justify-between">
+                  <DialogTitle>Novo Registro de Sessão</DialogTitle>
+                  <AutosaveIndicator status={autosaveNewStatus} lastSavedAt={newSavedAt} />
+                </div>
               </DialogHeader>
               <form onSubmit={handleCreateRecord}>
                 <ProntuarioEditor
