@@ -811,7 +811,10 @@ export default function Agenda() {
         </Card>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      {/* Status Legend */}
+      <StatusLegend className="mb-6 p-3 rounded-lg bg-muted/30 border border-border" />
+
+
         <div className="flex flex-wrap items-center gap-3">
           <QuickStats stats={stats} />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
