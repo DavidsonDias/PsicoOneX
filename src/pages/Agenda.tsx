@@ -466,6 +466,23 @@ export default function Agenda() {
     });
   };
 
+  const handleMarkPaid = async (apt: Appointment) => {
+    guardWrite(() => {
+      (async () => {
+        const { error } = await supabase.from("financial_transactions")
+          .update({ status: "paid", paid_date: new Date().toISOString().split("T")[0] })
+          .eq("appointment_id", apt.id)
+          .eq("status", "pending");
+
+        if (error) {
+          toast.error("Erro ao marcar como pago");
+          return;
+        }
+        toast.success(`Pagamento de ${apt.patients.full_name} registrado!`);
+      })();
+    });
+  };
+
   const resetForm = () => {
     setFormData({
       patient_id: "",
