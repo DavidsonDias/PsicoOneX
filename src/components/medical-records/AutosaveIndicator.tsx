@@ -1,12 +1,14 @@
 import { CheckCircle2, Loader2, AlertTriangle, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 interface AutosaveIndicatorProps {
   status: "idle" | "saving" | "saved" | "error";
+  lastSavedAt?: Date | null;
   className?: string;
 }
 
-export function AutosaveIndicator({ status, className }: AutosaveIndicatorProps) {
+export function AutosaveIndicator({ status, lastSavedAt, className }: AutosaveIndicatorProps) {
   return (
     <div className={cn("flex items-center gap-1.5 text-xs transition-opacity", className)}>
       {status === "idle" && (
@@ -24,13 +26,16 @@ export function AutosaveIndicator({ status, className }: AutosaveIndicatorProps)
       {status === "saved" && (
         <>
           <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-          <span className="text-emerald-600 dark:text-emerald-400">Salvo automaticamente</span>
+          <span className="text-emerald-600 dark:text-emerald-400">
+            Salvo automaticamente
+            {lastSavedAt && ` · ${format(lastSavedAt, "HH:mm")}`}
+          </span>
         </>
       )}
       {status === "error" && (
         <>
-          <AlertTriangle className="h-3 w-3 text-red-500" />
-          <span className="text-red-600 dark:text-red-400">Erro ao salvar</span>
+          <AlertTriangle className="h-3 w-3 text-destructive" />
+          <span className="text-destructive">Erro ao salvar</span>
         </>
       )}
     </div>
