@@ -167,6 +167,8 @@ const MedicalRecords = () => {
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [freeFormNotes, setFreeFormNotes] = useState("");
+  const DRAFT_KEY_NEW = "psicoone-draft-new-record";
+  const DRAFT_KEY_EDIT = (id: string) => `psicoone-draft-edit-${id}`;
   const [quickPatientOpen, setQuickPatientOpen] = useState(false);
 
   // New filter states
