@@ -27,6 +27,7 @@ const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const PortalPaciente = lazy(() => import("./pages/PortalPaciente"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Teleatendimento = lazy(() => import("./pages/Teleatendimento"));
+const SalaTeleatendimento = lazy(() => import("./pages/SalaTeleatendimento"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const Documentos = lazy(() => import("./pages/Documentos"));
 const EscalasPsicologicas = lazy(() => import("./pages/EscalasPsicologicas"));

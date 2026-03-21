@@ -1,309 +1,361 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Video, VideoOff, Mic, MicOff, Monitor, MonitorOff, Phone } from "lucide-react";
+import { Video, Clock, Users, Copy, ExternalLink } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useTelehealthWebRTC } from "@/hooks/useTelehealthWebRTC";
+import { useTelehealthChat } from "@/hooks/useTelehealthChat";
+import { VideoPanel } from "@/components/telehealth/VideoPanel";
+import { CallControls } from "@/components/telehealth/CallControls";
+import { ChatPanel } from "@/components/telehealth/ChatPanel";
+import { ConnectionIndicator } from "@/components/telehealth/ConnectionIndicator";
+import { PostSessionSummary } from "@/components/telehealth/PostSessionSummary";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Patient {
   id: string;
   full_name: string;
 }
 
+interface SessionRecord {
+  id: string;
+  room_token: string;
+  patient_id: string;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  created_at: string;
+}
+
+type ViewState = "lobby" | "in-call" | "post-session";
+
 const Teleatendimento = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<string>("");
-  const [roomId, setRoomId] = useState<string>("");
-  const [inCall, setInCall] = useState(false);
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  const [screenSharing, setScreenSharing] = useState(false);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState("");
+  const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [currentSession, setCurrentSession] = useState<SessionRecord | null>(null);
+  const [viewState, setViewState] = useState<ViewState>("lobby");
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [callStartTime, setCallStartTime] = useState<number>(0);
+  const [elapsed, setElapsed] = useState(0);
+
+  const selectedPatientName = patients.find((p) => p.id === selectedPatient)?.full_name || "";
+
+  const chat = useTelehealthChat(
+    currentSession?.room_token || "",
+    "Profissional"
+  );
+
+  const webrtc = useTelehealthWebRTC({
+    roomToken: currentSession?.room_token || "",
+    isHost: true,
+    onRemoteStream: setRemoteStream,
+  });
 
   useEffect(() => {
-    checkAuthAndLoadPatients();
+    loadData();
   }, []);
 
-  const checkAuthAndLoadPatients = async () => {
+  // Elapsed timer
+  useEffect(() => {
+    if (viewState !== "in-call" || !callStartTime) return;
+    const interval = setInterval(() => setElapsed(Math.floor((Date.now() - callStartTime) / 1000)), 1000);
+    return () => clearInterval(interval);
+  }, [viewState, callStartTime]);
+
+  const loadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const { data, error } = await supabase
-      .from("patients")
-      .select("id, full_name")
-      .eq("status", "active")
-      .order("full_name");
+    const [patientsRes, sessionsRes] = await Promise.all([
+      supabase.from("patients").select("id, full_name").eq("status", "active").order("full_name"),
+      supabase.from("telehealth_sessions").select("*").eq("psychologist_id", session.user.id).order("created_at", { ascending: false }).limit(20),
+    ]);
 
-    if (error) {
-      toast.error("Erro ao carregar pacientes");
-      return;
-    }
-    setPatients(data || []);
+    if (patientsRes.data) setPatients(patientsRes.data);
+    if (sessionsRes.data) setSessions(sessionsRes.data as any);
   };
 
-  const generateRoomId = () => {
-    const id = Math.random().toString(36).substring(2, 15);
-    setRoomId(id);
-    return id;
-  };
-
-  const startCall = async () => {
+  const createSession = useCallback(async () => {
     if (!selectedPatient) {
       toast.error("Selecione um paciente");
       return;
     }
 
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { data, error } = await supabase
+      .from("telehealth_sessions")
+      .insert({
+        psychologist_id: session.user.id,
+        patient_id: selectedPatient,
+        status: "waiting",
+      } as any)
+      .select()
+      .single();
+
+    if (error) {
+      toast.error("Erro ao criar sessão");
+      console.error(error);
+      return;
+    }
+
+    setCurrentSession(data as any);
+    return data as any;
+  }, [selectedPatient]);
+
+  const startCall = useCallback(async () => {
+    let sess = currentSession;
+    if (!sess) {
+      sess = await createSession();
+      if (!sess) return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
+      // Update session status
+      await supabase
+        .from("telehealth_sessions")
+        .update({ status: "active", started_at: new Date().toISOString() } as any)
+        .eq("id", sess.id);
 
-      localStreamRef.current = stream;
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
+      await webrtc.connect();
+      setCallStartTime(Date.now());
+      setViewState("in-call");
 
-      const newRoomId = roomId || generateRoomId();
-      setInCall(true);
-
-      const roomLink = `${window.location.origin}/sala/${newRoomId}`;
-      await navigator.clipboard.writeText(roomLink);
+      // Copy link
+      const link = `${window.location.origin}/sala/${sess.room_token}`;
+      await navigator.clipboard.writeText(link);
       toast.success("Link da sala copiado! Envie para o paciente.");
-
-      initializeWebRTC(stream);
-    } catch (error) {
-      console.error("Error starting call:", error);
-      toast.error("Erro ao acessar câmera/microfone");
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao iniciar. Verifique permissões de câmera/microfone.");
     }
-  };
+  }, [currentSession, createSession, webrtc]);
 
-  const initializeWebRTC = (stream: MediaStream) => {
-    const configuration = {
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    };
+  const endCall = useCallback(async () => {
+    webrtc.disconnect();
+    const duration = Math.floor((Date.now() - callStartTime) / 1000);
 
-    const peerConnection = new RTCPeerConnection(configuration);
-    peerConnectionRef.current = peerConnection;
+    if (currentSession) {
+      await supabase
+        .from("telehealth_sessions")
+        .update({
+          status: "ended",
+          ended_at: new Date().toISOString(),
+          duration_seconds: duration,
+          chat_messages: chat.messages,
+        } as any)
+        .eq("id", currentSession.id);
 
-    stream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, stream);
-    });
-
-    peerConnection.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      }
-    };
-
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        console.log("New ICE candidate:", event.candidate);
-      }
-    };
-  };
-
-  const toggleVideo = () => {
-    if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setVideoEnabled(videoTrack.enabled);
-      }
-    }
-  };
-
-  const toggleAudio = () => {
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setAudioEnabled(audioTrack.enabled);
-      }
-    }
-  };
-
-  const toggleScreenShare = async () => {
-    try {
-      if (!screenSharing) {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        const screenTrack = screenStream.getVideoTracks()[0];
-        const sender = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
-        
-        if (sender) {
-          sender.replaceTrack(screenTrack);
-        }
-
-        screenTrack.onended = () => {
-          toggleScreenShare();
-        };
-
-        setScreenSharing(true);
-      } else {
-        const videoTrack = localStreamRef.current?.getVideoTracks()[0];
-        const sender = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
-        
-        if (sender && videoTrack) {
-          sender.replaceTrack(videoTrack);
-        }
-
-        setScreenSharing(false);
-      }
-    } catch (error) {
-      console.error("Error toggling screen share:", error);
-      toast.error("Erro ao compartilhar tela");
-    }
-  };
-
-  const endCall = () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
+      setCurrentSession({ ...currentSession, duration_seconds: duration } as any);
     }
 
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-    }
-
-    setInCall(false);
-    setVideoEnabled(true);
-    setAudioEnabled(true);
-    setScreenSharing(false);
-    setRoomId("");
-    
+    setViewState("post-session");
+    setRemoteStream(null);
     toast.success("Chamada encerrada");
+  }, [webrtc, currentSession, callStartTime, chat.messages]);
+
+  const copyLink = async () => {
+    if (!currentSession) return;
+    const link = `${window.location.origin}/sala/${currentSession.room_token}`;
+    await navigator.clipboard.writeText(link);
+    toast.success("Link copiado!");
   };
 
-  return (
-    <AppLayout title="Teleatendimento" description="Consultas online seguras">
-      {!inCall ? (
-        <Card className="max-w-2xl mx-auto p-8">
-          <h2 className="text-2xl font-bold text-foreground mb-6">Iniciar Consulta Online</h2>
-          
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="patient">Selecione o Paciente</Label>
-              <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Escolha um paciente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {patients.map(patient => (
-                    <SelectItem key={patient.id} value={patient.id}>
-                      {patient.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
-            <div className="space-y-2">
-              <Label htmlFor="roomId">ID da Sala (opcional)</Label>
-              <Input
-                id="roomId"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
-                placeholder="Deixe vazio para gerar automaticamente"
-              />
-              <p className="text-xs text-muted-foreground">
-                Um link único será gerado e copiado automaticamente
-              </p>
-            </div>
+  // POST-SESSION
+  if (viewState === "post-session" && currentSession) {
+    return (
+      <AppLayout title="Teleatendimento" description="Sessão finalizada">
+        <PostSessionSummary
+          sessionId={currentSession.id}
+          patientId={currentSession.patient_id}
+          patientName={selectedPatientName}
+          chatMessages={chat.messages}
+          durationSeconds={currentSession.duration_seconds || elapsed}
+          onSavedToRecord={() => {
+            loadData();
+            setViewState("lobby");
+            setCurrentSession(null);
+          }}
+          onClose={() => {
+            loadData();
+            setViewState("lobby");
+            setCurrentSession(null);
+          }}
+        />
+      </AppLayout>
+    );
+  }
 
-            <Button onClick={startCall} className="w-full gap-2">
-              <Video className="h-5 w-5" />
-              Iniciar Consulta
+  // IN-CALL
+  if (viewState === "in-call") {
+    return (
+      <AppLayout title="Teleatendimento" description="Em consulta">
+        <div className="space-y-3">
+          {/* Call header */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <ConnectionIndicator status={webrtc.connectionStatus} />
+              <Badge variant="outline" className="gap-1">
+                <Clock className="h-3 w-3" />
+                {formatDuration(elapsed)}
+              </Badge>
+              <span className="text-sm font-medium">{selectedPatientName}</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={copyLink} className="gap-1.5">
+              <Copy className="h-3.5 w-3.5" />
+              Copiar link
             </Button>
           </div>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="relative aspect-video bg-muted overflow-hidden">
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-4 left-4 bg-background/80 px-3 py-1 rounded-md">
-                <p className="text-sm font-medium">Paciente</p>
-              </div>
-            </Card>
 
-            <Card className="relative aspect-video bg-muted overflow-hidden">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-4 left-4 bg-background/80 px-3 py-1 rounded-md">
-                <p className="text-sm font-medium">Você</p>
+          {/* Videos + Chat */}
+          <div className="flex gap-3">
+            <div className={`flex-1 space-y-3 ${chat.isOpen ? "" : "w-full"}`}>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <VideoPanel stream={remoteStream} label="Paciente" />
+                <VideoPanel stream={webrtc.localStream} label="Você" muted mirrored />
               </div>
-            </Card>
+              <CallControls
+                videoEnabled={webrtc.videoEnabled}
+                audioEnabled={webrtc.audioEnabled}
+                screenSharing={webrtc.screenSharing}
+                onToggleVideo={webrtc.toggleVideo}
+                onToggleAudio={webrtc.toggleAudio}
+                onToggleScreen={webrtc.toggleScreenShare}
+                onEndCall={endCall}
+                onToggleChat={chat.isOpen ? chat.closeChat : chat.openChat}
+                chatUnread={chat.unreadCount}
+              />
+            </div>
+
+            {chat.isOpen && (
+              <div className="w-80 hidden lg:flex flex-col h-[calc(100vh-16rem)]">
+                <ChatPanel messages={chat.messages} onSend={chat.sendMessage} onClose={chat.closeChat} />
+              </div>
+            )}
           </div>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-center gap-4">
-              <Button
-                variant={audioEnabled ? "default" : "destructive"}
-                size="icon"
-                onClick={toggleAudio}
-                className="h-12 w-12 rounded-full"
-              >
-                {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-              </Button>
-
-              <Button
-                variant={videoEnabled ? "default" : "destructive"}
-                size="icon"
-                onClick={toggleVideo}
-                className="h-12 w-12 rounded-full"
-              >
-                {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-              </Button>
-
-              <Button
-                variant={screenSharing ? "secondary" : "default"}
-                size="icon"
-                onClick={toggleScreenShare}
-                className="h-12 w-12 rounded-full"
-              >
-                {screenSharing ? <MonitorOff className="h-5 w-5" /> : <Monitor className="h-5 w-5" />}
-              </Button>
-
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={endCall}
-                className="h-12 w-12 rounded-full"
-              >
-                <Phone className="h-5 w-5" />
-              </Button>
-            </div>
-          </Card>
-
-          {roomId && (
-            <Card className="p-4 bg-primary/5">
-              <p className="text-sm text-center">
-                <strong>Link da Sala:</strong> {window.location.origin}/sala/{roomId}
-              </p>
-              <p className="text-xs text-center text-muted-foreground mt-1">
-                Link copiado para área de transferência
-              </p>
+          {/* Room link */}
+          {currentSession && (
+            <Card className="p-3 bg-primary/5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm truncate flex-1">
+                  <strong>Link:</strong> {window.location.origin}/sala/{currentSession.room_token}
+                </p>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={copyLink}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
             </Card>
           )}
         </div>
-      )}
+      </AppLayout>
+    );
+  }
+
+  // LOBBY
+  return (
+    <AppLayout title="Teleatendimento" description="Consultas online seguras">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Start new session */}
+        <Card className="p-6 space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Video className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Iniciar Consulta Online</h2>
+              <p className="text-sm text-muted-foreground">Selecione o paciente e inicie a videochamada</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Paciente</Label>
+            <Select value={selectedPatient} onValueChange={setSelectedPatient}>
+              <SelectTrigger>
+                <SelectValue placeholder="Escolha um paciente" />
+              </SelectTrigger>
+              <SelectContent>
+                {patients.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button onClick={startCall} className="w-full gap-2" size="lg">
+            <Video className="h-5 w-5" />
+            Iniciar Consulta
+          </Button>
+
+          <p className="text-xs text-muted-foreground text-center">
+            Um link seguro será gerado e copiado automaticamente para enviar ao paciente
+          </p>
+        </Card>
+
+        {/* Recent sessions */}
+        {sessions.length > 0 && (
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-muted-foreground" />
+              <h3 className="font-semibold">Sessões recentes</h3>
+            </div>
+
+            <div className="space-y-2">
+              {sessions.slice(0, 10).map((s) => (
+                <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Badge
+                      variant={s.status === "ended" ? "secondary" : s.status === "active" ? "default" : "outline"}
+                      className="text-xs"
+                    >
+                      {s.status === "ended" ? "Finalizada" : s.status === "active" ? "Ativa" : "Aguardando"}
+                    </Badge>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {patients.find((p) => p.id === s.patient_id)?.full_name || "Paciente"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(s.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        {s.duration_seconds ? ` · ${Math.round(s.duration_seconds / 60)} min` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  {s.status === "waiting" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const link = `${window.location.origin}/sala/${s.room_token}`;
+                        navigator.clipboard.writeText(link);
+                        toast.success("Link copiado!");
+                      }}
+                      className="gap-1"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Link
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
     </AppLayout>
   );
 };
