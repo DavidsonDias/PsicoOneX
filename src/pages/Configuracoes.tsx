@@ -158,23 +158,23 @@ export default function Configuracoes() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
 
-      const fetches: Promise<any>[] = [];
+      const fetches: (() => PromiseLike<any>)[] = [];
       const fetchKeys: string[] = [];
 
       if (exportModules.patients) {
-        fetches.push(supabase.from("patients").select("*").is("deleted_at", null).then(r => r));
+        fetches.push(() => supabase.from("patients").select("*").is("deleted_at", null));
         fetchKeys.push("patients");
       }
       if (exportModules.appointments) {
-        fetches.push(supabase.from("appointments").select("*, patients(full_name)").is("deleted_at", null).then(r => r));
+        fetches.push(() => supabase.from("appointments").select("*, patients(full_name)").is("deleted_at", null));
         fetchKeys.push("appointments");
       }
       if (exportModules.financial) {
-        fetches.push(supabase.from("financial_transactions").select("*, patients(full_name)").is("deleted_at", null).then(r => r));
+        fetches.push(() => supabase.from("financial_transactions").select("*, patients(full_name)").is("deleted_at", null));
         fetchKeys.push("financial");
       }
       if (exportModules.records) {
-        fetches.push(supabase.from("medical_records").select("*, patients(full_name)").is("deleted_at", null).then(r => r));
+        fetches.push(() => supabase.from("medical_records").select("*, patients(full_name)").is("deleted_at", null));
         fetchKeys.push("records");
       }
 
