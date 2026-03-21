@@ -25,6 +25,7 @@ import { QuickStats } from "@/components/agenda/QuickStats";
 import { DayOverview } from "@/components/agenda/DayOverview";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { StatsOverview } from "@/components/ui/stats-overview";
+import { StatusLegend } from "@/components/agenda/StatusLegend";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
