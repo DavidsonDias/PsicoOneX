@@ -68,6 +68,12 @@ export function ActionMenu({
               {editLabel}
             </DropdownMenuItem>
           )}
+          {extraActions?.map((action, i) => (
+            <DropdownMenuItem key={i} onClick={action.onClick} className="gap-2 cursor-pointer">
+              {action.icon}
+              {action.label}
+            </DropdownMenuItem>
+          ))}
           {onDelete && (
             <DropdownMenuItem 
               onClick={() => setDeleteDialogOpen(true)} 
