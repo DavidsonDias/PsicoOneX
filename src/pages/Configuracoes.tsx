@@ -283,6 +283,183 @@ export default function Configuracoes() {
     }
   }, [exportPassword, exportFormat, exportModules, selectedModuleCount]);
 
+  // ── IMPORT / RESTORE ──
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".json")) {
+      toast.error("Apenas arquivos .json exportados pelo PsicoOne são suportados");
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+
+      // Detect modules present
+      const detected: Record<string, any[]> = {};
+      if (Array.isArray(parsed.pacientes)) detected.patients = parsed.pacientes;
+      if (Array.isArray(parsed.prontuarios)) detected.records = parsed.prontuarios;
+      if (Array.isArray(parsed.agendamentos)) detected.appointments = parsed.agendamentos;
+      if (Array.isArray(parsed.financeiro)) detected.financial = parsed.financeiro;
+
+      if (Object.keys(detected).length === 0) {
+        toast.error("Nenhum dado reconhecido no arquivo. Use um backup gerado pelo PsicoOne.");
+        return;
+      }
+
+      setImportFile(file);
+      setImportData(detected);
+      setImportModules({
+        patients: !!detected.patients,
+        records: !!detected.records,
+        appointments: !!detected.appointments,
+        financial: !!detected.financial,
+      });
+      toast.success("Arquivo lido com sucesso! Revise os dados abaixo.");
+    } catch {
+      toast.error("Erro ao ler o arquivo. Verifique se é um JSON válido.");
+    }
+  }, []);
+
+  const handleImportRestore = useCallback(async () => {
+    if (!importData) return;
+    setImporting(true);
+    setImportDialogOpen(false);
+    setImportProgress(10);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+
+      let totalInserted = 0;
+      const steps = Object.entries(importModules).filter(([, v]) => v);
+      const stepSize = 80 / Math.max(steps.length, 1);
+
+      for (let i = 0; i < steps.length; i++) {
+        const [moduleKey] = steps[i];
+        const rows = importData[moduleKey];
+        if (!rows || rows.length === 0) continue;
+
+        setImportProgress(10 + Math.round(stepSize * i));
+
+        if (moduleKey === "patients" && importModules.patients) {
+          for (const p of rows) {
+            if (importStrategy === "skip") {
+              // Check if patient already exists by name
+              const { data: existing } = await supabase.from("patients")
+                .select("id").eq("full_name", p.nome).eq("psychologist_id", user.id).is("deleted_at", null).limit(1);
+              if (existing && existing.length > 0) continue;
+            }
+            await supabase.from("patients").insert({
+              psychologist_id: user.id,
+              full_name: p.nome || "Sem nome",
+              email: p.email || null,
+              phone: p.telefone || null,
+              cpf: p.cpf || null,
+              birth_date: p.nascimento || null,
+              status: p.status || "active",
+              address: p.endereco || null,
+              notes: p.observacoes || null,
+              default_session_value: p.valor_sessao || null,
+              payment_day: p.dia_pagamento || null,
+              monthly_plan_value: p.plano_mensal || null,
+            } as any);
+            totalInserted++;
+          }
+        }
+
+        if (moduleKey === "records" && importModules.records) {
+          for (const r of rows) {
+            // Find patient by name
+            const { data: pat } = await supabase.from("patients")
+              .select("id").eq("full_name", r.paciente).eq("psychologist_id", user.id).is("deleted_at", null).limit(1);
+            if (!pat || pat.length === 0) continue;
+
+            await supabase.from("medical_records").insert({
+              psychologist_id: user.id,
+              patient_id: pat[0].id,
+              session_date: r.data_sessao || new Date().toISOString().split("T")[0],
+              session_number: r.numero_sessao || null,
+              complaints: r.queixas || null,
+              evolution: r.evolucao || null,
+              techniques_used: r.tecnicas || null,
+              next_steps: r.proximos_passos || null,
+              observations: r.observacoes || null,
+            } as any);
+            totalInserted++;
+          }
+        }
+
+        if (moduleKey === "appointments" && importModules.appointments) {
+          for (const a of rows) {
+            const { data: pat } = await supabase.from("patients")
+              .select("id").eq("full_name", a.paciente).eq("psychologist_id", user.id).is("deleted_at", null).limit(1);
+            if (!pat || pat.length === 0) continue;
+
+            await supabase.from("appointments").insert({
+              psychologist_id: user.id,
+              patient_id: pat[0].id,
+              scheduled_at: a.data && a.horario ? `${a.data}T${a.horario}:00` : new Date().toISOString(),
+              status: a.status || "scheduled",
+              type: a.tipo || "presential",
+              session_value: a.valor || 200,
+              notes: a.observacoes || null,
+            } as any);
+            totalInserted++;
+          }
+        }
+
+        if (moduleKey === "financial" && importModules.financial) {
+          for (const t of rows) {
+            const { data: pat } = await supabase.from("patients")
+              .select("id").eq("full_name", t.paciente).eq("psychologist_id", user.id).is("deleted_at", null).limit(1);
+            if (!pat || pat.length === 0) continue;
+
+            await supabase.from("financial_transactions").insert({
+              psychologist_id: user.id,
+              patient_id: pat[0].id,
+              type: t.tipo === "Receita" ? "income" : "expense",
+              amount: t.valor || 0,
+              description: t.descricao || null,
+              status: t.status || "pending",
+              category: t.categoria || null,
+              due_date: t.vencimento || null,
+              paid_date: t.pagamento || null,
+              payment_method: t.metodo || null,
+            } as any);
+            totalInserted++;
+          }
+        }
+      }
+
+      setImportProgress(95);
+
+      await supabase.from("audit_logs").insert({
+        user_id: user.id,
+        action_type: "data_import",
+        entity_type: "system",
+        new_data: {
+          file_name: importFile?.name,
+          strategy: importStrategy,
+          modules: Object.entries(importModules).filter(([, v]) => v).map(([k]) => k),
+          total_inserted: totalInserted,
+        },
+      } as any);
+
+      setImportProgress(100);
+      toast.success(`${totalInserted} registro(s) importado(s) com sucesso!`);
+      setImportFile(null);
+      setImportData(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao importar dados. Verifique o console.");
+    } finally {
+      setTimeout(() => { setImporting(false); setImportProgress(0); }, 1000);
+    }
+  }, [importData, importModules, importStrategy, importFile]);
+
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
   };
