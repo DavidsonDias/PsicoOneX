@@ -208,13 +208,13 @@ const MedicalRecords = () => {
     }
   }, [formData.patient_id, calculateNextSessionNumber, editingRecord]);
 
-  // Autosave for edit mode — saves to DB every 3s when editing an existing record
-  const autosaveData = useMemo(() => {
+  // ── Autosave: EDIT mode (saves to DB) ──
+  const autosaveEditData = useMemo(() => {
     if (!editingRecord) return null;
     return { formData, freeFormNotes, recordId: editingRecord.id };
   }, [formData, freeFormNotes, editingRecord]);
 
-  const handleAutosave = useCallback(async (data: any, signal: AbortSignal) => {
+  const handleAutosaveEdit = useCallback(async (data: any, signal: AbortSignal) => {
     if (!data?.recordId) return;
     const combinedObservations = data.freeFormNotes
       ? (data.formData.observations ? `${data.formData.observations}\n\n--- Anotações Livres ---\n${data.freeFormNotes}` : data.freeFormNotes)
@@ -238,12 +238,47 @@ const MedicalRecords = () => {
     if (error) throw error;
   }, []);
 
-  const { status: autosaveStatus } = useAutosave({
-    data: autosaveData,
-    onSave: handleAutosave,
+  const { status: autosaveEditStatus, lastSavedAt: editSavedAt } = useAutosave({
+    data: autosaveEditData,
+    onSave: handleAutosaveEdit,
     interval: 3000,
     enabled: !!editingRecord,
+    localStorageKey: editingRecord ? DRAFT_KEY_EDIT(editingRecord.id) : undefined,
   });
+
+  // ── Autosave: NEW mode (saves to localStorage only) ──
+  const autosaveNewData = useMemo(() => {
+    if (editingRecord || !dialogOpen) return null;
+    return { formData, freeFormNotes };
+  }, [formData, freeFormNotes, editingRecord, dialogOpen]);
+
+  const handleAutosaveNew = useCallback(async (_data: any, _signal: AbortSignal) => {
+    // For new records we only persist via localStorageKey – no DB call
+    return;
+  }, []);
+
+  const { status: autosaveNewStatus, lastSavedAt: newSavedAt } = useAutosave({
+    data: autosaveNewData,
+    onSave: handleAutosaveNew,
+    interval: 3000,
+    enabled: dialogOpen && !editingRecord,
+    localStorageKey: DRAFT_KEY_NEW,
+  });
+
+  // Recover draft when opening new record dialog
+  useEffect(() => {
+    if (dialogOpen && !editingRecord) {
+      const draft = recoverDraft<{ formData: typeof formData; freeFormNotes: string }>(DRAFT_KEY_NEW);
+      if (draft?.formData?.patient_id || draft?.freeFormNotes) {
+        setFormData(prev => ({ ...prev, ...draft.formData }));
+        setFreeFormNotes(draft.freeFormNotes || "");
+        toast.info("Rascunho recuperado automaticamente");
+      }
+    }
+  }, [dialogOpen, editingRecord]);
+
+  const autosaveStatus = editingRecord ? autosaveEditStatus : autosaveNewStatus;
+  const lastSavedAt = editingRecord ? editSavedAt : newSavedAt;
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
