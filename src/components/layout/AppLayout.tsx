@@ -174,6 +174,14 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
         )}
       >
         <div className="container mx-auto px-4 sm:px-6 py-6 lg:py-8 max-w-7xl">
+          {/* System Status Bar */}
+          <SystemStatusBar
+            isOnline={isOnline}
+            syncStatus={syncState}
+            pendingCount={pendingCount}
+            lastSyncedAt={lastSyncedAt}
+          />
+
           {/* Subscription Banner */}
           <SubscriptionBanner />
 
