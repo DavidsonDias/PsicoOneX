@@ -1008,9 +1008,6 @@ export default function Agenda() {
                       </div>
                     </motion.div>
                   );
-                })}
-                  </motion.div>
-                ))}
               </div>
             )}
           </CardContent>
