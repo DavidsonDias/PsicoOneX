@@ -818,6 +818,164 @@ export default function Configuracoes() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* ── IMPORT / RESTORE CARD ── */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-secondary/10">
+                    <Upload className="h-6 w-6 text-secondary-foreground" />
+                  </div>
+                  <div>
+                    <CardTitle>Importar / Restaurar Backup</CardTitle>
+                    <CardDescription>Restaure dados a partir de um arquivo JSON exportado pelo PsicoOne</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* File upload */}
+                <div>
+                  <Label className="text-base font-semibold mb-3 block">Selecionar arquivo</Label>
+                  <label className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-dashed border-border hover:border-primary/40 cursor-pointer transition-colors bg-muted/20">
+                    <Upload className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-center">
+                      <p className="text-sm font-medium">
+                        {importFile ? importFile.name : "Clique para selecionar um arquivo .json"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Apenas arquivos JSON exportados pelo PsicoOne
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileSelect}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+
+                {/* Detected data summary */}
+                {importData && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      <p className="text-sm font-medium">
+                        Backup reconhecido — selecione o que deseja restaurar
+                      </p>
+                    </div>
+
+                    {/* Module selection with counts */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {([
+                        { key: "patients" as const, label: "Pacientes", icon: "👤" },
+                        { key: "records" as const, label: "Prontuários", icon: "📋" },
+                        { key: "appointments" as const, label: "Agendamentos", icon: "📅" },
+                        { key: "financial" as const, label: "Financeiro", icon: "💰" },
+                      ] as const).map(({ key, label, icon }) => {
+                        const rows = importData[key];
+                        if (!rows) return null;
+                        return (
+                          <label
+                            key={key}
+                            className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                              importModules[key]
+                                ? "border-primary bg-primary/5 shadow-sm"
+                                : "border-border hover:border-primary/30"
+                            }`}
+                          >
+                            <Checkbox
+                              checked={importModules[key]}
+                              onCheckedChange={(checked) =>
+                                setImportModules(prev => ({ ...prev, [key]: !!checked }))
+                              }
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span>{icon}</span>
+                                <span className="font-medium text-sm">{label}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {rows.length} registro{rows.length !== 1 ? "s" : ""} encontrado{rows.length !== 1 ? "s" : ""}
+                              </p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {/* Strategy */}
+                    <div>
+                      <Label className="text-base font-semibold mb-3 block">Estratégia de importação</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label
+                          className={`flex flex-col gap-1 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                            importStrategy === "skip"
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-border hover:border-primary/30"
+                          }`}
+                        >
+                          <input type="radio" name="importStrategy" value="skip" checked={importStrategy === "skip"} onChange={() => setImportStrategy("skip")} className="sr-only" />
+                          <span className="font-medium text-sm">Ignorar duplicados</span>
+                          <span className="text-xs text-muted-foreground">Pula registros que já existem (mais seguro)</span>
+                        </label>
+                        <label
+                          className={`flex flex-col gap-1 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                            importStrategy === "replace"
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-border hover:border-primary/30"
+                          }`}
+                        >
+                          <input type="radio" name="importStrategy" value="replace" checked={importStrategy === "replace"} onChange={() => setImportStrategy("replace")} className="sr-only" />
+                          <span className="font-medium text-sm">Importar tudo</span>
+                          <span className="text-xs text-muted-foreground">Insere todos os registros (pode duplicar)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Warning */}
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                      <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                      <p className="text-sm text-destructive">
+                        A importação é irreversível. Certifique-se de que o arquivo é confiável antes de continuar.
+                      </p>
+                    </div>
+
+                    {/* Import progress */}
+                    {importing && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Importando dados...</span>
+                          <span className="font-medium">{importProgress}%</span>
+                        </div>
+                        <Progress value={importProgress} className="h-2" />
+                      </div>
+                    )}
+
+                    {/* Action */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button
+                        className="gap-2 flex-1"
+                        onClick={() => setImportDialogOpen(true)}
+                        disabled={importing || !Object.values(importModules).some(Boolean)}
+                      >
+                        {importing
+                          ? <><Loader2 className="h-4 w-4 animate-spin" /> Importando...</>
+                          : <><RotateCcw className="h-4 w-4" /> Restaurar Dados</>
+                        }
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setImportFile(null); setImportData(null); }}
+                        disabled={importing}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
