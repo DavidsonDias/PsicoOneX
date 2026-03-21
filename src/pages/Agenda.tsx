@@ -3,6 +3,7 @@ import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
