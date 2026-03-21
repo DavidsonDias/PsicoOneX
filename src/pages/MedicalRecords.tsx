@@ -598,8 +598,13 @@ const MedicalRecords = () => {
     }
 
     toast.success("Prontuário criado com sucesso!");
-    clearDraft(DRAFT_KEY_NEW);
+    if (lastNewDraftKeyRef.current) {
+      removeDraftLocally(lastNewDraftKeyRef.current);
+      lastNewDraftKeyRef.current = null;
+    }
+    localStorage.removeItem(NEW_DRAFT_POINTER_KEY);
     setDialogOpen(false);
+    setNewDraftTempId(`temp-${Date.now()}`);
     resetForm();
     await loadRecords(userId);
   };
@@ -639,7 +644,7 @@ const MedicalRecords = () => {
     }
 
     toast.success("Prontuário atualizado com sucesso!");
-    if (editingRecord) clearDraft(DRAFT_KEY_EDIT(editingRecord.id));
+    if (editingRecord) removeDraftLocally(`draft:prontuario:${editingRecord.id}`);
     setEditingRecord(null);
     resetForm();
     await loadRecords(userId);
@@ -695,9 +700,8 @@ const MedicalRecords = () => {
 
       setDialogOpen(false);
       setViewDialogOpen(false);
-      
-      setEditingRecord(record);
-      setFormData({
+
+      const baseFormData: RecordFormState = {
         patient_id: record.patient_id,
         session_date: record.session_date,
         session_number: record.session_number || 1,
@@ -706,9 +710,30 @@ const MedicalRecords = () => {
         techniques_used: record.techniques_used || "",
         evolution: record.evolution || "",
         next_steps: record.next_steps || ""
-      });
-      setFreeFormNotes(freeNotes);
+      };
+
+      const editKey = `draft:prontuario:${record.id}`;
+      const localDraft = readDraftLocally(editKey);
+      const localDraftTs = localDraft?.updatedAt ? new Date(localDraft.updatedAt).getTime() : 0;
+      const dbTs = record.updated_at ? new Date(record.updated_at).getTime() : 0;
+      const localIsNewer = !!localDraft && localDraftTs > dbTs;
+
+      const shouldRecoverLocal = localIsNewer
+        ? window.confirm("📝 Rascunho local mais recente encontrado\n\nDeseja recuperar o conteúdo não sincronizado?")
+        : false;
+
+      const effectiveFormData = shouldRecoverLocal && localDraft ? localDraft.formData : baseFormData;
+      const effectiveNotes = shouldRecoverLocal && localDraft ? localDraft.freeFormNotes || "" : freeNotes;
+
+      if (!shouldRecoverLocal && localIsNewer) {
+        removeDraftLocally(editKey);
+      }
+
+      setEditingRecord(record);
+      setFormData(effectiveFormData);
+      setFreeFormNotes(effectiveNotes);
       setPendingFiles([]);
+      markSnapshotCommitted(JSON.stringify({ formData: effectiveFormData, freeFormNotes: effectiveNotes }));
     });
   };
 
@@ -725,6 +750,7 @@ const MedicalRecords = () => {
     });
     setFreeFormNotes("");
     setPendingFiles([]);
+    setLastCommittedSnapshot("");
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
