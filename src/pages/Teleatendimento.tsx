@@ -15,6 +15,7 @@ import { CallControls } from "@/components/telehealth/CallControls";
 import { ChatPanel } from "@/components/telehealth/ChatPanel";
 import { ConnectionIndicator } from "@/components/telehealth/ConnectionIndicator";
 import { PostSessionSummary } from "@/components/telehealth/PostSessionSummary";
+import { PreCallCheck } from "@/components/telehealth/PreCallCheck";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -34,7 +35,7 @@ interface SessionRecord {
   created_at: string;
 }
 
-type ViewState = "lobby" | "in-call" | "post-session";
+type ViewState = "lobby" | "pre-call" | "in-call" | "post-session";
 
 const Teleatendimento = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -63,7 +64,6 @@ const Teleatendimento = () => {
     loadData();
   }, []);
 
-  // Elapsed timer
   useEffect(() => {
     if (viewState !== "in-call" || !callStartTime) return;
     const interval = setInterval(() => setElapsed(Math.floor((Date.now() - callStartTime) / 1000)), 1000);
@@ -112,33 +112,43 @@ const Teleatendimento = () => {
     return data as any;
   }, [selectedPatient]);
 
-  const startCall = useCallback(async () => {
+  const handleStartPreCall = useCallback(async () => {
+    if (!selectedPatient) {
+      toast.error("Selecione um paciente");
+      return;
+    }
+
     let sess = currentSession;
     if (!sess) {
       sess = await createSession();
       if (!sess) return;
     }
 
+    setViewState("pre-call");
+  }, [selectedPatient, currentSession, createSession]);
+
+  const handlePreCallReady = useCallback(async () => {
+    if (!currentSession) return;
+
     try {
-      // Update session status
       await supabase
         .from("telehealth_sessions")
         .update({ status: "active", started_at: new Date().toISOString() } as any)
-        .eq("id", sess.id);
+        .eq("id", currentSession.id);
 
       await webrtc.connect();
       setCallStartTime(Date.now());
       setViewState("in-call");
 
-      // Copy link
-      const link = `${window.location.origin}/sala/${sess.room_token}`;
+      const link = `${window.location.origin}/sala/${currentSession.room_token}`;
       await navigator.clipboard.writeText(link);
       toast.success("Link da sala copiado! Envie para o paciente.");
     } catch (e) {
       console.error(e);
-      toast.error("Erro ao iniciar. Verifique permissões de câmera/microfone.");
+      toast.error("Erro ao iniciar chamada. Verifique permissões de câmera/microfone.");
+      setViewState("lobby");
     }
-  }, [currentSession, createSession, webrtc]);
+  }, [currentSession, webrtc]);
 
   const endCall = useCallback(async () => {
     webrtc.disconnect();
@@ -201,12 +211,26 @@ const Teleatendimento = () => {
     );
   }
 
+  // PRE-CALL CHECK
+  if (viewState === "pre-call") {
+    return (
+      <AppLayout title="Teleatendimento" description="Verificação de mídia">
+        <div className="flex items-center justify-center py-8">
+          <PreCallCheck
+            label={`Consulta com ${selectedPatientName}`}
+            onReady={handlePreCallReady}
+            onCancel={() => setViewState("lobby")}
+          />
+        </div>
+      </AppLayout>
+    );
+  }
+
   // IN-CALL
   if (viewState === "in-call") {
     return (
       <AppLayout title="Teleatendimento" description="Em consulta">
         <div className="space-y-3">
-          {/* Call header */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <ConnectionIndicator status={webrtc.connectionStatus} />
@@ -222,7 +246,6 @@ const Teleatendimento = () => {
             </Button>
           </div>
 
-          {/* Videos + Chat */}
           <div className="flex gap-3">
             <div className={`flex-1 space-y-3 ${chat.isOpen ? "" : "w-full"}`}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -249,7 +272,6 @@ const Teleatendimento = () => {
             )}
           </div>
 
-          {/* Room link */}
           {currentSession && (
             <Card className="p-3 bg-primary/5">
               <div className="flex items-center justify-between">
@@ -271,7 +293,6 @@ const Teleatendimento = () => {
   return (
     <AppLayout title="Teleatendimento" description="Consultas online seguras">
       <div className="max-w-3xl mx-auto space-y-6">
-        {/* Start new session */}
         <Card className="p-6 space-y-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -297,7 +318,7 @@ const Teleatendimento = () => {
             </Select>
           </div>
 
-          <Button onClick={startCall} className="w-full gap-2" size="lg">
+          <Button onClick={handleStartPreCall} className="w-full gap-2" size="lg">
             <Video className="h-5 w-5" />
             Iniciar Consulta
           </Button>
@@ -307,7 +328,6 @@ const Teleatendimento = () => {
           </p>
         </Card>
 
-        {/* Recent sessions */}
         {sessions.length > 0 && (
           <Card className="p-6">
             <div className="flex items-center gap-2 mb-4">

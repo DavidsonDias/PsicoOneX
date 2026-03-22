@@ -7,19 +7,22 @@ import { VideoPanel } from "@/components/telehealth/VideoPanel";
 import { CallControls } from "@/components/telehealth/CallControls";
 import { ChatPanel } from "@/components/telehealth/ChatPanel";
 import { ConnectionIndicator } from "@/components/telehealth/ConnectionIndicator";
+import { PreCallCheck } from "@/components/telehealth/PreCallCheck";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Video, ShieldCheck } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Video, ShieldCheck, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+
+type RoomState = "loading" | "error" | "name-entry" | "pre-call" | "in-call";
 
 const SalaTeleatendimento = () => {
   const { token } = useParams<{ token: string }>();
   const [patientName, setPatientName] = useState("");
   const [sessionInfo, setSessionInfo] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [joined, setJoined] = useState(false);
+  const [roomState, setRoomState] = useState<RoomState>("loading");
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,54 +40,62 @@ const SalaTeleatendimento = () => {
   }, [token]);
 
   const loadSession = async () => {
-    setLoading(true);
+    setRoomState("loading");
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchError } = await supabase
         .from("telehealth_sessions")
         .select("*")
         .eq("room_token", token)
         .single();
 
-      if (error || !data) {
+      if (fetchError || !data) {
         setError("Sala não encontrada ou link expirado.");
+        setRoomState("error");
         return;
       }
 
       if (data.status === "ended") {
         setError("Esta sessão já foi encerrada.");
+        setRoomState("error");
         return;
       }
 
       setSessionInfo(data);
+      setRoomState("name-entry");
     } catch {
       setError("Erro ao carregar sala.");
-    } finally {
-      setLoading(false);
+      setRoomState("error");
     }
   };
 
-  const joinRoom = useCallback(async () => {
+  const goToPreCall = useCallback(() => {
     if (!patientName.trim()) {
       toast.error("Digite seu nome para entrar");
       return;
     }
+    setRoomState("pre-call");
+  }, [patientName]);
+
+  const joinRoom = useCallback(async () => {
     try {
       await webrtc.connect();
-      setJoined(true);
+      setRoomState("in-call");
       toast.success("Conectado à sessão!");
     } catch (e) {
       console.error(e);
       toast.error("Erro ao conectar. Verifique permissões de câmera/microfone.");
+      setRoomState("name-entry");
     }
-  }, [patientName, webrtc]);
+  }, [webrtc]);
 
   const leaveRoom = useCallback(() => {
     webrtc.disconnect();
-    setJoined(false);
+    setRoomState("name-entry");
+    setRemoteStream(null);
     toast.info("Você saiu da sessão");
   }, [webrtc]);
 
-  if (loading) {
+  if (roomState === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -92,7 +103,7 @@ const SalaTeleatendimento = () => {
     );
   }
 
-  if (error) {
+  if (roomState === "error") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="p-8 text-center max-w-md">
@@ -104,7 +115,7 @@ const SalaTeleatendimento = () => {
     );
   }
 
-  if (!joined) {
+  if (roomState === "name-entry") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="p-8 max-w-md w-full space-y-6">
@@ -122,13 +133,13 @@ const SalaTeleatendimento = () => {
               value={patientName}
               onChange={(e) => setPatientName(e.target.value)}
               placeholder="Digite seu nome completo"
-              onKeyDown={(e) => e.key === "Enter" && joinRoom()}
+              onKeyDown={(e) => e.key === "Enter" && goToPreCall()}
             />
           </div>
 
-          <Button onClick={joinRoom} className="w-full gap-2" size="lg">
+          <Button onClick={goToPreCall} className="w-full gap-2" size="lg">
             <Video className="h-5 w-5" />
-            Entrar na consulta
+            Continuar
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
@@ -139,9 +150,21 @@ const SalaTeleatendimento = () => {
     );
   }
 
+  if (roomState === "pre-call") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <PreCallCheck
+          label={`Entrando como ${patientName}`}
+          onReady={joinRoom}
+          onCancel={() => setRoomState("name-entry")}
+        />
+      </div>
+    );
+  }
+
+  // IN-CALL
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between p-3 border-b">
         <div className="flex items-center gap-3">
           <h1 className="font-semibold text-sm">PsicoOne · Teleatendimento</h1>
@@ -149,7 +172,13 @@ const SalaTeleatendimento = () => {
         </div>
       </div>
 
-      {/* Video area */}
+      {webrtc.mediaError && (
+        <Alert variant="destructive" className="mx-3 mt-3">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{webrtc.mediaError}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex-1 p-3 flex gap-3 min-h-0">
         <div className={`flex-1 flex flex-col gap-3 ${chat.isOpen ? "lg:w-2/3" : "w-full"}`}>
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3">
