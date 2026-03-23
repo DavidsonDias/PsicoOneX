@@ -45,6 +45,13 @@ const approachPrompts: Record<string, string> = {
   neutral: `Mantenha uma perspectiva clínica geral e integrada, sem favorecer uma abordagem específica.`,
 };
 
+const refineInstructions: Record<string, string> = {
+  technical: "Reescreva o texto abaixo usando linguagem técnica e acadêmica, mantendo precisão clínica e terminologia profissional da psicologia.",
+  simplify: "Reescreva o texto abaixo usando linguagem simples e acessível, sem perder o conteúdo clínico essencial. Evite jargões.",
+  empathetic: "Reescreva o texto abaixo com tom mais empático e humanizado, mantendo o conteúdo clínico mas adicionando sensibilidade na linguagem.",
+  approach: "Reescreva o texto abaixo adaptando completamente ao estilo e vocabulário da abordagem clínica indicada.",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -52,15 +59,36 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { patientName, duration, chatMessages, clinicalApproach, outputType } = await req.json();
+    const {
+      patientName, duration, chatMessages, clinicalApproach,
+      outputType, refineAction, patientHistory,
+    } = await req.json();
 
     const approach = approachPrompts[clinicalApproach] || approachPrompts.neutral;
-    const type = outputType || "summary"; // summary | structured | transcript_summary
+    const type = outputType || "summary";
 
-    let instruction = "";
+    let prompt = "";
 
-    if (type === "structured") {
-      instruction = `Gere um prontuário clínico estruturado com os seguintes campos:
+    if (type === "refine" && refineAction) {
+      const instruction = refineInstructions[refineAction] || refineInstructions.technical;
+      prompt = `${instruction}
+
+${approach}
+
+Texto original:
+${chatMessages}
+
+REGRAS:
+- NÃO invente informações
+- NÃO faça diagnósticos
+- Mantenha o conteúdo original, apenas ajuste o estilo
+- Responda em português brasileiro
+- Retorne APENAS o texto reescrito, sem explicações`;
+    } else {
+      let instruction = "";
+
+      if (type === "structured") {
+        instruction = `Gere um prontuário clínico estruturado com os seguintes campos:
 
 ## Queixa Principal
 (Motivo da consulta / demanda apresentada)
@@ -79,23 +107,28 @@ serve(async (req) => {
 
 ## Plano Terapêutico
 (Próximos passos e encaminhamentos)`;
-    } else {
-      instruction = `Gere um resumo clínico profissional da sessão, incluindo:
+      } else {
+        instruction = `Gere um resumo clínico profissional da sessão, incluindo:
 1. **Contexto da sessão**: Tipo de atendimento e duração
 2. **Pontos principais discutidos**: Baseado nas informações disponíveis
 3. **Observações clínicas**: Impressões gerais
 4. **Próximos passos sugeridos**: Recomendações para acompanhamento`;
-    }
+      }
 
-    const prompt = `Você é um psicólogo clínico auxiliando na documentação de uma sessão de teleatendimento.
+      const historySection = patientHistory
+        ? `\n\nHistórico clínico recente do paciente (últimas sessões):\n${patientHistory}\n\nUse este histórico para contextualizar a evolução do paciente, identificar padrões e fundamentar suas observações.`
+        : "";
+
+      prompt = `Você é um psicólogo clínico auxiliando na documentação de uma sessão de teleatendimento.
 
 ${approach}
 
 Dados da sessão:
 - Paciente: ${patientName}
 - Duração: ${duration} minutos
-- Mensagens/notas da sessão:
+- Conteúdo da sessão (transcrição/chat/notas):
 ${chatMessages}
+${historySection}
 
 ${instruction}
 
@@ -106,6 +139,7 @@ REGRAS IMPORTANTES:
 - Escreva em terceira pessoa, como registro clínico
 - Se não houver informações suficientes, indique os campos para preenchimento manual
 - Responda em português brasileiro`;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
