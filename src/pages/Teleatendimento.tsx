@@ -5,11 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Video, Clock, Users, Copy, ExternalLink } from "lucide-react";
+import { Video, Clock, Users, Copy, ExternalLink, Mic, MicOff, AlertTriangle, ScrollText } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useTelehealthWebRTC } from "@/hooks/useTelehealthWebRTC";
 import { useTelehealthChat } from "@/hooks/useTelehealthChat";
+import { useSessionTranscription } from "@/hooks/useSessionTranscription";
 import { VideoPanel } from "@/components/telehealth/VideoPanel";
 import { CallControls } from "@/components/telehealth/CallControls";
 import { ChatPanel } from "@/components/telehealth/ChatPanel";
@@ -47,6 +50,10 @@ const Teleatendimento = () => {
   const [callStartTime, setCallStartTime] = useState<number>(0);
   const [elapsed, setElapsed] = useState(0);
 
+  // Transcription & privacy
+  const [transcriptionEnabled, setTranscriptionEnabled] = useState(true);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+
   const selectedPatientName = patients.find((p) => p.id === selectedPatient)?.full_name || "";
 
   const chat = useTelehealthChat(
@@ -58,6 +65,12 @@ const Teleatendimento = () => {
     roomToken: currentSession?.room_token || "",
     isHost: true,
     onRemoteStream: setRemoteStream,
+  });
+
+  const transcription = useSessionTranscription({
+    enabled: transcriptionEnabled && viewState === "in-call",
+    localLabel: "Profissional",
+    remoteLabel: selectedPatientName || "Paciente",
   });
 
   useEffect(() => {
@@ -124,6 +137,7 @@ const Teleatendimento = () => {
       if (!sess) return;
     }
 
+    setPrivacyAccepted(false);
     setViewState("pre-call");
   }, [selectedPatient, currentSession, createSession]);
 
@@ -140,6 +154,11 @@ const Teleatendimento = () => {
       setCallStartTime(Date.now());
       setViewState("in-call");
 
+      // Start transcription if enabled
+      if (transcriptionEnabled) {
+        transcription.startListening();
+      }
+
       const link = `${window.location.origin}/sala/${currentSession.room_token}`;
       await navigator.clipboard.writeText(link);
       toast.success("Link da sala copiado! Envie para o paciente.");
@@ -148,9 +167,10 @@ const Teleatendimento = () => {
       toast.error("Erro ao iniciar chamada. Verifique permissões de câmera/microfone.");
       setViewState("lobby");
     }
-  }, [currentSession, webrtc]);
+  }, [currentSession, webrtc, transcriptionEnabled, transcription]);
 
   const endCall = useCallback(async () => {
+    transcription.stopListening();
     webrtc.disconnect();
     const duration = Math.floor((Date.now() - callStartTime) / 1000);
 
@@ -171,7 +191,7 @@ const Teleatendimento = () => {
     setViewState("post-session");
     setRemoteStream(null);
     toast.success("Chamada encerrada");
-  }, [webrtc, currentSession, callStartTime, chat.messages]);
+  }, [webrtc, currentSession, callStartTime, chat.messages, transcription]);
 
   const copyLink = async () => {
     if (!currentSession) return;
@@ -196,12 +216,15 @@ const Teleatendimento = () => {
           patientName={selectedPatientName}
           chatMessages={chat.messages}
           durationSeconds={currentSession.duration_seconds || elapsed}
+          transcript={transcription.transcript}
           onSavedToRecord={() => {
+            transcription.clearTranscript();
             loadData();
             setViewState("lobby");
             setCurrentSession(null);
           }}
           onClose={() => {
+            transcription.clearTranscript();
             loadData();
             setViewState("lobby");
             setCurrentSession(null);
@@ -216,11 +239,55 @@ const Teleatendimento = () => {
     return (
       <AppLayout title="Teleatendimento" description="Verificação de mídia">
         <div className="flex items-center justify-center py-8">
-          <PreCallCheck
-            label={`Consulta com ${selectedPatientName}`}
-            onReady={handlePreCallReady}
-            onCancel={() => setViewState("lobby")}
-          />
+          <div className="space-y-4 max-w-lg w-full">
+            {/* Privacy consent */}
+            {!privacyAccepted && (
+              <Card className="p-5 space-y-4 border-primary/30">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-sm">Consentimento de sessão</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Esta sessão poderá ser analisada pela IA para geração automática de prontuário clínico.
+                      Nenhum dado será compartilhado externamente.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
+                  <Label htmlFor="transcription-toggle" className="text-xs cursor-pointer">
+                    Habilitar transcrição de áudio
+                  </Label>
+                  <Switch
+                    id="transcription-toggle"
+                    checked={transcriptionEnabled}
+                    onCheckedChange={setTranscriptionEnabled}
+                  />
+                </div>
+
+                {transcriptionEnabled && !transcription.supported && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Transcrição não suportada neste navegador. Use Chrome para melhor experiência.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <Button onClick={() => setPrivacyAccepted(true)} className="w-full">
+                  Aceitar e continuar
+                </Button>
+              </Card>
+            )}
+
+            {privacyAccepted && (
+              <PreCallCheck
+                label={`Consulta com ${selectedPatientName}`}
+                onReady={handlePreCallReady}
+                onCancel={() => setViewState("lobby")}
+              />
+            )}
+          </div>
         </div>
       </AppLayout>
     );
@@ -239,12 +306,38 @@ const Teleatendimento = () => {
                 {formatDuration(elapsed)}
               </Badge>
               <span className="text-sm font-medium">{selectedPatientName}</span>
+              {transcription.isListening && (
+                <Badge variant="secondary" className="gap-1 text-xs">
+                  <ScrollText className="h-3 w-3" />
+                  Transcrevendo
+                </Badge>
+              )}
             </div>
-            <Button variant="outline" size="sm" onClick={copyLink} className="gap-1.5">
-              <Copy className="h-3.5 w-3.5" />
-              Copiar link
-            </Button>
+            <div className="flex items-center gap-2">
+              {transcription.supported && (
+                <Button
+                  variant={transcription.isListening ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => transcription.isListening ? transcription.stopListening() : transcription.startListening()}
+                  className="gap-1.5 text-xs"
+                >
+                  {transcription.isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                  {transcription.isListening ? "Parar" : "Transcrever"}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={copyLink} className="gap-1.5">
+                <Copy className="h-3.5 w-3.5" />
+                Link
+              </Button>
+            </div>
           </div>
+
+          {/* Interim transcription preview */}
+          {transcription.interimText && (
+            <div className="p-2 rounded bg-muted/30 border border-border text-xs text-muted-foreground italic truncate">
+              {transcription.interimText}
+            </div>
+          )}
 
           <div className="flex gap-3">
             <div className={`flex-1 space-y-3 ${chat.isOpen ? "" : "w-full"}`}>
