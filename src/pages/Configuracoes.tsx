@@ -111,6 +111,7 @@ export default function Configuracoes() {
       phone: formData.get("phone") as string,
       specialty: formData.get("specialty") as string,
       clinic_name: formData.get("clinic_name") as string,
+      preferred_clinical_style: formData.get("preferred_clinical_style") as string,
     }).eq("id", user.id);
 
     setSaving(false);
