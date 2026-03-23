@@ -534,6 +534,24 @@ export default function Configuracoes() {
                     <Label htmlFor="clinic_name">Nome da Clínica</Label>
                     <Input id="clinic_name" name="clinic_name" defaultValue={profile?.clinic_name || ""} placeholder="Nome do consultório ou clínica" />
                   </div>
+                  <div className="col-span-1 sm:col-span-2 space-y-2">
+                    <Label htmlFor="preferred_clinical_style">Abordagem Clínica</Label>
+                    <Select name="preferred_clinical_style" defaultValue={profile?.preferred_clinical_style || "neutral"}>
+                      <SelectTrigger id="preferred_clinical_style">
+                        <SelectValue placeholder="Selecione sua abordagem" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="neutral">Neutro / Genérico</SelectItem>
+                        <SelectItem value="tcc">Cognitivo-Comportamental (TCC)</SelectItem>
+                        <SelectItem value="psychoanalysis">Psicanálise</SelectItem>
+                        <SelectItem value="phenomenological">Fenomenológica Existencial</SelectItem>
+                        <SelectItem value="humanistic">Humanista</SelectItem>
+                        <SelectItem value="systemic">Sistêmica</SelectItem>
+                        <SelectItem value="gestalt">Gestalt-terapia</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Usada pela IA para adaptar resumos e prontuários ao seu estilo clínico</p>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="session_duration">Duração da Sessão (min)</Label>
                     <Input id="session_duration" type="number" value={settings.session_duration} onChange={(e) => setSettings({ ...settings, session_duration: Number(e.target.value) })} />
