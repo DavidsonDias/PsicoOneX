@@ -43,9 +43,9 @@ export const PostSessionSummary = memo(function PostSessionSummary({
   }, []);
 
   const loadApproach = async () => {
-    const { data: { user } } = await supabase.auth.getSession().then(r => r.data);
-    if (!user) return;
-    const { data } = await supabase.from("profiles").select("preferred_clinical_style").eq("id", user.id).single();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const { data } = await supabase.from("profiles").select("preferred_clinical_style").eq("id", session.user.id).single();
     if (data?.preferred_clinical_style) setClinicalApproach(data.preferred_clinical_style);
   };
 
