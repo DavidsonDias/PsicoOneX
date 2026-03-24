@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,12 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Loader2, Sparkles, Save, FileText, Brain, ClipboardList, RefreshCw,
-  Wand2, ScrollText, ChevronDown,
+  Wand2, ScrollText, ChevronDown, History, RotateCcw, Edit3,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,6 +31,12 @@ interface PostSessionSummaryProps {
   onClose: () => void;
 }
 
+interface VersionEntry {
+  content: string;
+  timestamp: string;
+  action: string;
+}
+
 export const PostSessionSummary = memo(function PostSessionSummary({
   sessionId, patientId, patientName, chatMessages, durationSeconds,
   transcript = [], onSavedToRecord, onClose,
@@ -43,10 +50,16 @@ export const PostSessionSummary = memo(function PostSessionSummary({
   const [clinicalApproach, setClinicalApproach] = useState("neutral");
   const [activeTab, setActiveTab] = useState("standard");
   const [patientHistory, setPatientHistory] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
 
   // Output toggles
   const [enableStandard, setEnableStandard] = useState(true);
   const [enableStructured, setEnableStructured] = useState(true);
+
+  // Version history
+  const [standardVersions, setStandardVersions] = useState<VersionEntry[]>([]);
+  const [structuredVersions, setStructuredVersions] = useState<VersionEntry[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     loadApproach();
@@ -63,15 +76,11 @@ export const PostSessionSummary = memo(function PostSessionSummary({
   const loadPatientHistory = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
-
     const { data: records } = await supabase
       .from("medical_records")
       .select("session_date, session_number, observations, evolution, complaints, next_steps")
-      .eq("patient_id", patientId)
-      .eq("psychologist_id", session.user.id)
-      .is("deleted_at", null)
-      .order("session_date", { ascending: false })
-      .limit(3);
+      .eq("patient_id", patientId).eq("psychologist_id", session.user.id)
+      .is("deleted_at", null).order("session_date", { ascending: false }).limit(3);
 
     if (records && records.length > 0) {
       const history = records.map((r, i) => {
@@ -88,9 +97,24 @@ export const PostSessionSummary = memo(function PostSessionSummary({
     }
   };
 
+  const pushVersion = useCallback((type: "standard" | "structured", content: string, action: string) => {
+    const entry: VersionEntry = { content, timestamp: new Date().toISOString(), action };
+    if (type === "standard") {
+      setStandardVersions(prev => [entry, ...prev].slice(0, 10));
+    } else {
+      setStructuredVersions(prev => [entry, ...prev].slice(0, 10));
+    }
+  }, []);
+
+  const restoreVersion = useCallback((type: "standard" | "structured", version: VersionEntry) => {
+    if (type === "standard") setStandardSummary(version.content);
+    else setStructuredSummary(version.content);
+    toast.success("Versão restaurada");
+  }, []);
+
   const transcriptText = transcript
     .filter((e) => e.isFinal)
-    .map((e) => `${e.speakerLabel}: ${e.text}`)
+    .map((e) => `[${e.speakerLabel}]: ${e.text}`)
     .join("\n");
 
   const chatContext = chatMessages.map((m) => `${m.senderName}: ${m.text}`).join("\n");
@@ -102,11 +126,8 @@ export const PostSessionSummary = memo(function PostSessionSummary({
     setGeneratingType(type === "summary" ? "Resumo clínico" : "Prontuário estruturado");
     try {
       const body: any = {
-        patientName,
-        duration: durationMin,
-        chatMessages: sessionContent,
-        clinicalApproach,
-        outputType: type,
+        patientName, duration: durationMin, chatMessages: sessionContent,
+        clinicalApproach, outputType: type,
       };
       if (patientHistory) body.patientHistory = patientHistory;
 
@@ -116,9 +137,11 @@ export const PostSessionSummary = memo(function PostSessionSummary({
       const result = data?.summary || "Não foi possível gerar.";
       if (type === "summary") {
         setStandardSummary(result);
+        pushVersion("standard", result, "Geração IA");
         setActiveTab("standard");
       } else {
         setStructuredSummary(result);
+        pushVersion("structured", result, "Geração IA");
         setActiveTab("structured");
       }
       toast.success(`${type === "summary" ? "Resumo" : "Prontuário"} gerado!`);
@@ -136,29 +159,31 @@ export const PostSessionSummary = memo(function PostSessionSummary({
     if (enableStructured) await generateSummary("structured");
   };
 
-  // Refinement actions
   const refineText = async (action: string) => {
     const currentText = activeTab === "standard" ? standardSummary : structuredSummary;
     if (!currentText) return;
+
+    // Save current version before refining
+    pushVersion(activeTab === "standard" ? "standard" : "structured", currentText, "Antes de refinar");
 
     setRefining(true);
     try {
       const { data, error } = await supabase.functions.invoke("summarize-session", {
         body: {
-          patientName,
-          duration: durationMin,
-          chatMessages: currentText,
-          clinicalApproach,
-          outputType: "refine",
-          refineAction: action,
+          patientName, duration: durationMin, chatMessages: currentText,
+          clinicalApproach, outputType: "refine", refineAction: action,
         },
       });
       if (error) throw error;
       const result = data?.summary || currentText;
 
-      if (activeTab === "standard") setStandardSummary(result);
-      else setStructuredSummary(result);
-
+      if (activeTab === "standard") {
+        setStandardSummary(result);
+        pushVersion("standard", result, `Refinado: ${action}`);
+      } else {
+        setStructuredSummary(result);
+        pushVersion("structured", result, `Refinado: ${action}`);
+      }
       toast.success("Texto refinado!");
     } catch (e) {
       console.error("Refine error:", e);
@@ -174,17 +199,13 @@ export const PostSessionSummary = memo(function PostSessionSummary({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Não autenticado");
 
-      const { count } = await supabase
-        .from("medical_records")
+      const { count } = await supabase.from("medical_records")
         .select("*", { count: "exact", head: true })
-        .eq("patient_id", patientId)
-        .eq("psychologist_id", session.user.id)
-        .is("deleted_at", null);
+        .eq("patient_id", patientId).eq("psychologist_id", session.user.id).is("deleted_at", null);
 
       const observations = [standardSummary, structuredSummary].filter(Boolean).join("\n\n---\n\n");
 
-      const { data: record, error } = await supabase
-        .from("medical_records")
+      const { data: record, error } = await supabase.from("medical_records")
         .insert({
           patient_id: patientId,
           psychologist_id: session.user.id,
@@ -193,20 +214,13 @@ export const PostSessionSummary = memo(function PostSessionSummary({
           observations: observations || "Sessão de teleatendimento sem resumo gerado.",
           evolution: `Sessão de teleatendimento - Duração: ${durationMin} minutos`,
         })
-        .select("id")
-        .single();
+        .select("id").single();
 
       if (error) throw error;
 
       const fullContent = [observations, transcriptText && `\n\n--- Transcrição ---\n\n${transcriptText}`].filter(Boolean).join("");
-
-      await supabase
-        .from("telehealth_sessions")
-        .update({
-          ai_summary: fullContent,
-          medical_record_id: record.id,
-          chat_messages: chatMessages,
-        } as any)
+      await supabase.from("telehealth_sessions")
+        .update({ ai_summary: fullContent, medical_record_id: record.id, chat_messages: chatMessages } as any)
         .eq("id", sessionId);
 
       toast.success("Prontuário criado com sucesso!");
@@ -221,6 +235,7 @@ export const PostSessionSummary = memo(function PostSessionSummary({
 
   const hasSummary = !!standardSummary || !!structuredSummary;
   const hasTranscript = transcript.length > 0;
+  const currentVersions = activeTab === "standard" ? standardVersions : structuredVersions;
 
   const approachLabels: Record<string, string> = {
     neutral: "Genérico", tcc: "TCC", psychoanalysis: "Psicanálise",
@@ -229,39 +244,37 @@ export const PostSessionSummary = memo(function PostSessionSummary({
   };
 
   return (
-    <Card className="p-6 max-w-2xl mx-auto space-y-6">
+    <Card className="p-6 max-w-2xl mx-auto space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-xl font-bold">Sessão finalizada</h2>
           <p className="text-sm text-muted-foreground">
             {patientName} · {durationMin} min
-            {hasTranscript && ` · ${transcript.length} segmentos transcritos`}
+            {hasTranscript && ` · ${transcript.length} segmentos`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">
+          <Badge variant="outline" className="text-xs">
             <Brain className="h-3 w-3 mr-1" />
             {approachLabels[clinicalApproach] || "Genérico"}
-          </Badge>
-          <Badge variant="secondary">
-            <FileText className="h-3 w-3 mr-1" />
-            Teleatendimento
           </Badge>
         </div>
       </div>
 
+      {/* Clinical context indicator */}
       {patientHistory && (
         <div className="p-3 rounded-lg bg-muted/30 border border-border">
           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             <Brain className="h-3 w-3" />
-            Contexto clínico das últimas {Math.min(3, patientHistory.split("###").length - 1)} sessões será incluído na análise
+            Contexto clínico das últimas sessões incluído na análise
           </p>
         </div>
       )}
 
       {/* Output toggles */}
-      {!hasSummary && (
-        <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
+      {!hasSummary && !generating && (
+        <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/20">
           <p className="text-sm font-medium">Selecione os tipos de saída:</p>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
@@ -276,13 +289,27 @@ export const PostSessionSummary = memo(function PostSessionSummary({
         </div>
       )}
 
+      {/* Generate button with skeleton loading */}
       {!hasSummary && (
-        <Button onClick={generateAll} disabled={generating || (!enableStandard && !enableStructured)} className="w-full gap-2">
-          {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {generating ? `Gerando ${generatingType}...` : "Gerar com IA"}
-        </Button>
+        <>
+          <Button onClick={generateAll} disabled={generating || (!enableStandard && !enableStructured)} className="w-full gap-2">
+            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {generating ? `Gerando ${generatingType}...` : "Gerar com IA"}
+          </Button>
+          {generating && (
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-4/5" />
+            </div>
+          )}
+        </>
       )}
 
+      {/* Content tabs */}
       {(hasSummary || hasTranscript) && (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="w-full">
@@ -304,25 +331,73 @@ export const PostSessionSummary = memo(function PostSessionSummary({
           </TabsList>
 
           {standardSummary && (
-            <TabsContent value="standard" className="space-y-2">
-              <Textarea value={standardSummary} onChange={(e) => setStandardSummary(e.target.value)} rows={10} className="resize-none text-sm" />
+            <TabsContent value="standard" className="space-y-3">
+              <Textarea
+                value={standardSummary}
+                onChange={(e) => setStandardSummary(e.target.value)}
+                rows={10}
+                className="resize-none text-sm leading-relaxed"
+                readOnly={!isEditing}
+              />
               <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={isEditing ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    if (isEditing) pushVersion("standard", standardSummary, "Edição manual");
+                    setIsEditing(!isEditing);
+                  }}
+                  className="gap-1.5"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  {isEditing ? "Salvar edição" : "Editar"}
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => generateSummary("summary")} disabled={generating || refining} className="gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5" /> Regenerar
                 </Button>
                 <RefineMenu onRefine={refineText} disabled={refining} />
+                {standardVersions.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)} className="gap-1.5">
+                    <History className="h-3.5 w-3.5" />
+                    Versões ({standardVersions.length})
+                  </Button>
+                )}
               </div>
             </TabsContent>
           )}
 
           {structuredSummary && (
-            <TabsContent value="structured" className="space-y-2">
-              <Textarea value={structuredSummary} onChange={(e) => setStructuredSummary(e.target.value)} rows={12} className="resize-none text-sm" />
+            <TabsContent value="structured" className="space-y-3">
+              <Textarea
+                value={structuredSummary}
+                onChange={(e) => setStructuredSummary(e.target.value)}
+                rows={12}
+                className="resize-none text-sm leading-relaxed"
+                readOnly={!isEditing}
+              />
               <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={isEditing ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    if (isEditing) pushVersion("structured", structuredSummary, "Edição manual");
+                    setIsEditing(!isEditing);
+                  }}
+                  className="gap-1.5"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  {isEditing ? "Salvar edição" : "Editar"}
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => generateSummary("structured")} disabled={generating || refining} className="gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5" /> Regenerar
                 </Button>
                 <RefineMenu onRefine={refineText} disabled={refining} />
+                {structuredVersions.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)} className="gap-1.5">
+                    <History className="h-3.5 w-3.5" />
+                    Versões ({structuredVersions.length})
+                  </Button>
+                )}
               </div>
             </TabsContent>
           )}
@@ -331,10 +406,10 @@ export const PostSessionSummary = memo(function PostSessionSummary({
             <TabsContent value="transcript" className="space-y-2">
               <div className="max-h-80 overflow-y-auto space-y-2 p-3 rounded-lg bg-muted/20 border border-border">
                 {transcript.filter(e => e.isFinal).map((entry) => (
-                  <div key={entry.id} className="text-sm">
-                    <span className={`font-medium ${entry.speaker === "local" ? "text-primary" : "text-foreground"}`}>
+                  <div key={entry.id} className="text-sm flex gap-2">
+                    <span className={`font-medium shrink-0 ${entry.speaker === "local" ? "text-primary" : "text-foreground"}`}>
                       {entry.speakerLabel}:
-                    </span>{" "}
+                    </span>
                     <span className="text-muted-foreground">{entry.text}</span>
                   </div>
                 ))}
@@ -345,6 +420,39 @@ export const PostSessionSummary = memo(function PostSessionSummary({
         </Tabs>
       )}
 
+      {/* Version history panel */}
+      {showHistory && currentVersions.length > 0 && (
+        <Card className="p-4 space-y-3 bg-muted/20">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold flex items-center gap-1.5">
+              <History className="h-4 w-4" /> Histórico de versões
+            </h4>
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)}>Fechar</Button>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {currentVersions.map((v, i) => (
+              <div key={i} className="flex items-center justify-between p-2 rounded bg-background border border-border">
+                <div>
+                  <p className="text-xs font-medium">{v.action}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(v.timestamp), "HH:mm:ss")}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => restoreVersion(activeTab === "standard" ? "standard" : "structured", v)}
+                  className="gap-1 text-xs"
+                >
+                  <RotateCcw className="h-3 w-3" /> Restaurar
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Save actions */}
       {hasSummary && (
         <div className="flex gap-3">
           <Button onClick={saveToRecord} disabled={saving} className="flex-1 gap-2">

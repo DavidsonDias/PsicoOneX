@@ -67,78 +67,88 @@ serve(async (req) => {
     const approach = approachPrompts[clinicalApproach] || approachPrompts.neutral;
     const type = outputType || "summary";
 
-    let prompt = "";
+    let systemPrompt = "";
+    let userPrompt = "";
 
     if (type === "refine" && refineAction) {
       const instruction = refineInstructions[refineAction] || refineInstructions.technical;
-      prompt = `${instruction}
-
-${approach}
+      systemPrompt = `Você é um redator clínico especializado em psicologia. Seu trabalho é reescrever textos clínicos mantendo fidelidade absoluta ao conteúdo original. ${approach}`;
+      userPrompt = `${instruction}
 
 Texto original:
 ${chatMessages}
 
-REGRAS:
-- NÃO invente informações
-- NÃO faça diagnósticos
-- Mantenha o conteúdo original, apenas ajuste o estilo
+REGRAS INVIOLÁVEIS:
+- NÃO invente informações que não existam no texto original
+- NÃO adicione interpretações ou diagnósticos
+- NÃO remova informações relevantes
+- Mantenha o conteúdo original, ajuste APENAS o estilo
 - Responda em português brasileiro
-- Retorne APENAS o texto reescrito, sem explicações`;
+- Retorne APENAS o texto reescrito, sem explicações ou metadados`;
     } else {
-      let instruction = "";
-
-      if (type === "structured") {
-        instruction = `Gere um prontuário clínico estruturado com os seguintes campos:
-
-## Queixa Principal
-(Motivo da consulta / demanda apresentada)
-
-## Contexto Apresentado
-(Situação relatada pelo paciente)
-
-## Intervenções Realizadas
-(O que foi trabalhado durante a sessão)
-
-## Respostas do Paciente
-(Como o paciente reagiu às intervenções)
-
-## Evolução Observada
-(Progresso ou mudanças percebidas)
-
-## Plano Terapêutico
-(Próximos passos e encaminhamentos)`;
-      } else {
-        instruction = `Gere um resumo clínico profissional da sessão, incluindo:
-1. **Contexto da sessão**: Tipo de atendimento e duração
-2. **Pontos principais discutidos**: Baseado nas informações disponíveis
-3. **Observações clínicas**: Impressões gerais
-4. **Próximos passos sugeridos**: Recomendações para acompanhamento`;
-      }
-
-      const historySection = patientHistory
-        ? `\n\nHistórico clínico recente do paciente (últimas sessões):\n${patientHistory}\n\nUse este histórico para contextualizar a evolução do paciente, identificar padrões e fundamentar suas observações.`
-        : "";
-
-      prompt = `Você é um psicólogo clínico auxiliando na documentação de uma sessão de teleatendimento.
+      systemPrompt = `Você é um psicólogo clínico experiente auxiliando na documentação de sessões de teleatendimento.
 
 ${approach}
 
-Dados da sessão:
+PRINCÍPIOS FUNDAMENTAIS:
+1. FIDELIDADE: Use APENAS informações presentes na transcrição/chat. Nunca invente.
+2. PRECISÃO: Se um conteúdo não foi mencionado, escreva "Não abordado nesta sessão" no campo correspondente.
+3. ÉTICA: Nunca faça diagnósticos automáticos. Use linguagem como "o paciente relata", "foi observado que".
+4. PROFISSIONALISMO: Escreva em terceira pessoa, como registro clínico formal.
+5. COERÊNCIA: Cada afirmação deve ter base direta no conteúdo da sessão.`;
+
+      let instruction = "";
+
+      if (type === "structured") {
+        instruction = `Gere um prontuário clínico estruturado com os seguintes campos obrigatórios:
+
+## Queixa Principal
+(Motivo da consulta / demanda apresentada pelo paciente — use citações diretas quando possível)
+
+## Contexto Apresentado
+(Situação relatada pelo paciente, fatos e circunstâncias mencionados)
+
+## Intervenções Realizadas
+(O que foi trabalhado durante a sessão, técnicas e estratégias utilizadas)
+
+## Respostas do Paciente
+(Como o paciente reagiu às intervenções — comportamento verbal e não-verbal observável)
+
+## Evolução Observada
+(Progresso, mudanças percebidas ou estabilidade em relação a sessões anteriores)
+
+## Plano Terapêutico
+(Próximos passos, encaminhamentos, tarefas para casa, objetivos para próxima sessão)
+
+Se algum campo não tiver informação suficiente na transcrição, escreva: "Informação não disponível nesta sessão — preencher manualmente."`;
+      } else {
+        instruction = `Gere um resumo clínico profissional da sessão contendo:
+
+1. **Contexto da sessão**: Tipo de atendimento (teleatendimento), duração e configuração
+2. **Demanda principal**: O que o paciente trouxe como foco (use citações diretas quando possível)
+3. **Pontos-chave discutidos**: Liste os temas específicos abordados
+4. **Observações clínicas**: Impressões baseadas EXCLUSIVAMENTE no conteúdo observável
+5. **Próximos passos**: Recomendações e encaminhamentos discutidos na sessão
+
+FORMATO: Texto corrido em parágrafos, linguagem técnica mas acessível, entre 150-300 palavras.`;
+      }
+
+      const historySection = patientHistory
+        ? `\n\nHISTÓRICO CLÍNICO RECENTE (últimas sessões):\n${patientHistory}\n\nUse este histórico para:\n- Contextualizar a evolução do paciente\n- Identificar padrões recorrentes\n- Avaliar progresso terapêutico\n- NÃO repita informações do histórico como se fossem da sessão atual`
+        : "";
+
+      userPrompt = `Dados da sessão:
 - Paciente: ${patientName}
 - Duração: ${duration} minutos
-- Conteúdo da sessão (transcrição/chat/notas):
+- Tipo: Teleatendimento
+
+Conteúdo da sessão (transcrição/chat):
+---
 ${chatMessages}
+---
 ${historySection}
 
-${instruction}
-
-REGRAS IMPORTANTES:
-- NÃO invente informações que não estejam nos dados
-- NÃO faça diagnósticos automáticos
-- Mantenha linguagem profissional e ética
-- Escreva em terceira pessoa, como registro clínico
-- Se não houver informações suficientes, indique os campos para preenchimento manual
-- Responda em português brasileiro`;
+${instruction}`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -149,7 +159,10 @@ REGRAS IMPORTANTES:
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
       }),
     });
 

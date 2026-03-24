@@ -7,9 +7,12 @@ interface VideoPanelProps {
   label: string;
   muted?: boolean;
   mirrored?: boolean;
+  isFocused?: boolean;
 }
 
-export const VideoPanel = memo(function VideoPanel({ stream, label, muted = false, mirrored = false }: VideoPanelProps) {
+export const VideoPanel = memo(function VideoPanel({
+  stream, label, muted = false, mirrored = false, isFocused = false,
+}: VideoPanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -18,7 +21,6 @@ export const VideoPanel = memo(function VideoPanel({ stream, label, muted = fals
 
     if (stream) {
       el.srcObject = stream;
-      // Ensure playback starts (especially on mobile)
       const playPromise = el.play();
       if (playPromise) {
         playPromise.catch((err) => {
@@ -38,8 +40,9 @@ export const VideoPanel = memo(function VideoPanel({ stream, label, muted = fals
   const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks().some(t => t.enabled);
 
   return (
-    <Card className="relative aspect-video bg-muted overflow-hidden">
-      {/* Always render video element to avoid re-mount issues */}
+    <Card className={`relative overflow-hidden bg-muted/80 transition-all duration-300 ${
+      isFocused ? "aspect-video col-span-full" : "aspect-video"
+    }`}>
       <video
         ref={videoRef}
         autoPlay
@@ -61,8 +64,8 @@ export const VideoPanel = memo(function VideoPanel({ stream, label, muted = fals
           </div>
         </div>
       )}
-      <div className="absolute bottom-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-md">
-        <p className="text-sm font-medium">{label}</p>
+      <div className="absolute bottom-2 left-2 bg-background/80 backdrop-blur-sm px-2.5 py-1 rounded-md shadow-sm">
+        <p className="text-xs font-medium">{label}</p>
       </div>
     </Card>
   );

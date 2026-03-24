@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "unstable" | "reconnecting";
 
-export interface MediaDeviceInfo {
+export interface MediaDeviceOption {
   deviceId: string;
   label: string;
   kind: MediaDeviceKind;
@@ -15,6 +15,19 @@ interface UseTelehealthWebRTCOptions {
   onRemoteStream?: (stream: MediaStream) => void;
   onConnectionStatus?: (status: ConnectionStatus) => void;
 }
+
+const VIDEO_CONSTRAINTS_TIERS = [
+  { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+  { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+  { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: "user" },
+  true, // any video
+];
+
+const AUDIO_CONSTRAINTS = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+};
 
 export function useTelehealthWebRTC({
   roomToken,
@@ -28,6 +41,9 @@ export function useTelehealthWebRTC({
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [screenSharing, setScreenSharing] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [availableDevices, setAvailableDevices] = useState<MediaDeviceOption[]>([]);
+  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>("");
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>("");
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -43,13 +59,35 @@ export function useTelehealthWebRTC({
     onConnectionStatus?.(s);
   }, [onConnectionStatus]);
 
+  // Enumerate devices
+  const enumerateDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mapped: MediaDeviceOption[] = devices
+        .filter(d => d.kind === "videoinput" || d.kind === "audioinput")
+        .map((d, i) => ({
+          deviceId: d.deviceId,
+          label: d.label || `${d.kind === "videoinput" ? "Câmera" : "Microfone"} ${i + 1}`,
+          kind: d.kind,
+        }));
+      setAvailableDevices(mapped);
+      return mapped;
+    } catch {
+      return [];
+    }
+  }, []);
+
+  useEffect(() => {
+    enumerateDevices();
+    navigator.mediaDevices?.addEventListener?.("devicechange", enumerateDevices);
+    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", enumerateDevices);
+  }, [enumerateDevices]);
+
   const createPeerConnection = useCallback(() => {
     const config: RTCConfiguration = {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        // Free TURN servers for NAT traversal
         {
           urls: "turn:openrelay.metered.ca:80",
           username: "openrelayproject",
@@ -98,7 +136,6 @@ export function useTelehealthWebRTC({
           break;
         case "disconnected":
           updateStatus("unstable");
-          // Try soft reconnect after 3s
           setTimeout(() => {
             if (pc.iceConnectionState === "disconnected") {
               updateStatus("reconnecting");
@@ -167,39 +204,49 @@ export function useTelehealthWebRTC({
     return "Erro desconhecido ao acessar câmera/microfone.";
   };
 
+  // Progressive resolution fallback
   const startMedia = useCallback(async (videoOn = true, audioOn = true) => {
     setMediaError(null);
 
-    // Try video + audio
+    const audioConstraints: any = audioOn
+      ? (selectedAudioDevice ? { ...AUDIO_CONSTRAINTS, deviceId: { exact: selectedAudioDevice } } : AUDIO_CONSTRAINTS)
+      : false;
+
     if (videoOn) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
-        console.log("[WebRTC] Got media stream: video + audio");
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-        setVideoEnabled(true);
-        setAudioEnabled(true);
-        originalVideoTrackRef.current = stream.getVideoTracks()[0] || null;
-        return stream;
-      } catch (err) {
-        console.warn("[WebRTC] Video+audio failed, trying audio-only:", err);
+      for (const videoConstraint of VIDEO_CONSTRAINTS_TIERS) {
+        try {
+          const vc = typeof videoConstraint === "object" && selectedVideoDevice
+            ? { ...videoConstraint, deviceId: { exact: selectedVideoDevice } }
+            : videoConstraint;
+
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: vc,
+            audio: audioConstraints,
+          });
+          console.log("[WebRTC] Got media stream with video constraint:", JSON.stringify(videoConstraint));
+          localStreamRef.current = stream;
+          setLocalStream(stream);
+          setVideoEnabled(true);
+          setAudioEnabled(audioOn);
+          originalVideoTrackRef.current = stream.getVideoTracks()[0] || null;
+          await enumerateDevices();
+          return stream;
+        } catch (err) {
+          console.warn("[WebRTC] Video constraint failed, trying next tier:", err);
+        }
       }
     }
 
     // Fallback: audio only
     if (audioOn) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
         console.log("[WebRTC] Got media stream: audio only");
         localStreamRef.current = stream;
         setLocalStream(stream);
         setVideoEnabled(false);
         setAudioEnabled(true);
+        await enumerateDevices();
         return stream;
       } catch (err) {
         const msg = getMediaErrorMessage(err);
@@ -210,7 +257,7 @@ export function useTelehealthWebRTC({
     }
 
     throw new Error("Nenhuma mídia solicitada");
-  }, []);
+  }, [selectedVideoDevice, selectedAudioDevice, enumerateDevices]);
 
   const testMedia = useCallback(async (): Promise<{ video: boolean; audio: boolean; stream: MediaStream | null; error?: string }> => {
     try {
@@ -218,20 +265,67 @@ export function useTelehealthWebRTC({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
         audio: { echoCancellation: true, noiseSuppression: true },
       });
+      await enumerateDevices();
       return { video: true, audio: true, stream };
-    } catch (err) {
-      // Try audio only
+    } catch {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        await enumerateDevices();
         return { video: false, audio: true, stream, error: "Câmera indisponível, apenas áudio." };
       } catch (audioErr) {
         return { video: false, audio: false, stream: null, error: getMediaErrorMessage(audioErr) };
       }
     }
-  }, []);
+  }, [enumerateDevices]);
 
   const stopTestStream = useCallback((stream: MediaStream) => {
     stream.getTracks().forEach(t => t.stop());
+  }, []);
+
+  // Switch device mid-call
+  const switchDevice = useCallback(async (kind: "video" | "audio", deviceId: string) => {
+    if (kind === "video") setSelectedVideoDevice(deviceId);
+    else setSelectedAudioDevice(deviceId);
+
+    if (!localStreamRef.current || !pcRef.current) return;
+
+    try {
+      if (kind === "video") {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        });
+        const newTrack = newStream.getVideoTracks()[0];
+        const sender = pcRef.current.getSenders().find(s => s.track?.kind === "video");
+        if (sender) await sender.replaceTrack(newTrack);
+
+        // Replace track in local stream
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        if (oldTrack) {
+          localStreamRef.current.removeTrack(oldTrack);
+          oldTrack.stop();
+        }
+        localStreamRef.current.addTrack(newTrack);
+        originalVideoTrackRef.current = newTrack;
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+      } else {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: deviceId }, ...AUDIO_CONSTRAINTS },
+        });
+        const newTrack = newStream.getAudioTracks()[0];
+        const sender = pcRef.current.getSenders().find(s => s.track?.kind === "audio");
+        if (sender) await sender.replaceTrack(newTrack);
+
+        const oldTrack = localStreamRef.current.getAudioTracks()[0];
+        if (oldTrack) {
+          localStreamRef.current.removeTrack(oldTrack);
+          oldTrack.stop();
+        }
+        localStreamRef.current.addTrack(newTrack);
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+      }
+    } catch (e) {
+      console.error(`[WebRTC] Switch ${kind} device error:`, e);
+    }
   }, []);
 
   const connect = useCallback(async () => {
@@ -308,7 +402,6 @@ export function useTelehealthWebRTC({
         }
       })
       .on("broadcast", { event: "end-call" }, () => {
-        // Remote peer ended the call
         disconnect();
       })
       .subscribe((status) => {
@@ -323,9 +416,7 @@ export function useTelehealthWebRTC({
   }, [roomToken, isHost, startMedia, createPeerConnection, updateStatus]);
 
   const disconnect = useCallback(() => {
-    // Notify remote peer
     channelRef.current?.send({ type: "broadcast", event: "end-call", payload: {} });
-
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     pcRef.current?.close();
     channelRef.current?.unsubscribe();
@@ -400,12 +491,17 @@ export function useTelehealthWebRTC({
     audioEnabled,
     screenSharing,
     mediaError,
+    availableDevices,
+    selectedVideoDevice,
+    selectedAudioDevice,
     connect,
     disconnect,
     toggleVideo,
     toggleAudio,
     toggleScreenShare,
+    switchDevice,
     testMedia,
     stopTestStream,
+    enumerateDevices,
   };
 }
