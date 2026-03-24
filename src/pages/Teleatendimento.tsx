@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { useTelehealthWebRTC } from "@/hooks/useTelehealthWebRTC";
 import { useTelehealthChat } from "@/hooks/useTelehealthChat";
 import { useSessionTranscription } from "@/hooks/useSessionTranscription";
 import { VideoPanel } from "@/components/telehealth/VideoPanel";
-import { CallControls } from "@/components/telehealth/CallControls";
+import { CallControls, type VideoLayout } from "@/components/telehealth/CallControls";
 import { ChatPanel } from "@/components/telehealth/ChatPanel";
 import { ConnectionIndicator } from "@/components/telehealth/ConnectionIndicator";
 import { PostSessionSummary } from "@/components/telehealth/PostSessionSummary";
@@ -50,16 +50,18 @@ const Teleatendimento = () => {
   const [callStartTime, setCallStartTime] = useState<number>(0);
   const [elapsed, setElapsed] = useState(0);
 
+  // Premium UI state
+  const [videoLayout, setVideoLayout] = useState<VideoLayout>("grid");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const callContainerRef = useRef<HTMLDivElement>(null);
+
   // Transcription & privacy
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(true);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const selectedPatientName = patients.find((p) => p.id === selectedPatient)?.full_name || "";
 
-  const chat = useTelehealthChat(
-    currentSession?.room_token || "",
-    "Profissional"
-  );
+  const chat = useTelehealthChat(currentSession?.room_token || "", "Profissional");
 
   const webrtc = useTelehealthWebRTC({
     roomToken: currentSession?.room_token || "",
@@ -73,9 +75,7 @@ const Teleatendimento = () => {
     remoteLabel: selectedPatientName || "Paciente",
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
     if (viewState !== "in-call" || !callStartTime) return;
@@ -83,82 +83,63 @@ const Teleatendimento = () => {
     return () => clearInterval(interval);
   }, [viewState, callStartTime]);
 
+  // Fullscreen
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement && callContainerRef.current) {
+      callContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
   const loadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-
     const [patientsRes, sessionsRes] = await Promise.all([
       supabase.from("patients").select("id, full_name").eq("status", "active").order("full_name"),
       supabase.from("telehealth_sessions").select("*").eq("psychologist_id", session.user.id).order("created_at", { ascending: false }).limit(20),
     ]);
-
     if (patientsRes.data) setPatients(patientsRes.data);
     if (sessionsRes.data) setSessions(sessionsRes.data as any);
   };
 
   const createSession = useCallback(async () => {
-    if (!selectedPatient) {
-      toast.error("Selecione um paciente");
-      return;
-    }
-
+    if (!selectedPatient) { toast.error("Selecione um paciente"); return; }
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-
     const { data, error } = await supabase
       .from("telehealth_sessions")
-      .insert({
-        psychologist_id: session.user.id,
-        patient_id: selectedPatient,
-        status: "waiting",
-      } as any)
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Erro ao criar sessão");
-      console.error(error);
-      return;
-    }
-
+      .insert({ psychologist_id: session.user.id, patient_id: selectedPatient, status: "waiting" } as any)
+      .select().single();
+    if (error) { toast.error("Erro ao criar sessão"); return; }
     setCurrentSession(data as any);
     return data as any;
   }, [selectedPatient]);
 
   const handleStartPreCall = useCallback(async () => {
-    if (!selectedPatient) {
-      toast.error("Selecione um paciente");
-      return;
-    }
-
+    if (!selectedPatient) { toast.error("Selecione um paciente"); return; }
     let sess = currentSession;
-    if (!sess) {
-      sess = await createSession();
-      if (!sess) return;
-    }
-
+    if (!sess) { sess = await createSession(); if (!sess) return; }
     setPrivacyAccepted(false);
     setViewState("pre-call");
   }, [selectedPatient, currentSession, createSession]);
 
   const handlePreCallReady = useCallback(async () => {
     if (!currentSession) return;
-
     try {
-      await supabase
-        .from("telehealth_sessions")
+      await supabase.from("telehealth_sessions")
         .update({ status: "active", started_at: new Date().toISOString() } as any)
         .eq("id", currentSession.id);
-
       await webrtc.connect();
       setCallStartTime(Date.now());
       setViewState("in-call");
-
-      // Start transcription if enabled
-      if (transcriptionEnabled) {
-        transcription.startListening();
-      }
-
+      if (transcriptionEnabled) transcription.startListening();
       const link = `${window.location.origin}/sala/${currentSession.room_token}`;
       await navigator.clipboard.writeText(link);
       toast.success("Link da sala copiado! Envie para o paciente.");
@@ -170,28 +151,20 @@ const Teleatendimento = () => {
   }, [currentSession, webrtc, transcriptionEnabled, transcription]);
 
   const endCall = useCallback(async () => {
+    if (isFullscreen) document.exitFullscreen().catch(() => {});
     transcription.stopListening();
     webrtc.disconnect();
     const duration = Math.floor((Date.now() - callStartTime) / 1000);
-
     if (currentSession) {
-      await supabase
-        .from("telehealth_sessions")
-        .update({
-          status: "ended",
-          ended_at: new Date().toISOString(),
-          duration_seconds: duration,
-          chat_messages: chat.messages,
-        } as any)
+      await supabase.from("telehealth_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString(), duration_seconds: duration, chat_messages: chat.messages } as any)
         .eq("id", currentSession.id);
-
       setCurrentSession({ ...currentSession, duration_seconds: duration } as any);
     }
-
     setViewState("post-session");
     setRemoteStream(null);
     toast.success("Chamada encerrada");
-  }, [webrtc, currentSession, callStartTime, chat.messages, transcription]);
+  }, [webrtc, currentSession, callStartTime, chat.messages, transcription, isFullscreen]);
 
   const copyLink = async () => {
     if (!currentSession) return;
@@ -240,7 +213,6 @@ const Teleatendimento = () => {
       <AppLayout title="Teleatendimento" description="Verificação de mídia">
         <div className="flex items-center justify-center py-8">
           <div className="space-y-4 max-w-lg w-full">
-            {/* Privacy consent */}
             {!privacyAccepted && (
               <Card className="p-5 space-y-4 border-primary/30">
                 <div className="flex items-start gap-3">
@@ -253,18 +225,12 @@ const Teleatendimento = () => {
                     </p>
                   </div>
                 </div>
-
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
                   <Label htmlFor="transcription-toggle" className="text-xs cursor-pointer">
                     Habilitar transcrição de áudio
                   </Label>
-                  <Switch
-                    id="transcription-toggle"
-                    checked={transcriptionEnabled}
-                    onCheckedChange={setTranscriptionEnabled}
-                  />
+                  <Switch id="transcription-toggle" checked={transcriptionEnabled} onCheckedChange={setTranscriptionEnabled} />
                 </div>
-
                 {transcriptionEnabled && !transcription.supported && (
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />
@@ -273,13 +239,9 @@ const Teleatendimento = () => {
                     </AlertDescription>
                   </Alert>
                 )}
-
-                <Button onClick={() => setPrivacyAccepted(true)} className="w-full">
-                  Aceitar e continuar
-                </Button>
+                <Button onClick={() => setPrivacyAccepted(true)} className="w-full">Aceitar e continuar</Button>
               </Card>
             )}
-
             {privacyAccepted && (
               <PreCallCheck
                 label={`Consulta com ${selectedPatientName}`}
@@ -293,21 +255,22 @@ const Teleatendimento = () => {
     );
   }
 
-  // IN-CALL
+  // IN-CALL — Premium layout
   if (viewState === "in-call") {
     return (
       <AppLayout title="Teleatendimento" description="Em consulta">
-        <div className="space-y-3">
+        <div ref={callContainerRef} className={`space-y-3 ${isFullscreen ? "bg-background p-4 h-screen flex flex-col" : ""}`}>
+          {/* Top bar */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <ConnectionIndicator status={webrtc.connectionStatus} />
-              <Badge variant="outline" className="gap-1">
+              <Badge variant="outline" className="gap-1 font-mono text-xs">
                 <Clock className="h-3 w-3" />
                 {formatDuration(elapsed)}
               </Badge>
               <span className="text-sm font-medium">{selectedPatientName}</span>
               {transcription.isListening && (
-                <Badge variant="secondary" className="gap-1 text-xs">
+                <Badge variant="secondary" className="gap-1 text-xs animate-pulse">
                   <ScrollText className="h-3 w-3" />
                   Transcrevendo
                 </Badge>
@@ -332,19 +295,38 @@ const Teleatendimento = () => {
             </div>
           </div>
 
-          {/* Interim transcription preview */}
+          {/* Media error */}
+          {webrtc.mediaError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-xs">{webrtc.mediaError}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Interim transcription */}
           {transcription.interimText && (
             <div className="p-2 rounded bg-muted/30 border border-border text-xs text-muted-foreground italic truncate">
               {transcription.interimText}
             </div>
           )}
 
-          <div className="flex gap-3">
+          {/* Video area */}
+          <div className={`flex gap-3 ${isFullscreen ? "flex-1 min-h-0" : ""}`}>
             <div className={`flex-1 space-y-3 ${chat.isOpen ? "" : "w-full"}`}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <VideoPanel stream={remoteStream} label="Paciente" />
-                <VideoPanel stream={webrtc.localStream} label="Você" muted mirrored />
-              </div>
+              {videoLayout === "grid" ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <VideoPanel stream={remoteStream} label="Paciente" />
+                  <VideoPanel stream={webrtc.localStream} label="Você" muted mirrored />
+                </div>
+              ) : (
+                <div className="relative">
+                  <VideoPanel stream={remoteStream} label="Paciente" isFocused />
+                  <div className="absolute bottom-4 right-4 w-48 z-10">
+                    <VideoPanel stream={webrtc.localStream} label="Você" muted mirrored />
+                  </div>
+                </div>
+              )}
+
               <CallControls
                 videoEnabled={webrtc.videoEnabled}
                 audioEnabled={webrtc.audioEnabled}
@@ -355,6 +337,14 @@ const Teleatendimento = () => {
                 onEndCall={endCall}
                 onToggleChat={chat.isOpen ? chat.closeChat : chat.openChat}
                 chatUnread={chat.unreadCount}
+                layout={videoLayout}
+                onLayoutChange={setVideoLayout}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
+                availableDevices={webrtc.availableDevices}
+                selectedVideoDevice={webrtc.selectedVideoDevice}
+                selectedAudioDevice={webrtc.selectedAudioDevice}
+                onSwitchDevice={webrtc.switchDevice}
               />
             </div>
 
@@ -366,10 +356,10 @@ const Teleatendimento = () => {
           </div>
 
           {currentSession && (
-            <Card className="p-3 bg-primary/5">
+            <Card className="p-3 bg-primary/5 border-primary/20">
               <div className="flex items-center justify-between">
-                <p className="text-sm truncate flex-1">
-                  <strong>Link:</strong> {window.location.origin}/sala/{currentSession.room_token}
+                <p className="text-xs truncate flex-1 text-muted-foreground">
+                  <strong className="text-foreground">Link:</strong> {window.location.origin}/sala/{currentSession.room_token}
                 </p>
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={copyLink}>
                   <Copy className="h-4 w-4" />
@@ -427,7 +417,6 @@ const Teleatendimento = () => {
               <Users className="h-5 w-5 text-muted-foreground" />
               <h3 className="font-semibold">Sessões recentes</h3>
             </div>
-
             <div className="space-y-2">
               {sessions.slice(0, 10).map((s) => (
                 <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
