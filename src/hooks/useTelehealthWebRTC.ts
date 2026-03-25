@@ -9,6 +9,15 @@ export interface MediaDeviceOption {
   kind: MediaDeviceKind;
 }
 
+export interface DebugInfo {
+  iceState: string;
+  connectionState: string;
+  signalingState: string;
+  activeDevices: { video: string; audio: string };
+  latencyMs: number | null;
+  reconnectAttempts: number;
+}
+
 interface UseTelehealthWebRTCOptions {
   roomToken: string;
   isHost: boolean;
@@ -17,10 +26,10 @@ interface UseTelehealthWebRTCOptions {
 }
 
 const VIDEO_CONSTRAINTS_TIERS = [
-  { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-  { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-  { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: "user" },
-  true, // any video
+  { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" as const },
+  { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" as const },
+  { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: "user" as const },
+  true,
 ];
 
 const AUDIO_CONSTRAINTS = {
@@ -28,6 +37,8 @@ const AUDIO_CONSTRAINTS = {
   noiseSuppression: true,
   autoGainControl: true,
 };
+
+const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000];
 
 export function useTelehealthWebRTC({
   roomToken,
@@ -44,6 +55,14 @@ export function useTelehealthWebRTC({
   const [availableDevices, setAvailableDevices] = useState<MediaDeviceOption[]>([]);
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>("");
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>("");
+  const [debugInfo, setDebugInfo] = useState<DebugInfo>({
+    iceState: "new",
+    connectionState: "new",
+    signalingState: "stable",
+    activeDevices: { video: "", audio: "" },
+    latencyMs: null,
+    reconnectAttempts: 0,
+  });
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -53,11 +72,42 @@ export function useTelehealthWebRTC({
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
+  const heartbeatRef = useRef<ReturnType<typeof setInterval>>();
+  const lastPongRef = useRef<number>(Date.now());
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
+  const isConnectedRef = useRef(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Load persisted device choices
+  useEffect(() => {
+    try {
+      const vid = localStorage.getItem("psicoone_video_device");
+      const aud = localStorage.getItem("psicoone_audio_device");
+      if (vid) setSelectedVideoDevice(vid);
+      if (aud) setSelectedAudioDevice(aud);
+    } catch {}
+  }, []);
 
   const updateStatus = useCallback((s: ConnectionStatus) => {
     setConnectionStatus(s);
     onConnectionStatus?.(s);
   }, [onConnectionStatus]);
+
+  const updateDebug = useCallback(() => {
+    const pc = pcRef.current;
+    if (!pc) return;
+    setDebugInfo({
+      iceState: pc.iceConnectionState,
+      connectionState: pc.connectionState,
+      signalingState: pc.signalingState,
+      activeDevices: {
+        video: localStreamRef.current?.getVideoTracks()[0]?.label || "none",
+        audio: localStreamRef.current?.getAudioTracks()[0]?.label || "none",
+      },
+      latencyMs: null,
+      reconnectAttempts: reconnectAttemptsRef.current,
+    });
+  }, []);
 
   // Enumerate devices
   const enumerateDevices = useCallback(async () => {
@@ -82,6 +132,51 @@ export function useTelehealthWebRTC({
     navigator.mediaDevices?.addEventListener?.("devicechange", enumerateDevices);
     return () => navigator.mediaDevices?.removeEventListener?.("devicechange", enumerateDevices);
   }, [enumerateDevices]);
+
+  // Tab visibility handler — restart ICE when returning to tab
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === "visible" && pcRef.current && isConnectedRef.current) {
+        const pc = pcRef.current;
+        if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
+          console.log("[WebRTC] Tab visible — restarting ICE");
+          updateStatus("reconnecting");
+          pc.restartIce();
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [updateStatus]);
+
+  // Heartbeat via DataChannel
+  const setupHeartbeat = useCallback((pc: RTCPeerConnection) => {
+    if (isHost) {
+      const dc = pc.createDataChannel("heartbeat");
+      dataChannelRef.current = dc;
+      dc.onopen = () => {
+        heartbeatRef.current = setInterval(() => {
+          if (dc.readyState === "open") {
+            dc.send("ping");
+          }
+        }, 3000);
+      };
+      dc.onmessage = (e) => {
+        if (e.data === "pong") lastPongRef.current = Date.now();
+      };
+    } else {
+      pc.ondatachannel = (event) => {
+        const dc = event.channel;
+        dataChannelRef.current = dc;
+        dc.onmessage = (e) => {
+          if (e.data === "ping") {
+            dc.send("pong");
+            lastPongRef.current = Date.now();
+          }
+        };
+      };
+    }
+  }, [isHost]);
 
   const createPeerConnection = useCallback(() => {
     const config: RTCConfiguration = {
@@ -108,6 +203,7 @@ export function useTelehealthWebRTC({
     };
 
     const pc = new RTCPeerConnection(config);
+    setupHeartbeat(pc);
 
     pc.onicecandidate = (event) => {
       if (event.candidate && channelRef.current) {
@@ -128,6 +224,7 @@ export function useTelehealthWebRTC({
 
     pc.oniceconnectionstatechange = () => {
       console.log("[WebRTC] ICE state:", pc.iceConnectionState);
+      updateDebug();
       switch (pc.iceConnectionState) {
         case "connected":
         case "completed":
@@ -136,7 +233,9 @@ export function useTelehealthWebRTC({
           break;
         case "disconnected":
           updateStatus("unstable");
-          setTimeout(() => {
+          // Wait 3s, then restart ICE if still disconnected
+          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = setTimeout(() => {
             if (pc.iceConnectionState === "disconnected") {
               updateStatus("reconnecting");
               pc.restartIce();
@@ -149,6 +248,13 @@ export function useTelehealthWebRTC({
         case "closed":
           updateStatus("disconnected");
           break;
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      updateDebug();
+      if (pc.connectionState === "failed") {
+        handleReconnect(pc);
       }
     };
 
@@ -170,18 +276,27 @@ export function useTelehealthWebRTC({
 
     pcRef.current = pc;
     return pc;
-  }, [onRemoteStream, updateStatus]);
+  }, [onRemoteStream, updateStatus, setupHeartbeat, updateDebug]);
 
   const handleReconnect = useCallback((pc: RTCPeerConnection) => {
     if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
       updateStatus("disconnected");
+      setMediaError("Conexão perdida. Tente reconectar manualmente.");
       console.error("[WebRTC] Max reconnection attempts reached");
       return;
     }
+    const attempt = reconnectAttemptsRef.current;
     reconnectAttemptsRef.current++;
     updateStatus("reconnecting");
-    console.log(`[WebRTC] Reconnect attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
-    pc.restartIce();
+    const delay = RECONNECT_DELAYS[Math.min(attempt, RECONNECT_DELAYS.length - 1)];
+    console.log(`[WebRTC] Reconnect attempt ${attempt + 1}/${maxReconnectAttempts} in ${delay}ms`);
+    
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = setTimeout(() => {
+      if (pc.connectionState !== "closed") {
+        pc.restartIce();
+      }
+    }, delay);
   }, [updateStatus]);
 
   const getMediaErrorMessage = (err: unknown): string => {
@@ -204,7 +319,7 @@ export function useTelehealthWebRTC({
     return "Erro desconhecido ao acessar câmera/microfone.";
   };
 
-  // Progressive resolution fallback
+  // Progressive resolution fallback with retry
   const startMedia = useCallback(async (videoOn = true, audioOn = true) => {
     setMediaError(null);
 
@@ -212,28 +327,33 @@ export function useTelehealthWebRTC({
       ? (selectedAudioDevice ? { ...AUDIO_CONSTRAINTS, deviceId: { exact: selectedAudioDevice } } : AUDIO_CONSTRAINTS)
       : false;
 
+    // Try with video (progressive fallback)
     if (videoOn) {
-      for (const videoConstraint of VIDEO_CONSTRAINTS_TIERS) {
-        try {
-          const vc = typeof videoConstraint === "object" && selectedVideoDevice
-            ? { ...videoConstraint, deviceId: { exact: selectedVideoDevice } }
-            : videoConstraint;
+      for (let retry = 0; retry < 2; retry++) {
+        for (const videoConstraint of VIDEO_CONSTRAINTS_TIERS) {
+          try {
+            const vc = typeof videoConstraint === "object" && selectedVideoDevice
+              ? { ...videoConstraint, deviceId: { exact: selectedVideoDevice } }
+              : videoConstraint;
 
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: vc,
-            audio: audioConstraints,
-          });
-          console.log("[WebRTC] Got media stream with video constraint:", JSON.stringify(videoConstraint));
-          localStreamRef.current = stream;
-          setLocalStream(stream);
-          setVideoEnabled(true);
-          setAudioEnabled(audioOn);
-          originalVideoTrackRef.current = stream.getVideoTracks()[0] || null;
-          await enumerateDevices();
-          return stream;
-        } catch (err) {
-          console.warn("[WebRTC] Video constraint failed, trying next tier:", err);
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: vc,
+              audio: audioConstraints,
+            });
+            console.log("[WebRTC] Got media stream:", JSON.stringify(videoConstraint));
+            localStreamRef.current = stream;
+            setLocalStream(stream);
+            setVideoEnabled(true);
+            setAudioEnabled(audioOn);
+            originalVideoTrackRef.current = stream.getVideoTracks()[0] || null;
+            await enumerateDevices();
+            return stream;
+          } catch (err) {
+            console.warn(`[WebRTC] Video tier failed (attempt ${retry + 1}):`, err);
+          }
         }
+        // Brief pause before retry round
+        if (retry === 0) await new Promise(r => setTimeout(r, 500));
       }
     }
 
@@ -282,10 +402,15 @@ export function useTelehealthWebRTC({
     stream.getTracks().forEach(t => t.stop());
   }, []);
 
-  // Switch device mid-call
+  // Switch device mid-call — persist choice
   const switchDevice = useCallback(async (kind: "video" | "audio", deviceId: string) => {
-    if (kind === "video") setSelectedVideoDevice(deviceId);
-    else setSelectedAudioDevice(deviceId);
+    if (kind === "video") {
+      setSelectedVideoDevice(deviceId);
+      try { localStorage.setItem("psicoone_video_device", deviceId); } catch {}
+    } else {
+      setSelectedAudioDevice(deviceId);
+      try { localStorage.setItem("psicoone_audio_device", deviceId); } catch {}
+    }
 
     if (!localStreamRef.current || !pcRef.current) return;
 
@@ -298,7 +423,6 @@ export function useTelehealthWebRTC({
         const sender = pcRef.current.getSenders().find(s => s.track?.kind === "video");
         if (sender) await sender.replaceTrack(newTrack);
 
-        // Replace track in local stream
         const oldTrack = localStreamRef.current.getVideoTracks()[0];
         if (oldTrack) {
           localStreamRef.current.removeTrack(oldTrack);
@@ -323,14 +447,16 @@ export function useTelehealthWebRTC({
         localStreamRef.current.addTrack(newTrack);
         setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
       }
+      updateDebug();
     } catch (e) {
       console.error(`[WebRTC] Switch ${kind} device error:`, e);
     }
-  }, []);
+  }, [updateDebug]);
 
   const connect = useCallback(async () => {
     updateStatus("connecting");
     setMediaError(null);
+    isConnectedRef.current = true;
 
     const stream = await startMedia();
     const pc = createPeerConnection();
@@ -416,12 +542,16 @@ export function useTelehealthWebRTC({
   }, [roomToken, isHost, startMedia, createPeerConnection, updateStatus]);
 
   const disconnect = useCallback(() => {
+    isConnectedRef.current = false;
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     channelRef.current?.send({ type: "broadcast", event: "end-call", payload: {} });
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     pcRef.current?.close();
     channelRef.current?.unsubscribe();
     pcRef.current = null;
     channelRef.current = null;
+    dataChannelRef.current = null;
     localStreamRef.current = null;
     setLocalStream(null);
     setVideoEnabled(true);
@@ -478,6 +608,9 @@ export function useTelehealthWebRTC({
 
   useEffect(() => {
     return () => {
+      isConnectedRef.current = false;
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       pcRef.current?.close();
       channelRef.current?.unsubscribe();
@@ -494,6 +627,7 @@ export function useTelehealthWebRTC({
     availableDevices,
     selectedVideoDevice,
     selectedAudioDevice,
+    debugInfo,
     connect,
     disconnect,
     toggleVideo,
