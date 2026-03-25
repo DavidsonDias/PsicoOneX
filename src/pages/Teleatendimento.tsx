@@ -10,6 +10,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Video, Clock, Users, Copy, ExternalLink, Mic, MicOff, AlertTriangle, ScrollText } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { DebugOverlay } from "@/components/telehealth/DebugOverlay";
+import { SessionActions } from "@/components/telehealth/SessionActions";
 import { useTelehealthWebRTC } from "@/hooks/useTelehealthWebRTC";
 import { useTelehealthChat } from "@/hooks/useTelehealthChat";
 import { useSessionTranscription } from "@/hooks/useSessionTranscription";
