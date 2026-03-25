@@ -294,6 +294,7 @@ const Teleatendimento = () => {
                 <Copy className="h-3.5 w-3.5" />
                 Link
               </Button>
+              <DebugOverlay debug={webrtc.debugInfo} />
             </div>
           </div>
 
