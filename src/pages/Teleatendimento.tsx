@@ -10,6 +10,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Video, Clock, Users, Copy, ExternalLink, Mic, MicOff, AlertTriangle, ScrollText } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { DebugOverlay } from "@/components/telehealth/DebugOverlay";
+import { SessionActions } from "@/components/telehealth/SessionActions";
 import { useTelehealthWebRTC } from "@/hooks/useTelehealthWebRTC";
 import { useTelehealthChat } from "@/hooks/useTelehealthChat";
 import { useSessionTranscription } from "@/hooks/useSessionTranscription";
@@ -292,6 +294,7 @@ const Teleatendimento = () => {
                 <Copy className="h-3.5 w-3.5" />
                 Link
               </Button>
+              <DebugOverlay debug={webrtc.debugInfo} />
             </div>
           </div>
 
@@ -437,21 +440,24 @@ const Teleatendimento = () => {
                       </p>
                     </div>
                   </div>
-                  {s.status === "waiting" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const link = `${window.location.origin}/sala/${s.room_token}`;
-                        navigator.clipboard.writeText(link);
-                        toast.success("Link copiado!");
-                      }}
-                      className="gap-1"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Link
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {s.status === "waiting" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const link = `${window.location.origin}/sala/${s.room_token}`;
+                          navigator.clipboard.writeText(link);
+                          toast.success("Link copiado!");
+                        }}
+                        className="gap-1"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Link
+                      </Button>
+                    )}
+                    <SessionActions sessionId={s.id} status={s.status} onUpdate={loadData} />
+                  </div>
                 </div>
               ))}
             </div>
