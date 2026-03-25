@@ -440,21 +440,24 @@ const Teleatendimento = () => {
                       </p>
                     </div>
                   </div>
-                  {s.status === "waiting" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const link = `${window.location.origin}/sala/${s.room_token}`;
-                        navigator.clipboard.writeText(link);
-                        toast.success("Link copiado!");
-                      }}
-                      className="gap-1"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Link
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {s.status === "waiting" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const link = `${window.location.origin}/sala/${s.room_token}`;
+                          navigator.clipboard.writeText(link);
+                          toast.success("Link copiado!");
+                        }}
+                        className="gap-1"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Link
+                      </Button>
+                    )}
+                    <SessionActions sessionId={s.id} status={s.status} onUpdate={loadData} />
+                  </div>
                 </div>
               ))}
             </div>
