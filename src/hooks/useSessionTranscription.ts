@@ -1,19 +1,19 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import type { TranscriptSegment, TranscriptionEngine } from "@/lib/transcription/types";
+import { WebSpeechAdapter } from "@/lib/transcription/webspeech-adapter";
+import { DeepgramAdapter } from "@/lib/transcription/deepgram-adapter";
 
-export interface TranscriptEntry {
-  id: string;
-  speaker: "local" | "remote";
-  speakerLabel: string;
-  text: string;
-  timestamp: string;
-  isFinal: boolean;
-}
+export type { TranscriptSegment };
+
+// Re-export for backward compatibility
+export type TranscriptEntry = TranscriptSegment;
 
 interface UseSessionTranscriptionOptions {
   enabled: boolean;
   localLabel: string;
   remoteLabel: string;
   lang?: string;
+  engine?: TranscriptionEngine;
 }
 
 export function useSessionTranscription({
@@ -21,97 +21,110 @@ export function useSessionTranscription({
   localLabel,
   remoteLabel,
   lang = "pt-BR",
+  engine = "auto",
 }: UseSessionTranscriptionOptions) {
-  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [transcript, setTranscript] = useState<TranscriptSegment[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState("");
   const [supported, setSupported] = useState(true);
-  const recognitionRef = useRef<any>(null);
-  const restartTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const [activeEngine, setActiveEngine] = useState<TranscriptionEngine>("webspeech");
+  const [engineChecked, setEngineChecked] = useState(false);
 
+  const adapterRef = useRef<WebSpeechAdapter | DeepgramAdapter | null>(null);
+
+  // Auto-detect best available engine
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setSupported(false);
+    if (engine !== "auto") {
+      setActiveEngine(engine);
+      setEngineChecked(true);
+      return;
     }
-  }, []);
+
+    let cancelled = false;
+    DeepgramAdapter.isAvailable().then((available) => {
+      if (cancelled) return;
+      setActiveEngine(available ? "deepgram" : "webspeech");
+      setEngineChecked(true);
+      if (available) {
+        console.log("[Transcription] Deepgram disponível — usando engine server-side");
+      } else {
+        console.log("[Transcription] Deepgram não configurado — usando Web Speech API (fallback)");
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setActiveEngine("webspeech");
+        setEngineChecked(true);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [engine]);
+
+  const callbacks = useCallback(() => ({
+    onSegment: (segment: TranscriptSegment) => {
+      setTranscript((prev) => [...prev, segment]);
+    },
+    onInterim: (text: string) => {
+      setInterimText(text);
+    },
+    onError: (error: string) => {
+      console.warn("[Transcription]", error);
+    },
+    onStatusChange: (listening: boolean) => {
+      setIsListening(listening);
+    },
+  }), []);
 
   const startListening = useCallback(() => {
-    if (!enabled || !supported) return;
+    if (!enabled || !engineChecked) return;
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    const config = {
+      engine: activeEngine,
+      lang,
+      localLabel,
+      remoteLabel,
+      diarize: true,
+      punctuate: true,
+      interimResults: true,
+      deepgramModel: "nova-2",
+    };
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = lang;
-    recognition.maxAlternatives = 1;
+    const cbs = callbacks();
 
-    recognition.onresult = (event: any) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const text = result[0].transcript;
-
-        if (result.isFinal) {
-          const trimmed = text.trim();
-          if (trimmed) {
-            setTranscript((prev) => [
-              ...prev,
-              {
-                id: crypto.randomUUID(),
-                speaker: "local",
-                speakerLabel: localLabel,
-                text: trimmed,
-                timestamp: new Date().toISOString(),
-                isFinal: true,
-              },
-            ]);
-          }
-          setInterimText("");
+    if (activeEngine === "deepgram") {
+      const adapter = new DeepgramAdapter(config, cbs);
+      if (adapter.isSupported()) {
+        adapterRef.current = adapter;
+        adapter.start();
+        setSupported(true);
+      } else {
+        // Fallback to WebSpeech
+        const fallback = new WebSpeechAdapter(config, cbs);
+        if (fallback.isSupported()) {
+          adapterRef.current = fallback;
+          fallback.start();
+          setActiveEngine("webspeech");
+          setSupported(true);
         } else {
-          interim += text;
+          setSupported(false);
         }
       }
-      if (interim) setInterimText(interim);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.warn("[Transcription] Error:", event.error);
-      if (event.error === "no-speech" || event.error === "aborted") {
-        // Auto-restart
-        restartTimeoutRef.current = setTimeout(() => {
-          if (isListening) startListening();
-        }, 500);
+    } else {
+      const adapter = new WebSpeechAdapter(config, cbs);
+      if (adapter.isSupported()) {
+        adapterRef.current = adapter;
+        adapter.start();
+        setSupported(true);
+      } else {
+        setSupported(false);
       }
-    };
-
-    recognition.onend = () => {
-      // Auto-restart if still supposed to be listening
-      if (isListening) {
-        restartTimeoutRef.current = setTimeout(() => {
-          startListening();
-        }, 300);
-      }
-    };
-
-    try {
-      recognition.start();
-      recognitionRef.current = recognition;
-      setIsListening(true);
-    } catch (e) {
-      console.error("[Transcription] Start failed:", e);
     }
-  }, [enabled, supported, lang, localLabel, isListening]);
+  }, [enabled, engineChecked, activeEngine, lang, localLabel, remoteLabel, callbacks]);
 
   const stopListening = useCallback(() => {
+    adapterRef.current?.stop();
+    adapterRef.current = null;
     setIsListening(false);
-    if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
-    try {
-      recognitionRef.current?.stop();
-    } catch {}
-    recognitionRef.current = null;
     setInterimText("");
   }, []);
 
@@ -127,10 +140,11 @@ export function useSessionTranscription({
           text: text.trim(),
           timestamp: new Date().toISOString(),
           isFinal: true,
+          engine: activeEngine === "deepgram" ? "deepgram" : "webspeech",
         },
       ]);
     },
-    [remoteLabel]
+    [remoteLabel, activeEngine]
   );
 
   const getFullTranscript = useCallback(() => {
@@ -147,15 +161,16 @@ export function useSessionTranscription({
 
   useEffect(() => {
     return () => {
-      stopListening();
+      adapterRef.current?.stop();
     };
-  }, [stopListening]);
+  }, []);
 
   return {
     transcript,
     interimText,
     isListening,
     supported,
+    activeEngine,
     startListening,
     stopListening,
     addRemoteEntry,
