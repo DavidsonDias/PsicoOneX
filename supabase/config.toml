@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.customer-portal]
 verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = false
