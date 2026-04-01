@@ -528,6 +528,7 @@ export default function Patients() {
                   submitLabel={scheduleEnabled ? "Cadastrar e Agendar" : "Cadastrar Paciente"}
                   loading={creating}
                   onCancel={() => setDialogOpen(false)}
+                  onFinancialChange={handleFinancialChange}
                   extraContent={
                     <>
                       <Separator />
@@ -535,7 +536,7 @@ export default function Patients() {
                         <div className="flex items-center justify-between">
                           <div className="space-y-1">
                             <h3 className="text-sm font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" />Criar agendamento recorrente agora?</h3>
-                            <p className="text-xs text-muted-foreground">Configure sessões semanais automáticas para este paciente</p>
+                            <p className="text-xs text-muted-foreground">Configure sessões automáticas para este paciente</p>
                           </div>
                           <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
                         </div>
@@ -546,11 +547,44 @@ export default function Patients() {
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-2"><Label className="text-xs">Dia da Semana</Label><Select value={scheduleWeekday} onValueChange={setScheduleWeekday}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{WEEKDAYS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent></Select></div>
                                   <div className="space-y-2"><Label className="text-xs">Horário</Label><Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} /></div>
-                                  <div className="space-y-2"><Label className="text-xs">Duração</Label><Select value={scheduleDuration} onValueChange={setScheduleDuration}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="30">30 min</SelectItem><SelectItem value="50">50 min</SelectItem><SelectItem value="60">1 hora</SelectItem><SelectItem value="90">1h 30min</SelectItem><SelectItem value="120">2 horas</SelectItem></SelectContent></Select></div>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Duração</Label>
+                                    <Select value={scheduleDuration} onValueChange={setScheduleDuration}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="30">30 min</SelectItem>
+                                        <SelectItem value="40">40 min</SelectItem>
+                                        <SelectItem value="50">50 min</SelectItem>
+                                        <SelectItem value="60">1 hora</SelectItem>
+                                        <SelectItem value="90">1h 30min</SelectItem>
+                                        <SelectItem value="120">2 horas</SelectItem>
+                                        <SelectItem value="custom">Personalizado</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    {scheduleDuration === "custom" && (
+                                      <Input
+                                        type="number"
+                                        min={10}
+                                        max={180}
+                                        placeholder="Ex: 45"
+                                        value={customDuration}
+                                        onChange={(e) => setCustomDuration(e.target.value)}
+                                        className="mt-2"
+                                      />
+                                    )}
+                                  </div>
                                   <div className="space-y-2"><Label className="text-xs flex items-center gap-1"><DollarSign className="h-3 w-3" />Valor</Label><Input type="number" step="0.01" value={scheduleValue} onChange={(e) => setScheduleValue(e.target.value)} /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2"><Label className="text-xs">Data de Início</Label><Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} /></div>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Data de Início</Label>
+                                    <Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} />
+                                    {scheduleStartDate && (
+                                      <p className="text-[11px] text-muted-foreground">
+                                        Início: {format(new Date(scheduleStartDate + "T00:00:00"), "dd/MM/yyyy (EEEE)", { locale: ptBR })}
+                                      </p>
+                                    )}
+                                  </div>
                                   <div className="space-y-2"><Label className="text-xs">Tipo</Label><Select value={scheduleType} onValueChange={setScheduleType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="presential">Presencial</SelectItem><SelectItem value="online">Online</SelectItem></SelectContent></Select></div>
                                 </div>
                                 <div className="space-y-2">
@@ -567,8 +601,10 @@ export default function Patients() {
                                     <div className="grid grid-cols-2 gap-2 text-sm">
                                       <div><span className="text-muted-foreground">Dia:</span> <span className="font-medium">{scheduleSummary.weekdayLabel}</span></div>
                                       <div><span className="text-muted-foreground">Horário:</span> <span className="font-medium">{scheduleSummary.time}</span></div>
-                                      <div><span className="text-muted-foreground">Valor:</span> <span className="font-medium text-green-600">R$ {scheduleSummary.value.toFixed(2)}</span></div>
+                                      <div><span className="text-muted-foreground">Valor:</span> <span className="font-medium text-emerald-600 dark:text-emerald-400">R$ {scheduleSummary.value.toFixed(2)}</span></div>
                                       <div><span className="text-muted-foreground">Tipo:</span> <span className="font-medium">{scheduleSummary.type}</span></div>
+                                      <div><span className="text-muted-foreground">Frequência:</span> <span className="font-medium capitalize">{scheduleFrequency}</span></div>
+                                      <div><span className="text-muted-foreground">Duração:</span> <span className="font-medium">{getEffectiveDuration()} min</span></div>
                                     </div>
                                   </div>
                                 )}
