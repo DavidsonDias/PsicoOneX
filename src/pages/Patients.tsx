@@ -187,7 +187,7 @@ export default function Patients() {
     }
   };
 
-  const generateWeeklyDates = (startDate: string, weekday: number, endDate?: string, maxWeeks = 12) => {
+  const generateRecurringDates = (startDate: string, weekday: number, freq: SessionFrequency, endDate?: string, maxWeeks = 12) => {
     const dates: Date[] = [];
     let current = new Date(startDate + "T00:00:00");
     const currentDay = current.getDay();
@@ -195,8 +195,9 @@ export default function Patients() {
     if (daysUntilTarget > 0) current = addDays(current, daysUntilTarget);
     const end = endDate ? new Date(endDate + "T23:59:59") : null;
     const limit = end ? 52 : maxWeeks;
+    const weekStep = freq === "quinzenal" ? 2 : freq === "mensal" ? 4 : 1;
     for (let i = 0; i < limit; i++) {
-      const d = addWeeks(current, i);
+      const d = addWeeks(current, i * weekStep);
       if (end && d > end) break;
       dates.push(d);
     }
