@@ -125,29 +125,48 @@ export default function Patients() {
   const [scheduleWeekday, setScheduleWeekday] = useState("3");
   const [scheduleTime, setScheduleTime] = useState("19:00");
   const [scheduleDuration, setScheduleDuration] = useState("50");
+  const [customDuration, setCustomDuration] = useState("");
   const [scheduleValue, setScheduleValue] = useState("200");
   const [scheduleStartDate, setScheduleStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [scheduleEndType, setScheduleEndType] = useState<"indefinite" | "date">("indefinite");
   const [scheduleEndDate, setScheduleEndDate] = useState("");
   const [scheduleType, setScheduleType] = useState("presential");
+  const [scheduleFrequency, setScheduleFrequency] = useState<SessionFrequency>("semanal");
 
-  useEffect(() => { loadPatients(); }, []);
+  // Smart date: auto-calculate start date based on selected weekday
+  const getNextDateForWeekday = useCallback((weekdayStr: string) => {
+    const target = parseInt(weekdayStr);
+    const today = new Date();
+    const currentDay = today.getDay();
+    const daysUntil = (target - currentDay + 7) % 7;
+    const nextDate = addDays(today, daysUntil);
+    return format(nextDate, "yyyy-MM-dd");
+  }, []);
 
+  // Auto-update start date when weekday changes
   useEffect(() => {
-    if (editingPatient) {
-      setEditPhone(editingPatient.phone || "");
-      setEditCpf(editingPatient.cpf || "");
-      setEditEmergencyPhone(editingPatient.emergency_phone || "");
-    }
-  }, [editingPatient]);
+    setScheduleStartDate(getNextDateForWeekday(scheduleWeekday));
+  }, [scheduleWeekday, getNextDateForWeekday]);
+
+  // Sync financial data from PatientForm to scheduling section
+  const handleFinancialChange = useCallback((data: { sessionValue: string; frequency: SessionFrequency; monthlyPlan: string }) => {
+    if (data.sessionValue) setScheduleValue(data.sessionValue);
+    if (data.frequency) setScheduleFrequency(data.frequency);
+  }, []);
+
+  const getEffectiveDuration = () => {
+    if (scheduleDuration === "custom") return parseInt(customDuration) || 50;
+    return parseInt(scheduleDuration) || 50;
+  };
 
   const resetCreateForm = () => {
     setPhone(""); setCpf(""); setEmergencyPhone("");
     setScheduleEnabled(false); setScheduleWeekday("3");
     setScheduleTime("19:00"); setScheduleDuration("50");
-    setScheduleValue("200"); setScheduleStartDate(format(new Date(), "yyyy-MM-dd"));
+    setCustomDuration(""); setScheduleValue("200");
+    setScheduleStartDate(format(new Date(), "yyyy-MM-dd"));
     setScheduleEndType("indefinite"); setScheduleEndDate("");
-    setScheduleType("presential");
+    setScheduleType("presential"); setScheduleFrequency("semanal");
   };
 
   const loadPatients = async () => {
