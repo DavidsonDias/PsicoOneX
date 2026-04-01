@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { DollarSign, CheckCircle2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DollarSign, CheckCircle2, Info, Repeat } from "lucide-react";
+
+export type SessionFrequency = "semanal" | "quinzenal" | "mensal" | "avulso";
 
 export interface PatientFormData {
   full_name: string;
@@ -20,6 +23,7 @@ export interface PatientFormData {
   default_session_value: string;
   payment_day: string;
   monthly_plan_value: string;
+  frequency: SessionFrequency;
 }
 
 interface PatientFormProps {
@@ -28,10 +32,10 @@ interface PatientFormProps {
   submitLabel?: string;
   loading?: boolean;
   onCancel?: () => void;
-  /** Render extra content before submit buttons (e.g. scheduling section) */
   extraContent?: React.ReactNode;
-  /** Compact mode hides some optional fields */
   compact?: boolean;
+  /** Called whenever financial fields change so parent can sync scheduling */
+  onFinancialChange?: (data: { sessionValue: string; frequency: SessionFrequency; monthlyPlan: string }) => void;
 }
 
 const formatPhone = (value: string): string => {
@@ -50,6 +54,40 @@ const formatCPF = (value: string): string => {
   return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
 };
 
+function calcMonthlyPlan(sessionValue: string, frequency: SessionFrequency): string {
+  const val = parseFloat(sessionValue);
+  if (!val || isNaN(val)) return "";
+  switch (frequency) {
+    case "semanal": return (val * 4).toFixed(2);
+    case "quinzenal": return (val * 2).toFixed(2);
+    case "mensal": return val.toFixed(2);
+    case "avulso": return "";
+    default: return "";
+  }
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline-block ml-1" />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[220px] text-xs">
+          <p>{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+const FREQUENCY_OPTIONS: { value: SessionFrequency; label: string }[] = [
+  { value: "semanal", label: "Semanal" },
+  { value: "quinzenal", label: "Quinzenal" },
+  { value: "mensal", label: "Mensal" },
+  { value: "avulso", label: "Avulso" },
+];
+
 export function PatientForm({
   initialData,
   onSubmit,
@@ -58,18 +96,54 @@ export function PatientForm({
   onCancel,
   extraContent,
   compact = false,
+  onFinancialChange,
 }: PatientFormProps) {
   const [phone, setPhone] = useState(initialData?.phone || "");
   const [cpf, setCpf] = useState(initialData?.cpf || "");
   const [emergencyPhone, setEmergencyPhone] = useState(initialData?.emergency_phone || "");
+  const [sessionValue, setSessionValue] = useState(initialData?.default_session_value || "");
+  const [frequency, setFrequency] = useState<SessionFrequency>(initialData?.frequency || "semanal");
+  const [monthlyPlan, setMonthlyPlan] = useState(initialData?.monthly_plan_value || "");
+  const [monthlyPlanManual, setMonthlyPlanManual] = useState(false);
 
   useEffect(() => {
     if (initialData) {
       setPhone(initialData.phone || "");
       setCpf(initialData.cpf || "");
       setEmergencyPhone(initialData.emergency_phone || "");
+      setSessionValue(initialData.default_session_value || "");
+      setFrequency(initialData.frequency || "semanal");
+      setMonthlyPlan(initialData.monthly_plan_value || "");
     }
   }, [initialData]);
+
+  // Auto-calc monthly plan when session value or frequency changes (unless manual override)
+  useEffect(() => {
+    if (!monthlyPlanManual) {
+      const calculated = calcMonthlyPlan(sessionValue, frequency);
+      setMonthlyPlan(calculated);
+    }
+  }, [sessionValue, frequency, monthlyPlanManual]);
+
+  // Notify parent of financial field changes
+  useEffect(() => {
+    onFinancialChange?.({ sessionValue, frequency, monthlyPlan });
+  }, [sessionValue, frequency, monthlyPlan]);
+
+  const handleMonthlyPlanChange = (val: string) => {
+    setMonthlyPlanManual(true);
+    setMonthlyPlan(val);
+  };
+
+  const handleFrequencyChange = (val: SessionFrequency) => {
+    setFrequency(val);
+    setMonthlyPlanManual(false); // reset manual override on frequency change
+  };
+
+  const handleSessionValueChange = (val: string) => {
+    setSessionValue(val);
+    setMonthlyPlanManual(false);
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -84,9 +158,10 @@ export function PatientForm({
       emergency_contact: (fd.get("emergency_contact") as string) || "",
       emergency_phone: emergencyPhone,
       notes: (fd.get("notes") as string) || "",
-      default_session_value: (fd.get("default_session_value") as string) || "",
+      default_session_value: sessionValue,
       payment_day: (fd.get("payment_day") as string) || "",
-      monthly_plan_value: (fd.get("monthly_plan_value") as string) || "",
+      monthly_plan_value: monthlyPlan,
+      frequency,
     });
   };
 
@@ -146,13 +221,51 @@ export function PatientForm({
         <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <DollarSign className="h-4 w-4" />Dados Financeiros
         </h3>
+
+        {/* Frequency selector */}
+        <div className="space-y-2">
+          <Label className="flex items-center">
+            <Repeat className="h-3.5 w-3.5 mr-1.5" />
+            Frequência do Atendimento
+            <InfoTooltip text="Define a periodicidade dos atendimentos e calcula automaticamente o plano mensal." />
+          </Label>
+          <div className="flex gap-2">
+            {FREQUENCY_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                type="button"
+                size="sm"
+                variant={frequency === opt.value ? "default" : "outline"}
+                onClick={() => handleFrequencyChange(opt.value)}
+                className="flex-1"
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="default_session_value">Valor da Sessão (R$)</Label>
-            <Input id="default_session_value" name="default_session_value" type="number" step="0.01" placeholder="200.00" defaultValue={initialData?.default_session_value} />
+            <Label htmlFor="default_session_value" className="flex items-center">
+              Valor da Sessão (R$)
+              <InfoTooltip text="Valor cobrado por cada atendimento realizado." />
+            </Label>
+            <Input
+              id="default_session_value"
+              name="default_session_value"
+              type="number"
+              step="0.01"
+              placeholder="200.00"
+              value={sessionValue}
+              onChange={(e) => handleSessionValueChange(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="payment_day">Dia de Pagamento</Label>
+            <Label htmlFor="payment_day" className="flex items-center">
+              Dia de Pagamento
+              <InfoTooltip text="Dia do mês em que o paciente realiza o pagamento." />
+            </Label>
             <Select name="payment_day" defaultValue={initialData?.payment_day || ""}>
               <SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger>
               <SelectContent>
@@ -163,8 +276,26 @@ export function PatientForm({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="monthly_plan_value">Plano Mensal (R$)</Label>
-            <Input id="monthly_plan_value" name="monthly_plan_value" type="number" step="0.01" placeholder="0.00" defaultValue={initialData?.monthly_plan_value} />
+            <Label htmlFor="monthly_plan_value" className="flex items-center">
+              Plano Mensal (R$)
+              <InfoTooltip text="Valor total mensal baseado na frequência dos atendimentos. Calculado automaticamente mas pode ser editado." />
+            </Label>
+            <div className="relative">
+              <Input
+                id="monthly_plan_value"
+                name="monthly_plan_value"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={monthlyPlan}
+                onChange={(e) => handleMonthlyPlanChange(e.target.value)}
+              />
+              {!monthlyPlanManual && monthlyPlan && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  auto
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>

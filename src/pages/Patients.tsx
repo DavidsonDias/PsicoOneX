@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { useNavigate } from "react-router-dom";
@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, Users, LayoutGrid, List, UserPlus, TrendingUp, Clock, Upload, Calendar, DollarSign, Repeat, CheckCircle2, Download } from "lucide-react";
+import { Plus, Search, Users, LayoutGrid, List, UserPlus, TrendingUp, Clock, Upload, Calendar, DollarSign, Repeat, CheckCircle2, Download, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkActions } from "@/components/patients/BulkActions";
-import { PatientForm, PatientFormData } from "@/components/patients/PatientForm";
+import { PatientForm, PatientFormData, SessionFrequency } from "@/components/patients/PatientForm";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
 import { format, addWeeks, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -125,29 +125,50 @@ export default function Patients() {
   const [scheduleWeekday, setScheduleWeekday] = useState("3");
   const [scheduleTime, setScheduleTime] = useState("19:00");
   const [scheduleDuration, setScheduleDuration] = useState("50");
+  const [customDuration, setCustomDuration] = useState("");
   const [scheduleValue, setScheduleValue] = useState("200");
   const [scheduleStartDate, setScheduleStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [scheduleEndType, setScheduleEndType] = useState<"indefinite" | "date">("indefinite");
   const [scheduleEndDate, setScheduleEndDate] = useState("");
   const [scheduleType, setScheduleType] = useState("presential");
+  const [scheduleFrequency, setScheduleFrequency] = useState<SessionFrequency>("semanal");
 
   useEffect(() => { loadPatients(); }, []);
 
+  // Smart date: auto-calculate start date based on selected weekday
+  const getNextDateForWeekday = useCallback((weekdayStr: string) => {
+    const target = parseInt(weekdayStr);
+    const today = new Date();
+    const currentDay = today.getDay();
+    const daysUntil = (target - currentDay + 7) % 7;
+    const nextDate = addDays(today, daysUntil);
+    return format(nextDate, "yyyy-MM-dd");
+  }, []);
+
+  // Auto-update start date when weekday changes
   useEffect(() => {
-    if (editingPatient) {
-      setEditPhone(editingPatient.phone || "");
-      setEditCpf(editingPatient.cpf || "");
-      setEditEmergencyPhone(editingPatient.emergency_phone || "");
-    }
-  }, [editingPatient]);
+    setScheduleStartDate(getNextDateForWeekday(scheduleWeekday));
+  }, [scheduleWeekday, getNextDateForWeekday]);
+
+  // Sync financial data from PatientForm to scheduling section
+  const handleFinancialChange = useCallback((data: { sessionValue: string; frequency: SessionFrequency; monthlyPlan: string }) => {
+    if (data.sessionValue) setScheduleValue(data.sessionValue);
+    if (data.frequency) setScheduleFrequency(data.frequency);
+  }, []);
+
+  const getEffectiveDuration = () => {
+    if (scheduleDuration === "custom") return parseInt(customDuration) || 50;
+    return parseInt(scheduleDuration) || 50;
+  };
 
   const resetCreateForm = () => {
     setPhone(""); setCpf(""); setEmergencyPhone("");
     setScheduleEnabled(false); setScheduleWeekday("3");
     setScheduleTime("19:00"); setScheduleDuration("50");
-    setScheduleValue("200"); setScheduleStartDate(format(new Date(), "yyyy-MM-dd"));
+    setCustomDuration(""); setScheduleValue("200");
+    setScheduleStartDate(format(new Date(), "yyyy-MM-dd"));
     setScheduleEndType("indefinite"); setScheduleEndDate("");
-    setScheduleType("presential");
+    setScheduleType("presential"); setScheduleFrequency("semanal");
   };
 
   const loadPatients = async () => {
@@ -166,7 +187,7 @@ export default function Patients() {
     }
   };
 
-  const generateWeeklyDates = (startDate: string, weekday: number, endDate?: string, maxWeeks = 12) => {
+  const generateRecurringDates = (startDate: string, weekday: number, freq: SessionFrequency, endDate?: string, maxWeeks = 12) => {
     const dates: Date[] = [];
     let current = new Date(startDate + "T00:00:00");
     const currentDay = current.getDay();
@@ -174,8 +195,9 @@ export default function Patients() {
     if (daysUntilTarget > 0) current = addDays(current, daysUntilTarget);
     const end = endDate ? new Date(endDate + "T23:59:59") : null;
     const limit = end ? 52 : maxWeeks;
+    const weekStep = freq === "quinzenal" ? 2 : freq === "mensal" ? 4 : 1;
     for (let i = 0; i < limit; i++) {
-      const d = addWeeks(current, i);
+      const d = addWeeks(current, i * weekStep);
       if (end && d > end) break;
       dates.push(d);
     }
@@ -215,9 +237,10 @@ export default function Patients() {
       if (scheduleEnabled && newPatient) {
         const weekday = parseInt(scheduleWeekday);
         const sessionValue = parseFloat(scheduleValue) || 200;
-        const duration = parseInt(scheduleDuration) || 50;
+        const duration = getEffectiveDuration();
         const endDt = scheduleEndType === "date" && scheduleEndDate ? scheduleEndDate : undefined;
-        const dates = generateWeeklyDates(scheduleStartDate, weekday, endDt);
+        const recurrenceType = scheduleFrequency === "quinzenal" ? "biweekly" : scheduleFrequency === "mensal" ? "monthly" : "weekly";
+        const dates = scheduleFrequency === "avulso" ? [] : generateRecurringDates(scheduleStartDate, weekday, scheduleFrequency, endDt);
 
         if (dates.length > 0) {
           const { data: existingApts } = await supabase
@@ -249,7 +272,7 @@ export default function Patients() {
             const aptData: any = {
               patient_id: newPatient.id, psychologist_id: userId, scheduled_at: scheduledAt,
               status: "scheduled", type: scheduleType, duration_minutes: duration,
-              session_value: sessionValue, recurrence_type: "weekly",
+              session_value: sessionValue, recurrence_type: recurrenceType,
             };
             if (i > 0 && parentId) aptData.recurrence_parent_id = parentId;
 
@@ -433,8 +456,9 @@ export default function Patients() {
     weekdayLabel: WEEKDAYS.find(w => w.value === scheduleWeekday)?.label || "",
     time: scheduleTime,
     value: parseFloat(scheduleValue) || 200,
-    duration: scheduleDuration,
+    duration: getEffectiveDuration(),
     type: scheduleType === "online" ? "Online" : "Presencial",
+    frequency: scheduleFrequency,
   } : null;
 
   return (
@@ -505,6 +529,7 @@ export default function Patients() {
                   submitLabel={scheduleEnabled ? "Cadastrar e Agendar" : "Cadastrar Paciente"}
                   loading={creating}
                   onCancel={() => setDialogOpen(false)}
+                  onFinancialChange={handleFinancialChange}
                   extraContent={
                     <>
                       <Separator />
@@ -512,7 +537,7 @@ export default function Patients() {
                         <div className="flex items-center justify-between">
                           <div className="space-y-1">
                             <h3 className="text-sm font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" />Criar agendamento recorrente agora?</h3>
-                            <p className="text-xs text-muted-foreground">Configure sessões semanais automáticas para este paciente</p>
+                            <p className="text-xs text-muted-foreground">Configure sessões automáticas para este paciente</p>
                           </div>
                           <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
                         </div>
@@ -523,11 +548,44 @@ export default function Patients() {
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-2"><Label className="text-xs">Dia da Semana</Label><Select value={scheduleWeekday} onValueChange={setScheduleWeekday}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{WEEKDAYS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent></Select></div>
                                   <div className="space-y-2"><Label className="text-xs">Horário</Label><Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} /></div>
-                                  <div className="space-y-2"><Label className="text-xs">Duração</Label><Select value={scheduleDuration} onValueChange={setScheduleDuration}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="30">30 min</SelectItem><SelectItem value="50">50 min</SelectItem><SelectItem value="60">1 hora</SelectItem><SelectItem value="90">1h 30min</SelectItem><SelectItem value="120">2 horas</SelectItem></SelectContent></Select></div>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Duração</Label>
+                                    <Select value={scheduleDuration} onValueChange={setScheduleDuration}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="30">30 min</SelectItem>
+                                        <SelectItem value="40">40 min</SelectItem>
+                                        <SelectItem value="50">50 min</SelectItem>
+                                        <SelectItem value="60">1 hora</SelectItem>
+                                        <SelectItem value="90">1h 30min</SelectItem>
+                                        <SelectItem value="120">2 horas</SelectItem>
+                                        <SelectItem value="custom">Personalizado</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    {scheduleDuration === "custom" && (
+                                      <Input
+                                        type="number"
+                                        min={10}
+                                        max={180}
+                                        placeholder="Ex: 45"
+                                        value={customDuration}
+                                        onChange={(e) => setCustomDuration(e.target.value)}
+                                        className="mt-2"
+                                      />
+                                    )}
+                                  </div>
                                   <div className="space-y-2"><Label className="text-xs flex items-center gap-1"><DollarSign className="h-3 w-3" />Valor</Label><Input type="number" step="0.01" value={scheduleValue} onChange={(e) => setScheduleValue(e.target.value)} /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2"><Label className="text-xs">Data de Início</Label><Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} /></div>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Data de Início</Label>
+                                    <Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} />
+                                    {scheduleStartDate && (
+                                      <p className="text-[11px] text-muted-foreground">
+                                        Início: {format(new Date(scheduleStartDate + "T00:00:00"), "dd/MM/yyyy (EEEE)", { locale: ptBR })}
+                                      </p>
+                                    )}
+                                  </div>
                                   <div className="space-y-2"><Label className="text-xs">Tipo</Label><Select value={scheduleType} onValueChange={setScheduleType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="presential">Presencial</SelectItem><SelectItem value="online">Online</SelectItem></SelectContent></Select></div>
                                 </div>
                                 <div className="space-y-2">
@@ -544,8 +602,10 @@ export default function Patients() {
                                     <div className="grid grid-cols-2 gap-2 text-sm">
                                       <div><span className="text-muted-foreground">Dia:</span> <span className="font-medium">{scheduleSummary.weekdayLabel}</span></div>
                                       <div><span className="text-muted-foreground">Horário:</span> <span className="font-medium">{scheduleSummary.time}</span></div>
-                                      <div><span className="text-muted-foreground">Valor:</span> <span className="font-medium text-green-600">R$ {scheduleSummary.value.toFixed(2)}</span></div>
+                                      <div><span className="text-muted-foreground">Valor:</span> <span className="font-medium text-emerald-600 dark:text-emerald-400">R$ {scheduleSummary.value.toFixed(2)}</span></div>
                                       <div><span className="text-muted-foreground">Tipo:</span> <span className="font-medium">{scheduleSummary.type}</span></div>
+                                      <div><span className="text-muted-foreground">Frequência:</span> <span className="font-medium capitalize">{scheduleFrequency}</span></div>
+                                      <div><span className="text-muted-foreground">Duração:</span> <span className="font-medium">{getEffectiveDuration()} min</span></div>
                                     </div>
                                   </div>
                                 )}
@@ -649,7 +709,7 @@ export default function Patients() {
               { key: "phone", header: "Telefone" },
               {
                 key: "birth_date", header: "Nascimento",
-                render: (p) => p.birth_date ? format(new Date(p.birth_date), "dd/MM/yyyy") : "-",
+                render: (p) => p.birth_date ? format(new Date(p.birth_date + "T00:00:00"), "dd/MM/yyyy") : "-",
               },
               {
                 key: "status", header: "Status",
