@@ -456,8 +456,9 @@ export default function Patients() {
     weekdayLabel: WEEKDAYS.find(w => w.value === scheduleWeekday)?.label || "",
     time: scheduleTime,
     value: parseFloat(scheduleValue) || 200,
-    duration: scheduleDuration,
+    duration: getEffectiveDuration(),
     type: scheduleType === "online" ? "Online" : "Presencial",
+    frequency: scheduleFrequency,
   } : null;
 
   return (
