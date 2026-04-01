@@ -272,7 +272,7 @@ export default function Patients() {
             const aptData: any = {
               patient_id: newPatient.id, psychologist_id: userId, scheduled_at: scheduledAt,
               status: "scheduled", type: scheduleType, duration_minutes: duration,
-              session_value: sessionValue, recurrence_type: "weekly",
+              session_value: sessionValue, recurrence_type: recurrenceType,
             };
             if (i > 0 && parentId) aptData.recurrence_parent_id = parentId;
 
