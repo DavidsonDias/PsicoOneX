@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { useNavigate } from "react-router-dom";
