@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, Users, LayoutGrid, List, UserPlus, TrendingUp, Clock, Upload, Calendar, DollarSign, Repeat, CheckCircle2, Download } from "lucide-react";
+import { Plus, Search, Users, LayoutGrid, List, UserPlus, TrendingUp, Clock, Upload, Calendar, DollarSign, Repeat, CheckCircle2, Download, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
