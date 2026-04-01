@@ -133,6 +133,8 @@ export default function Patients() {
   const [scheduleType, setScheduleType] = useState("presential");
   const [scheduleFrequency, setScheduleFrequency] = useState<SessionFrequency>("semanal");
 
+  useEffect(() => { loadPatients(); }, []);
+
   // Smart date: auto-calculate start date based on selected weekday
   const getNextDateForWeekday = useCallback((weekdayStr: string) => {
     const target = parseInt(weekdayStr);
