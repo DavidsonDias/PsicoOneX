@@ -237,9 +237,10 @@ export default function Patients() {
       if (scheduleEnabled && newPatient) {
         const weekday = parseInt(scheduleWeekday);
         const sessionValue = parseFloat(scheduleValue) || 200;
-        const duration = parseInt(scheduleDuration) || 50;
+        const duration = getEffectiveDuration();
         const endDt = scheduleEndType === "date" && scheduleEndDate ? scheduleEndDate : undefined;
-        const dates = generateWeeklyDates(scheduleStartDate, weekday, endDt);
+        const recurrenceType = scheduleFrequency === "quinzenal" ? "biweekly" : scheduleFrequency === "mensal" ? "monthly" : "weekly";
+        const dates = scheduleFrequency === "avulso" ? [] : generateRecurringDates(scheduleStartDate, weekday, scheduleFrequency, endDt);
 
         if (dates.length > 0) {
           const { data: existingApts } = await supabase
