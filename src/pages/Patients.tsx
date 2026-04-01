@@ -709,7 +709,7 @@ export default function Patients() {
               { key: "phone", header: "Telefone" },
               {
                 key: "birth_date", header: "Nascimento",
-                render: (p) => p.birth_date ? format(new Date(p.birth_date), "dd/MM/yyyy") : "-",
+                render: (p) => p.birth_date ? format(new Date(p.birth_date + "T00:00:00"), "dd/MM/yyyy") : "-",
               },
               {
                 key: "status", header: "Status",
