@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download, ExternalLink, AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download, ExternalLink, AlertTriangle, Info, Sparkles } from "lucide-react";
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { useNavigate } from "react-router-dom";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
@@ -63,6 +64,38 @@ interface Patient {
   default_session_value?: number | null;
   payment_day?: number | null;
   monthly_plan_value?: number | null;
+}
+
+function inferFrequencyFromPatient(p: Patient): string | null {
+  if (!p.default_session_value || !p.monthly_plan_value) return null;
+  const ratio = p.monthly_plan_value / p.default_session_value;
+  if (Math.abs(ratio - 4) < 0.1) return "weekly";
+  if (Math.abs(ratio - 2) < 0.1) return "biweekly";
+  if (Math.abs(ratio - 1) < 0.1) return "monthly";
+  return null;
+}
+
+function getNextDateByWeekday(targetDay: number): string {
+  const today = new Date();
+  const currentDay = today.getDay();
+  let diff = targetDay - currentDay;
+  if (diff < 0) diff += 7;
+  const result = new Date(today);
+  result.setDate(result.getDate() + diff);
+  return format(result, "yyyy-MM-dd");
+}
+
+function SmallTooltip({ text }: { text: string }) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-3 w-3 text-muted-foreground cursor-help inline-block ml-1" />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[200px] text-xs"><p>{text}</p></TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 export default function Agenda() {
@@ -594,6 +627,75 @@ export default function Agenda() {
     };
   }, [appointments, selectedDate]);
 
+  const [customDuration, setCustomDuration] = useState("");
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
+
+  const handlePatientSelect = useCallback((value: string) => {
+    const p = patients.find(pt => pt.id === value);
+    const updates: Partial<typeof formData> = { patient_id: value };
+    const filled = new Set<string>();
+
+    if (p?.default_session_value) {
+      updates.session_value = String(p.default_session_value);
+      filled.add("session_value");
+    }
+
+    const freq = p ? inferFrequencyFromPatient(p) : null;
+    if (freq) {
+      updates.recurrence_enabled = true;
+      updates.recurrence_type = freq;
+      filled.add("recurrence_type");
+    }
+
+    setFormData(prev => ({ ...prev, ...updates }));
+    setAutoFilledFields(filled);
+
+    if (filled.size > 0) {
+      toast.success("Dados do paciente aplicados automaticamente", { icon: "✨" });
+    }
+
+    setTimeout(() => setAutoFilledFields(new Set()), 3000);
+  }, [patients]);
+
+  const durationPresets = ["30", "40", "50", "60", "90", "120"];
+  const isCustomDuration = !durationPresets.includes(formData.duration);
+
+  const handleDurationPreset = (v: string) => {
+    setFormData(prev => ({ ...prev, duration: v }));
+    setCustomDuration("");
+  };
+
+  const handleCustomDuration = (v: string) => {
+    const num = parseInt(v);
+    setCustomDuration(v);
+    if (num >= 10 && num <= 180) {
+      setFormData(prev => ({ ...prev, duration: String(num) }));
+    }
+  };
+
+  const selectedWeekday = useMemo(() => {
+    if (!formData.date) return "";
+    try {
+      return format(new Date(formData.date + "T00:00:00"), "EEEE", { locale: ptBR });
+    } catch { return ""; }
+  }, [formData.date]);
+
+  const monthlyTotal = useMemo(() => {
+    const val = parseFloat(formData.session_value);
+    if (!val || !formData.recurrence_enabled) return null;
+    switch (formData.recurrence_type) {
+      case "weekly": return val * 4;
+      case "biweekly": return val * 2;
+      case "monthly": return val;
+      default: return null;
+    }
+  }, [formData.session_value, formData.recurrence_enabled, formData.recurrence_type]);
+
+  const selectedPatientForForm = patients.find(p => p.id === formData.patient_id);
+
+  const fieldHighlight = (field: string) =>
+    autoFilledFields.has(field) ? "ring-2 ring-primary/50 transition-all" : "";
+
   if (loading) {
     return (
       <AppLayout>
@@ -610,17 +712,14 @@ export default function Agenda() {
     );
   }
 
+
+
   const AppointmentForm = ({ onSubmit, submitLabel }: { onSubmit: (e: React.FormEvent) => void; submitLabel: string }) => (
     <form onSubmit={onSubmit} className="space-y-4">
+      {/* Patient selector */}
       <div className="space-y-2">
         <Label>Paciente *</Label>
-        <Select value={formData.patient_id} onValueChange={(value) => {
-          const selectedPatient = patients.find(p => p.id === value);
-          const sessionValue = selectedPatient?.default_session_value 
-            ? String(selectedPatient.default_session_value) 
-            : formData.session_value;
-          setFormData({...formData, patient_id: value, session_value: sessionValue});
-        }}>
+        <Select value={formData.patient_id} onValueChange={handlePatientSelect}>
           <SelectTrigger>
             <SelectValue placeholder="Selecione o paciente" />
           </SelectTrigger>
@@ -637,45 +736,57 @@ export default function Agenda() {
             ))}
           </SelectContent>
         </Select>
-        {/* Patient financial context */}
-        {formData.patient_id && (() => {
-          const sp = patients.find(p => p.id === formData.patient_id);
-          if (!sp) return null;
-          const hasFinancial = sp.default_session_value || sp.monthly_plan_value || sp.payment_day;
-          if (!hasFinancial) return null;
-          return (
-            <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-1">
+
+        {/* Financial context card */}
+        <AnimatePresence>
+          {selectedPatientForForm && (selectedPatientForForm.default_session_value || selectedPatientForForm.monthly_plan_value || selectedPatientForForm.payment_day) && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="p-3 rounded-lg bg-muted/50 border border-border space-y-1"
+            >
               <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <DollarSign className="h-3 w-3" /> Contexto financeiro
+                <Sparkles className="h-3 w-3 text-primary" /> Contexto financeiro do paciente
               </p>
               <div className="flex flex-wrap gap-3 text-xs">
-                {sp.default_session_value && (
-                  <span>Sessão: <strong className="text-green-600">R$ {sp.default_session_value}</strong></span>
+                {selectedPatientForForm.default_session_value && (
+                  <span>Sessão: <strong className="text-primary">R$ {selectedPatientForForm.default_session_value}</strong></span>
                 )}
-                {sp.monthly_plan_value && (
-                  <span>Plano: <strong>R$ {sp.monthly_plan_value}</strong></span>
+                {selectedPatientForForm.monthly_plan_value && (
+                  <span>Plano: <strong>R$ {selectedPatientForForm.monthly_plan_value}</strong></span>
                 )}
-                {sp.payment_day && (
-                  <span>Pgto dia: <strong>{sp.payment_day}</strong></span>
+                {selectedPatientForForm.payment_day && (
+                  <span>Pgto dia: <strong>{selectedPatientForForm.payment_day}</strong></span>
                 )}
               </div>
-            </div>
-          );
-        })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
+      {/* Date / Time / Duration */}
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label>Data *</Label>
+          <Label className="flex items-center">Data *<SmallTooltip text="Data do atendimento." /></Label>
           <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required />
+          {selectedWeekday && (
+            <p className="text-[10px] text-muted-foreground capitalize">{selectedWeekday}</p>
+          )}
         </div>
         <div className="space-y-2">
           <Label>Hora *</Label>
           <Input type="time" value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} required />
         </div>
         <div className="space-y-2">
-          <Label>Duração</Label>
-          <Select value={formData.duration} onValueChange={(v) => setFormData({...formData, duration: v})}>
+          <Label className="flex items-center">Duração<SmallTooltip text="Escolha um preset ou digite uma duração personalizada (10-180 min)." /></Label>
+          <Select value={isCustomDuration ? "custom" : formData.duration} onValueChange={(v) => {
+            if (v === "custom") {
+              setCustomDuration(formData.duration);
+            } else {
+              handleDurationPreset(v);
+            }
+          }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="30">30 min</SelectItem>
@@ -684,11 +795,28 @@ export default function Agenda() {
               <SelectItem value="60">1 hora</SelectItem>
               <SelectItem value="90">1h 30min</SelectItem>
               <SelectItem value="120">2 horas</SelectItem>
+              <SelectItem value="custom">Personalizado...</SelectItem>
             </SelectContent>
           </Select>
+          <AnimatePresence>
+            {(isCustomDuration || customDuration !== "") && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+                <Input
+                  type="number"
+                  min={10}
+                  max={180}
+                  placeholder="Ex: 45"
+                  value={customDuration || formData.duration}
+                  onChange={(e) => handleCustomDuration(e.target.value)}
+                  className="h-8 text-xs mt-1"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
+      {/* Status + Value */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Status Inicial</Label>
@@ -701,20 +829,30 @@ export default function Agenda() {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label className="flex items-center gap-2">
+          <Label className="flex items-center gap-1">
             <DollarSign className="h-3.5 w-3.5" />
             Valor da Sessão
+            <SmallTooltip text="Valor cobrado por este atendimento. Preenchido automaticamente com base no cadastro do paciente." />
           </Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={formData.session_value}
-            onChange={(e) => setFormData({...formData, session_value: e.target.value})}
-            placeholder="200.00"
-          />
+          <div className="relative">
+            <Input
+              type="number"
+              step="0.01"
+              value={formData.session_value}
+              onChange={(e) => setFormData({...formData, session_value: e.target.value})}
+              placeholder="200.00"
+              className={fieldHighlight("session_value")}
+            />
+            {autoFilledFields.has("session_value") && (
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                auto
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Type */}
       <div className="space-y-2">
         <Label>Tipo de Atendimento</Label>
         <div className="flex gap-3">
@@ -727,48 +865,118 @@ export default function Agenda() {
         </div>
       </div>
 
+      {/* Recurrence */}
       {!editingAppointment && (
-        <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
+        <motion.div layout className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-2">
               <Repeat className="h-4 w-4 text-primary" />
               Agendamento Recorrente
+              {autoFilledFields.has("recurrence_type") && (
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">auto</span>
+              )}
             </Label>
             <Switch checked={formData.recurrence_enabled} onCheckedChange={(v) => setFormData({...formData, recurrence_enabled: v})} />
           </div>
-          {formData.recurrence_enabled && (
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Frequência</Label>
-                <Select value={formData.recurrence_type} onValueChange={(v) => setFormData({...formData, recurrence_type: v})}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="biweekly">Quinzenal</SelectItem>
-                    <SelectItem value="monthly">Mensal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Repetições</Label>
-                <Select value={formData.recurrence_count} onValueChange={(v) => setFormData({...formData, recurrence_count: v})}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[2, 4, 8, 12, 16, 24].map(n => (
-                      <SelectItem key={n} value={String(n)}>{n} sessões</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </div>
+          <AnimatePresence>
+            {formData.recurrence_enabled && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="grid grid-cols-2 gap-3 pt-2"
+              >
+                <div className="space-y-1">
+                  <Label className="text-xs">Frequência</Label>
+                  <Select value={formData.recurrence_type} onValueChange={(v) => setFormData({...formData, recurrence_type: v})}>
+                    <SelectTrigger className={cn("h-9", fieldHighlight("recurrence_type"))}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="biweekly">Quinzenal</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Repetições</Label>
+                  <Select value={formData.recurrence_count} onValueChange={(v) => setFormData({...formData, recurrence_count: v})}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[2, 4, 8, 12, 16, 24].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n} sessões</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       )}
 
+      {/* Notes */}
       <div className="space-y-2">
         <Label>Observações</Label>
         <Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} placeholder="Informações adicionais" rows={3} />
       </div>
+
+      {/* Smart Summary */}
+      <AnimatePresence>
+        {formData.patient_id && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 rounded-lg border border-primary/20 bg-primary/5 space-y-2"
+          >
+            <p className="text-xs font-semibold flex items-center gap-1.5 text-primary">
+              <Sparkles className="h-3.5 w-3.5" /> Resumo do Agendamento
+            </p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <span className="text-muted-foreground">Paciente:</span>
+              <span className="font-medium">{selectedPatientForForm?.full_name || "—"}</span>
+
+              <span className="text-muted-foreground">Tipo:</span>
+              <span className="font-medium">{formData.type === "online" ? "Online" : "Presencial"}</span>
+
+              {formData.recurrence_enabled && (
+                <>
+                  <span className="text-muted-foreground">Frequência:</span>
+                  <span className="font-medium">
+                    {formData.recurrence_type === "weekly" ? "Semanal" : formData.recurrence_type === "biweekly" ? "Quinzenal" : "Mensal"}
+                  </span>
+                </>
+              )}
+
+              <span className="text-muted-foreground">Horário:</span>
+              <span className="font-medium">{formData.time}</span>
+
+              <span className="text-muted-foreground">Duração:</span>
+              <span className="font-medium">{formData.duration} min</span>
+
+              <span className="text-muted-foreground">Valor/sessão:</span>
+              <span className="font-medium text-primary">R$ {parseFloat(formData.session_value || "0").toFixed(2)}</span>
+
+              {monthlyTotal && (
+                <>
+                  <span className="text-muted-foreground">Total mensal:</span>
+                  <span className="font-medium text-primary">R$ {monthlyTotal.toFixed(2)}</span>
+                </>
+              )}
+
+              {formData.date && (
+                <>
+                  <span className="text-muted-foreground">Próxima sessão:</span>
+                  <span className="font-medium capitalize">
+                    {format(new Date(formData.date + "T00:00:00"), "dd/MM/yyyy")} ({selectedWeekday})
+                  </span>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Button type="submit" className="w-full" disabled={creating}>{creating ? "Criando..." : submitLabel}</Button>
     </form>
   );
