@@ -670,6 +670,88 @@ export default function Agenda() {
       toast.success("Dados do paciente aplicados automaticamente", { icon: "✨" });
     }
 
+    setTimeout(() => setAutoFilledFields(new Set()), 3000);
+  }, [patients]);
+
+  const durationPresets = ["30", "40", "50", "60", "90", "120"];
+  const isCustomDuration = !durationPresets.includes(formData.duration);
+
+  const handleDurationPreset = (v: string) => {
+    setFormData(prev => ({ ...prev, duration: v }));
+    setCustomDuration("");
+  };
+
+  const handleCustomDuration = (v: string) => {
+    const num = parseInt(v);
+    setCustomDuration(v);
+    if (num >= 10 && num <= 180) {
+      setFormData(prev => ({ ...prev, duration: String(num) }));
+    }
+  };
+
+  const selectedWeekday = useMemo(() => {
+    if (!formData.date) return "";
+    try {
+      return format(new Date(formData.date + "T00:00:00"), "EEEE", { locale: ptBR });
+    } catch { return ""; }
+  }, [formData.date]);
+
+  const monthlyTotal = useMemo(() => {
+    const val = parseFloat(formData.session_value);
+    if (!val || !formData.recurrence_enabled) return null;
+    switch (formData.recurrence_type) {
+      case "weekly": return val * 4;
+      case "biweekly": return val * 2;
+      case "monthly": return val;
+      default: return null;
+    }
+  }, [formData.session_value, formData.recurrence_enabled, formData.recurrence_type]);
+
+  const selectedPatientForForm = patients.find(p => p.id === formData.patient_id);
+
+  const fieldHighlight = (field: string) =>
+    autoFilledFields.has(field) ? "ring-2 ring-primary/50 transition-all" : "";
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          </div>
+          <div className="grid lg:grid-cols-[320px,1fr] gap-6">
+            <Skeleton className="h-80 rounded-xl" />
+            <Skeleton className="h-96 rounded-xl" />
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const handlePatientSelect = useCallback((value: string) => {
+    const p = patients.find(pt => pt.id === value);
+    const updates: Partial<typeof formData> = { patient_id: value };
+    const filled = new Set<string>();
+
+    if (p?.default_session_value) {
+      updates.session_value = String(p.default_session_value);
+      filled.add("session_value");
+    }
+
+    const freq = p ? inferFrequencyFromPatient(p) : null;
+    if (freq) {
+      updates.recurrence_enabled = true;
+      updates.recurrence_type = freq;
+      filled.add("recurrence_type");
+    }
+
+    setFormData(prev => ({ ...prev, ...updates }));
+    setAutoFilledFields(filled);
+
+    if (filled.size > 0) {
+      toast.success("Dados do paciente aplicados automaticamente", { icon: "✨" });
+    }
+
     // Clear highlight after 3s
     setTimeout(() => setAutoFilledFields(new Set()), 3000);
   }, [patients, formData]);
