@@ -66,6 +66,38 @@ interface Patient {
   monthly_plan_value?: number | null;
 }
 
+function inferFrequencyFromPatient(p: Patient): string | null {
+  if (!p.default_session_value || !p.monthly_plan_value) return null;
+  const ratio = p.monthly_plan_value / p.default_session_value;
+  if (Math.abs(ratio - 4) < 0.1) return "weekly";
+  if (Math.abs(ratio - 2) < 0.1) return "biweekly";
+  if (Math.abs(ratio - 1) < 0.1) return "monthly";
+  return null;
+}
+
+function getNextDateByWeekday(targetDay: number): string {
+  const today = new Date();
+  const currentDay = today.getDay();
+  let diff = targetDay - currentDay;
+  if (diff < 0) diff += 7;
+  const result = new Date(today);
+  result.setDate(result.getDate() + diff);
+  return format(result, "yyyy-MM-dd");
+}
+
+function SmallTooltip({ text }: { text: string }) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-3 w-3 text-muted-foreground cursor-help inline-block ml-1" />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[200px] text-xs"><p>{text}</p></TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export default function Agenda() {
   const navigate = useNavigate();
   const { guardWrite } = useWriteGuard();
