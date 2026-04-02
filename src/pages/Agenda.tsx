@@ -630,22 +630,6 @@ export default function Agenda() {
   const [customDuration, setCustomDuration] = useState("");
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
 
-  if (loading) {
-    return (
-      <AppLayout>
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
-          </div>
-          <div className="grid lg:grid-cols-[320px,1fr] gap-6">
-            <Skeleton className="h-80 rounded-xl" />
-            <Skeleton className="h-96 rounded-xl" />
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
   const handlePatientSelect = useCallback((value: string) => {
     const p = patients.find(pt => pt.id === value);
     const updates: Partial<typeof formData> = { patient_id: value };
@@ -711,6 +695,22 @@ export default function Agenda() {
 
   const fieldHighlight = (field: string) =>
     autoFilledFields.has(field) ? "ring-2 ring-primary/50 transition-all" : "";
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          </div>
+          <div className="grid lg:grid-cols-[320px,1fr] gap-6">
+            <Skeleton className="h-80 rounded-xl" />
+            <Skeleton className="h-96 rounded-xl" />
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
 
 
