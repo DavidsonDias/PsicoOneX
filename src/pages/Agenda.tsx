@@ -627,6 +627,9 @@ export default function Agenda() {
     };
   }, [appointments, selectedDate]);
 
+  const [customDuration, setCustomDuration] = useState("");
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
+
   if (loading) {
     return (
       <AppLayout>
@@ -642,9 +645,6 @@ export default function Agenda() {
       </AppLayout>
     );
   }
-
-  const [customDuration, setCustomDuration] = useState("");
-  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
 
   const handlePatientSelect = useCallback((value: string) => {
     const p = patients.find(pt => pt.id === value);
