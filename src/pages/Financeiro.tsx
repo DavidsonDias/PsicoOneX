@@ -486,91 +486,105 @@ export default function Financeiro() {
 
   // Transaction form — used for both create and edit
   const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent<HTMLFormElement>) => void; isEdit?: boolean }) => {
-    const selectedPatient = patients.find(p => p.id === (isEdit ? formData.patient_id : formData.patient_id));
+    const selectedPatient = patients.find(p => p.id === formData.patient_id);
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
     return (
-      <form onSubmit={onSubmit} className="space-y-6">
+      <form onSubmit={onSubmit} className="space-y-5">
         {/* Section 1: Dados Principais */}
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Dados Principais</h4>
+
+          {/* Row 1: Tipo + Paciente */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Tipo</Label>
-              {isEdit ? (
-                <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v, category: ""})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="income">Receita</SelectItem><SelectItem value="expense">Despesa</SelectItem></SelectContent>
-                </Select>
-              ) : (
-                <Select name="type" required defaultValue="income">
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent><SelectItem value="income">Receita</SelectItem><SelectItem value="expense">Despesa</SelectItem></SelectContent>
-                </Select>
-              )}
+              <Select
+                value={formData.type}
+                onValueChange={(v) => setFormData({ ...formData, type: v, category: "" })}
+                {...(!isEdit && { name: "type" })}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="income">Receita</SelectItem>
+                  <SelectItem value="expense">Despesa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Paciente</Label>
+              <Select value={formData.patient_id} onValueChange={(v) => handlePatientSelect(v, !!isEdit)} {...(!isEdit && { name: "patient_id" })}>
+                <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Row 2: Categoria + Valor */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Categoria</Label>
+              <Select value={formData.category} onValueChange={(v) => handleCategoryChange(v, !!isEdit)} {...(!isEdit && { name: "category" })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>{currentCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Valor (R$)</Label>
-              {isEdit ? (
-                <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
-              ) : (
-                <Input name="amount" type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
-              )}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Paciente</Label>
-              {isEdit ? (
-                <Select value={formData.patient_id} onValueChange={(v) => handlePatientSelect(v, true)}>
-                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                  <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
-                </Select>
-              ) : (
-                <Select name="patient_id" value={formData.patient_id} onValueChange={(v) => handlePatientSelect(v, false)}>
-                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                  <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
-                </Select>
-              )}
-            </div>
-            <div>
-              <Label>Categoria</Label>
-              {isEdit ? (
-                <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{currentCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
-              ) : (
-                <Select name="category" required value={formData.category} onValueChange={(v) => setFormData({...formData, category: v})}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>{currentCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
-              )}
+              <div className="relative">
+                <Input
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  required
+                />
+                {selectedPatient && !isEdit && formData.amount && (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                    auto
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Smart fill indicator */}
-          {selectedPatient && !isEdit && selectedPatient.default_session_value && (
-            <div className="bg-muted/30 rounded-lg p-3 flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Preenchimento automático</p>
-                <p className="text-sm font-medium truncate">
-                  {selectedPatient.full_name} — Sessão R$ {selectedPatient.default_session_value}
-                  {selectedPatient.payment_day && ` · Pgto dia ${selectedPatient.payment_day}`}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="col-span-2">
-            <Label>Descrição</Label>
-            {isEdit ? (
-              <Textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} required />
-            ) : (
-              <Input name="description" placeholder="Sessão de atendimento" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} required />
+          <AnimatePresence>
+            {selectedPatient && !isEdit && (selectedPatient.default_session_value || selectedPatient.payment_day) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-muted/30 rounded-lg p-3 flex items-center gap-3"
+              >
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Preenchimento automático</p>
+                  <p className="text-sm font-medium truncate">
+                    {selectedPatient.full_name}
+                    {selectedPatient.default_session_value && ` · Sessão R$ ${selectedPatient.default_session_value}`}
+                    {selectedPatient.monthly_plan_value && ` · Plano R$ ${selectedPatient.monthly_plan_value}`}
+                    {selectedPatient.payment_day && ` · Pgto dia ${selectedPatient.payment_day}`}
+                  </p>
+                </div>
+              </motion.div>
             )}
+          </AnimatePresence>
+
+          {/* Descrição full width */}
+          <div>
+            <Label>Descrição</Label>
+            <Input
+              name="description"
+              placeholder="Sessão de atendimento"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              required
+            />
           </div>
         </div>
 
@@ -582,70 +596,72 @@ export default function Financeiro() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Forma de Pagamento</Label>
-              {isEdit ? (
-                <Select value={formData.payment_method} onValueChange={(v) => setFormData({...formData, payment_method: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                </Select>
-              ) : (
-                <Select name="payment_method" required>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                </Select>
-              )}
+              <Select value={formData.payment_method} onValueChange={(v) => setFormData({ ...formData, payment_method: v })} {...(!isEdit && { name: "payment_method" })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Status</Label>
-              {isEdit ? (
-                <Select value={formData.payment_status} onValueChange={(v) => setFormData({...formData, payment_status: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem>
-                    <SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="cancelled">Cancelado</SelectItem>
-                    <SelectItem value="exempt">Isento</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Select name="payment_status" required defaultValue="pending">
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pendente</SelectItem><SelectItem value="paid">Pago</SelectItem>
-                    <SelectItem value="overdue">Atrasado</SelectItem><SelectItem value="exempt">Isento</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            <div>
-              <Label>Vencimento</Label>
-              {isEdit ? (
-                <Input type="date" value={formData.due_date} onChange={(e) => setFormData({...formData, due_date: e.target.value})} required />
-              ) : (
-                <Input name="due_date" type="date" required />
-              )}
-            </div>
-            <div>
-              <Label>Taxa (%)</Label>
-              {isEdit ? (
-                <Input type="number" step="0.01" value={formData.tax_rate} onChange={(e) => setFormData({...formData, tax_rate: e.target.value})} />
-              ) : (
-                <Input name="tax_rate" type="number" step="0.01" defaultValue="0" placeholder="0" />
-              )}
+              <Select value={formData.payment_status} onValueChange={(v) => setFormData({ ...formData, payment_status: v })} {...(!isEdit && { name: "payment_status" })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="paid">Pago</SelectItem>
+                  <SelectItem value="overdue">Atrasado</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                  <SelectItem value="exempt">Isento</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div>
-            <Label>Centro de Custo</Label>
-            {isEdit ? (
-              <Select value={formData.cost_center} onValueChange={(v) => setFormData({...formData, cost_center: v})}>
-                <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                <SelectContent>{COST_CENTERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-              </Select>
-            ) : (
-              <Select name="cost_center">
-                <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                <SelectContent>{COST_CENTERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-              </Select>
-            )}
+            <Label>Vencimento</Label>
+            <div className="relative">
+              <Input
+                name="due_date"
+                type="date"
+                value={formData.due_date}
+                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                required
+              />
+              {selectedPatient && !isEdit && selectedPatient.payment_day && formData.due_date && (
+                <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  dia {selectedPatient.payment_day}
+                </span>
+              )}
+            </div>
           </div>
+
+          {/* Avançado (collapsible) */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground gap-1"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            <Settings className="h-3 w-3" />
+            {showAdvanced ? "Ocultar opções avançadas" : "Opções avançadas"}
+          </Button>
+          <AnimatePresence>
+            {showAdvanced && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-4 overflow-hidden"
+              >
+                <div>
+                  <Label>Centro de Custo</Label>
+                  <Select value={formData.cost_center} onValueChange={(v) => setFormData({ ...formData, cost_center: v })} {...(!isEdit && { name: "cost_center" })}>
+                    <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                    <SelectContent>{COST_CENTERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="flex justify-end gap-2">
