@@ -69,12 +69,12 @@ interface PatientFull {
 }
 
 const INCOME_CATEGORIES = [
-  "Consulta psicológica", "Pacote mensal", "Atendimento online",
-  "Atendimento presencial", "Avaliação", "Laudo", "Supervisão", "Workshop", "Outros"
+  "Consulta psicológica", "Pacote mensal", "Avaliação / Laudo",
+  "Atendimento online", "Atendimento presencial", "Supervisão", "Workshop", "Outros"
 ];
 const EXPENSE_CATEGORIES = [
-  "Aluguel consultório", "Marketing clínico", "Plataforma / software",
-  "Impostos", "Equipamentos", "Materiais", "Estrutura", "Outros"
+  "Ferramentas / Software", "Marketing", "Operacional",
+  "Aluguel consultório", "Impostos", "Equipamentos", "Outros"
 ];
 const COST_CENTERS = ["Clínica", "Marketing", "Software", "Estrutura", "Impostos", "Pessoal", "Outros"];
 const PAYMENT_METHODS = [
@@ -83,9 +83,27 @@ const PAYMENT_METHODS = [
   { value: "debit_card", label: "Cartão Débito" },
   { value: "cash", label: "Dinheiro" },
   { value: "bank_transfer", label: "Transferência" },
-  { value: "convenio", label: "Convênio" },
-  { value: "link", label: "Link de Pagamento" },
 ];
+
+function calcSmartDueDate(paymentDay: number): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const day = now.getDate();
+  // If payment day already passed this month, use next month
+  if (paymentDay < day) {
+    const next = new Date(year, month + 1, paymentDay);
+    return format(next, "yyyy-MM-dd");
+  }
+  return format(new Date(year, month, paymentDay), "yyyy-MM-dd");
+}
+
+function suggestDescription(patientName: string, category: string): string {
+  if (category === "Consulta psicológica") return `Sessão psicológica — ${patientName}`;
+  if (category === "Pacote mensal") return `Plano mensal — ${patientName}`;
+  if (category === "Avaliação / Laudo") return `Avaliação — ${patientName}`;
+  return `Sessão de atendimento — ${patientName}`;
+}
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
