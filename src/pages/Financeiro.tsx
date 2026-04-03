@@ -317,15 +317,12 @@ export default function Financeiro() {
     e.preventDefault();
     const canProceed = await checkSubscriptionBeforeWrite();
     if (!canProceed) { setDialogOpen(false); return; }
-    const fd = new FormData(e.currentTarget);
 
-    const amount = parseFloat(fd.get("amount") as string);
-    const taxRate = parseFloat(fd.get("tax_rate") as string) || 0;
-    const taxAmount = amount * (taxRate / 100);
-    const pid = fd.get("patient_id") as string;
-    const dueDate = fd.get("due_date") as string;
+    const amount = parseFloat(formData.amount);
+    const pid = formData.patient_id;
+    const dueDate = formData.due_date;
 
-    // Duplicate detection: same patient + same due_date + same amount
+    // Duplicate detection
     if (pid && dueDate) {
       const duplicate = transactions.find(t =>
         t.patient_id === pid && t.due_date === dueDate && Number(t.amount) === amount && t.payment_status !== "cancelled"
@@ -337,11 +334,10 @@ export default function Financeiro() {
     }
 
     const txData: any = {
-      psychologist_id: userId, type: fd.get("type"), amount,
-      description: fd.get("description"), category: fd.get("category"),
-      payment_method: fd.get("payment_method"), status: fd.get("payment_status"),
-      due_date: dueDate, cost_center: fd.get("cost_center") || null,
-      tax_rate: taxRate, tax_amount: taxAmount,
+      psychologist_id: userId, type: formData.type, amount,
+      description: formData.description, category: formData.category,
+      payment_method: formData.payment_method, status: formData.payment_status,
+      due_date: dueDate, cost_center: formData.cost_center || null,
     };
     if (pid) txData.patient_id = pid;
     if (txData.status === "paid") txData.paid_date = new Date().toISOString().split("T")[0];
