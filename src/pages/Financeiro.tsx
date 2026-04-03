@@ -363,14 +363,12 @@ export default function Financeiro() {
     if (!canProceed) { setEditingTransaction(null); return; }
 
     const amount = parseFloat(formData.amount);
-    const taxRate = parseFloat(formData.tax_rate) || 0;
 
     const updateData: any = {
       type: formData.type, amount, description: formData.description,
       category: formData.category, payment_method: formData.payment_method,
       status: formData.payment_status, due_date: formData.due_date,
       patient_id: formData.patient_id || null, cost_center: formData.cost_center || null,
-      tax_rate: taxRate, tax_amount: amount * (taxRate / 100),
     };
 
     if (formData.payment_status === "paid" && editingTransaction.payment_status !== "paid") {
