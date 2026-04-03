@@ -404,7 +404,6 @@ export default function Financeiro() {
         category: t.category, payment_method: t.payment_method,
         payment_status: t.payment_status, due_date: t.due_date,
         patient_id: t.patient_id || "", cost_center: t.cost_center || "",
-        tax_rate: String(t.tax_rate || 0),
       });
       setEditingTransaction(t);
     });
@@ -413,7 +412,7 @@ export default function Financeiro() {
   const resetForm = () => setFormData({
     type: "income", amount: "", description: "", category: "",
     payment_method: "", payment_status: "pending", due_date: "",
-    patient_id: "", cost_center: "", tax_rate: "0",
+    patient_id: "", cost_center: "",
   });
 
   const filteredTransactions = periodTransactions.filter(t => {
