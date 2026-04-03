@@ -176,24 +176,50 @@ export default function Financeiro() {
     if (data) setPatients(data);
   };
 
-  // Auto-fill when patient is selected in NEW transaction form
   const handlePatientSelect = (patientId: string, isEdit: boolean) => {
     if (isEdit) {
       setFormData(prev => ({ ...prev, patient_id: patientId }));
       return;
     }
     const patient = patients.find(p => p.id === patientId);
-    if (patient) {
-      setFormData(prev => ({
-        ...prev,
-        patient_id: patientId,
-        amount: patient.default_session_value ? String(patient.default_session_value) : prev.amount,
-        category: prev.category || "Consulta psicológica",
-        description: prev.description || "Sessão de atendimento",
-      }));
-    } else {
+    if (!patient) {
       setFormData(prev => ({ ...prev, patient_id: patientId }));
+      return;
     }
+    const cat = formData.category || "Consulta psicológica";
+    const smartValue = cat === "Pacote mensal" && patient.monthly_plan_value
+      ? String(patient.monthly_plan_value)
+      : patient.default_session_value ? String(patient.default_session_value) : formData.amount;
+    const smartDueDate = patient.payment_day ? calcSmartDueDate(patient.payment_day) : formData.due_date;
+    const smartDesc = suggestDescription(patient.full_name, cat);
+
+    setFormData(prev => ({
+      ...prev,
+      patient_id: patientId,
+      amount: smartValue,
+      category: cat,
+      description: smartDesc,
+      due_date: smartDueDate,
+    }));
+  };
+
+  // When category changes and patient is selected, re-sync value
+  const handleCategoryChange = (category: string, isEdit: boolean) => {
+    if (isEdit) {
+      setFormData(prev => ({ ...prev, category }));
+      return;
+    }
+    const patient = patients.find(p => p.id === formData.patient_id);
+    const updates: Partial<typeof formData> = { category };
+    if (patient) {
+      if (category === "Pacote mensal" && patient.monthly_plan_value) {
+        updates.amount = String(patient.monthly_plan_value);
+      } else if (patient.default_session_value) {
+        updates.amount = String(patient.default_session_value);
+      }
+      updates.description = suggestDescription(patient.full_name, category);
+    }
+    setFormData(prev => ({ ...prev, ...updates }));
   };
 
   // Period-filtered transactions
