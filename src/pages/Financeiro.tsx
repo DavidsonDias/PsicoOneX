@@ -132,7 +132,7 @@ export default function Financeiro() {
   const [formData, setFormData] = useState({
     type: "income", amount: "", description: "", category: "",
     payment_method: "", payment_status: "pending", due_date: "",
-    patient_id: "", cost_center: "", tax_rate: "0",
+    patient_id: "", cost_center: "",
   });
 
   useEffect(() => { checkAuthAndLoadData(); }, []);
