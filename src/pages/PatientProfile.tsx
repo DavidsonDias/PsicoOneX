@@ -97,6 +97,52 @@ export default function PatientProfile() {
 
   if (!patient) return null;
 
+  const patientToFormData = (): Partial<PatientFormData> => ({
+    full_name: patient.full_name,
+    email: patient.email || "",
+    phone: patient.phone || "",
+    cpf: patient.cpf || "",
+    birth_date: patient.birth_date || "",
+    address: patient.address || "",
+    emergency_contact: patient.emergency_contact || "",
+    emergency_phone: patient.emergency_phone || "",
+    notes: patient.notes || "",
+    default_session_value: patient.default_session_value?.toString() || "",
+    payment_day: patient.payment_day?.toString() || "",
+  });
+
+  const handleEditSubmit = async (data: PatientFormData) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({
+          full_name: data.full_name,
+          email: data.email || null,
+          phone: data.phone || null,
+          cpf: data.cpf || null,
+          birth_date: data.birth_date || null,
+          address: data.address || null,
+          emergency_contact: data.emergency_contact || null,
+          emergency_phone: data.emergency_phone || null,
+          notes: data.notes || null,
+          default_session_value: data.default_session_value ? parseFloat(data.default_session_value) : null,
+          payment_day: data.payment_day ? parseInt(data.payment_day) : null,
+          monthly_plan_value: data.monthly_plan_value ? parseFloat(data.monthly_plan_value) : null,
+        })
+        .eq("id", patient.id);
+
+      if (error) throw error;
+      toast.success("Cadastro atualizado com sucesso!");
+      setEditOpen(false);
+      if (id) loadPatient(id);
+    } catch {
+      toast.error("Erro ao atualizar cadastro");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const initials = patient.full_name
     .split(" ")
     .map((n) => n[0])
