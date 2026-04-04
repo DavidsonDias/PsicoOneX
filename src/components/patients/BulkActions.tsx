@@ -54,26 +54,72 @@ export function BulkActions({
         exit={{ opacity: 0, y: 20 }}
         className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-xl"
       >
-        <div className="bg-card border border-border shadow-2xl rounded-xl p-3 sm:px-6 sm:py-3">
-          {/* Mobile: stacked layout */}
-          <div className="flex items-center justify-between mb-3 sm:mb-0 sm:hidden">
-            <Badge variant="secondary" className="text-xs px-2 py-1">
-              {selectedCount} de {totalCount}
-            </Badge>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClearSelection}>
-              <X className="h-4 w-4" />
-            </Button>
+        <div className="bg-card border border-border shadow-2xl rounded-xl p-4 sm:px-6 sm:py-3">
+          {/* Mobile layout */}
+          <div className="sm:hidden">
+            <div className="flex items-center justify-between mb-3">
+              <Badge variant="secondary" className="text-sm px-3 py-1">
+                {selectedCount} de {totalCount} selecionado(s)
+              </Badge>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onClearSelection}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 w-full min-h-[48px] text-xs">
+                    <Download className="h-4 w-4 shrink-0" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={onExportCSV} className="gap-2 cursor-pointer">
+                    <File className="h-4 w-4" />CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onExportExcel} className="gap-2 cursor-pointer">
+                    <FileSpreadsheet className="h-4 w-4" />Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onExportPDF} className="gap-2 cursor-pointer">
+                    <FileText className="h-4 w-4" />PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {onInactivate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 w-full min-h-[48px] text-xs border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
+                  onClick={() => setInactivateDialogOpen(true)}
+                >
+                  <UserX className="h-4 w-4 shrink-0" />
+                  Inativar
+                </Button>
+              )}
+
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-1.5 w-full min-h-[48px] text-xs"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                Excluir
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-            {/* Desktop badge + close */}
-            <Badge variant="secondary" className="hidden sm:inline-flex text-sm px-3 py-1">
+
+          {/* Desktop layout */}
+          <div className="hidden sm:flex items-center gap-4">
+            <Badge variant="secondary" className="text-sm px-3 py-1">
               {selectedCount} de {totalCount} selecionado(s)
             </Badge>
-            <div className="hidden sm:block h-6 w-px bg-border" />
+            <div className="h-6 w-px bg-border" />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 flex-1 sm:flex-none min-h-[44px] sm:min-h-0">
+                <Button variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Exportar
                   <ChevronDown className="h-3 w-3" />
@@ -96,7 +142,7 @@ export function BulkActions({
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 flex-1 sm:flex-none min-h-[44px] sm:min-h-0 border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
+                className="gap-2 border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
                 onClick={() => setInactivateDialogOpen(true)}
               >
                 <UserX className="h-4 w-4" />
@@ -107,14 +153,14 @@ export function BulkActions({
             <Button
               variant="destructive"
               size="sm"
-              className="gap-2 flex-1 sm:flex-none min-h-[44px] sm:min-h-0"
+              className="gap-2"
               onClick={() => setDeleteDialogOpen(true)}
             >
               <Trash2 className="h-4 w-4" />
               Excluir
             </Button>
 
-            <Button variant="ghost" size="icon" className="hidden sm:inline-flex h-8 w-8" onClick={onClearSelection}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClearSelection}>
               <X className="h-4 w-4" />
             </Button>
           </div>
