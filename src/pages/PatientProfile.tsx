@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ArrowLeft, User, FileText, DollarSign, Calendar, File, Edit } from "lucide-react";
-import PatientForm, { PatientFormData } from "@/components/patients/PatientForm";
+import { PatientForm, PatientFormData } from "@/components/patients/PatientForm";
 import { differenceInYears } from "date-fns";
 import { PatientOverviewTab } from "@/components/patient-profile/PatientOverviewTab";
 import { PatientRecordsTab } from "@/components/patient-profile/PatientRecordsTab";
