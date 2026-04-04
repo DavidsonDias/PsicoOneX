@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ArrowLeft, User, FileText, DollarSign, Calendar, File, Edit } from "lucide-react";
+import { PatientForm, PatientFormData } from "@/components/patients/PatientForm";
 import { differenceInYears } from "date-fns";
 import { PatientOverviewTab } from "@/components/patient-profile/PatientOverviewTab";
 import { PatientRecordsTab } from "@/components/patient-profile/PatientRecordsTab";
@@ -41,6 +43,8 @@ export default function PatientProfile() {
   const [patient, setPatient] = useState<PatientFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (id) loadPatient(id);
@@ -93,6 +97,52 @@ export default function PatientProfile() {
 
   if (!patient) return null;
 
+  const patientToFormData = (): Partial<PatientFormData> => ({
+    full_name: patient.full_name,
+    email: patient.email || "",
+    phone: patient.phone || "",
+    cpf: patient.cpf || "",
+    birth_date: patient.birth_date || "",
+    address: patient.address || "",
+    emergency_contact: patient.emergency_contact || "",
+    emergency_phone: patient.emergency_phone || "",
+    notes: patient.notes || "",
+    default_session_value: patient.default_session_value?.toString() || "",
+    payment_day: patient.payment_day?.toString() || "",
+  });
+
+  const handleEditSubmit = async (data: PatientFormData) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({
+          full_name: data.full_name,
+          email: data.email || null,
+          phone: data.phone || null,
+          cpf: data.cpf || null,
+          birth_date: data.birth_date || null,
+          address: data.address || null,
+          emergency_contact: data.emergency_contact || null,
+          emergency_phone: data.emergency_phone || null,
+          notes: data.notes || null,
+          default_session_value: data.default_session_value ? parseFloat(data.default_session_value) : null,
+          payment_day: data.payment_day ? parseInt(data.payment_day) : null,
+          monthly_plan_value: data.monthly_plan_value ? parseFloat(data.monthly_plan_value) : null,
+        })
+        .eq("id", patient.id);
+
+      if (error) throw error;
+      toast.success("Cadastro atualizado com sucesso!");
+      setEditOpen(false);
+      if (id) loadPatient(id);
+    } catch {
+      toast.error("Erro ao atualizar cadastro");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const initials = patient.full_name
     .split(" ")
     .map((n) => n[0])
@@ -142,11 +192,27 @@ export default function PatientProfile() {
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="gap-2 self-start sm:self-auto" onClick={() => navigate("/pacientes")}>
+          <Button variant="outline" size="sm" className="gap-2 self-start sm:self-auto" onClick={() => setEditOpen(true)}>
             <Edit className="h-4 w-4" />
             Editar Cadastro
           </Button>
         </motion.div>
+
+        {/* Edit Modal */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Cadastro — {patient.full_name}</DialogTitle>
+            </DialogHeader>
+            <PatientForm
+              initialData={patientToFormData()}
+              onSubmit={handleEditSubmit}
+              submitLabel="Salvar Alterações"
+              loading={saving}
+              onCancel={() => setEditOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
