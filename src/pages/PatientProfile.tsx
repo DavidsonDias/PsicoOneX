@@ -192,11 +192,27 @@ export default function PatientProfile() {
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="gap-2 self-start sm:self-auto" onClick={() => navigate("/pacientes")}>
+          <Button variant="outline" size="sm" className="gap-2 self-start sm:self-auto" onClick={() => setEditOpen(true)}>
             <Edit className="h-4 w-4" />
             Editar Cadastro
           </Button>
         </motion.div>
+
+        {/* Edit Modal */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Cadastro — {patient.full_name}</DialogTitle>
+            </DialogHeader>
+            <PatientForm
+              initialData={patientToFormData()}
+              onSubmit={handleEditSubmit}
+              submitLabel="Salvar Alterações"
+              loading={saving}
+              onCancel={() => setEditOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
