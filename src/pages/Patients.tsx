@@ -747,6 +747,7 @@ export default function Patients() {
         selectedCount={selectedIds.size}
         totalCount={filteredPatients.length}
         onDelete={handleBulkDelete}
+        onInactivate={handleBulkInactivate}
         onExportCSV={handleExportCSV}
         onExportExcel={handleExportExcel}
         onExportPDF={handleExportPDF}
