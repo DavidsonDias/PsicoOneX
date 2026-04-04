@@ -408,6 +408,27 @@ export default function Patients() {
     }
   };
 
+  // Bulk inactivate
+  const handleBulkInactivate = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const ids = Array.from(selectedIds);
+      for (const id of ids) {
+        await supabase.from("patients").update({ status: "inactive" }).eq("id", id);
+        await supabase.from("audit_logs").insert({
+          user_id: session.user.id, action_type: "status_change", entity_type: "patient", entity_id: id,
+          new_data: { status: "inactive", bulk_action: true },
+        } as any);
+      }
+      toast.success(`${ids.length} paciente(s) inativado(s)!`);
+      setSelectedIds(new Set());
+      loadPatients();
+    } catch {
+      toast.error("Erro ao inativar pacientes");
+    }
+  };
+
   // Selection helpers
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => {
