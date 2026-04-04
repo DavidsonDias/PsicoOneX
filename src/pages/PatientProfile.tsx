@@ -43,6 +43,8 @@ export default function PatientProfile() {
   const [patient, setPatient] = useState<PatientFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (id) loadPatient(id);
