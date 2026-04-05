@@ -6,21 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Users, Calendar, FileText, DollarSign, 
-  Heart, BarChart3, Video, Receipt, ClipboardList,
-  ArrowRight, TrendingUp, Clock, CheckCircle2,
-  Sparkles, Bell, Brain, Plus, MessageSquare
+  ArrowRight, Clock, CheckCircle2,
+  Brain, Plus
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { MetricCard } from "@/components/ui/metric-card";
 import { QuickActionCard } from "@/components/ui/quick-action-card";
 import { ProgressRing } from "@/components/ui/progress-ring";
-import { InsightsPanel } from "@/components/dashboard/InsightsPanel";
+import { ProactiveInsightsPanel } from "@/components/dashboard/ProactiveInsightsPanel";
+import { StrategicMetrics } from "@/components/dashboard/StrategicMetrics";
+import { AutomationRulesPanel } from "@/components/dashboard/AutomationRulesPanel";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useOnboarding } from "@/hooks/useOnboarding";
+import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { format, differenceInHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -37,30 +38,21 @@ interface TodayAppointment {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
-  const [stats, setStats] = useState({
-    patients: 0,
-    appointments: 0,
-    records: 0,
-    revenue: 0,
-  });
   const [todayAppointments, setTodayAppointments] = useState<TodayAppointment[]>([]);
   const [allAppointments, setAllAppointments] = useState<TodayAppointment[]>([]);
-  const [pendingPayments, setPendingPayments] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const { notifications, markAsRead, markAllAsRead, createNotification } = useNotifications();
   const { showOnboarding, authProvider, googleCalendarConnected, completeOnboarding } = useOnboarding();
+  const { insights, metrics, isLoading: insightsLoading, refresh: refreshInsights } = useProactiveInsights();
 
   const [chartData, setChartData] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboardData();
-    // Check for Stripe checkout return
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "success") {
       toast.success("Pagamento realizado com sucesso! Sua assinatura está ativa.");
-      // Clean URL
       window.history.replaceState({}, "", "/dashboard");
-      // Trigger subscription check
       supabase.functions.invoke("check-subscription").catch(() => {});
     }
   }, []);
@@ -68,12 +60,8 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        return;
-      }
+      if (!session) return;
 
-      // Load profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
@@ -82,34 +70,13 @@ export default function Dashboard() {
 
       setProfile(profileData);
 
-      // Load stats
-      const [patientsRes, appointmentsRes, recordsRes, transactionsRes] = await Promise.all([
-        supabase.from("patients").select("*", { count: "exact", head: true }),
-        supabase.from("appointments").select("*", { count: "exact", head: true }),
-        supabase.from("medical_records").select("*", { count: "exact", head: true }),
-        supabase.from("financial_transactions")
-          .select("amount, status, type, due_date")
-          .eq("psychologist_id", session.user.id),
-      ]);
+      // Load transactions for chart
+      const { data: txData } = await supabase
+        .from("financial_transactions")
+        .select("amount, status, type, due_date")
+        .eq("psychologist_id", session.user.id);
 
-      const incomeTransactions = transactionsRes.data?.filter(t => t.type === "income") || [];
-      const paidRevenue = incomeTransactions.filter(t => t.status === "paid")
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-      
-      const pending = incomeTransactions.filter(t => t.status === "pending")
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-
-      setPendingPayments(pending);
-
-      setStats({
-        patients: patientsRes.count || 0,
-        appointments: appointmentsRes.count || 0,
-        records: recordsRes.count || 0,
-        revenue: paidRevenue,
-      });
-
-      // Build real chart data from transactions (last 6 months)
-      const allTxs = transactionsRes.data || [];
+      const allTxs = txData || [];
       const months = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date();
@@ -132,12 +99,7 @@ export default function Dashboard() {
       const today = new Date().toISOString().split('T')[0];
       const { data: todayData } = await supabase
         .from("appointments")
-        .select(`
-          id,
-          scheduled_at,
-          status,
-          patients (full_name)
-        `)
+        .select("id, scheduled_at, status, patients (full_name)")
         .eq("psychologist_id", session.user.id)
         .gte("scheduled_at", `${today}T00:00:00`)
         .lte("scheduled_at", `${today}T23:59:59`)
@@ -145,21 +107,15 @@ export default function Dashboard() {
 
       setTodayAppointments((todayData as any) || []);
 
-      // Load all appointments for calendar
       const { data: allData } = await supabase
         .from("appointments")
-        .select(`
-          id,
-          scheduled_at,
-          status,
-          patients (full_name)
-        `)
+        .select("id, scheduled_at, status, patients (full_name)")
         .eq("psychologist_id", session.user.id)
         .order("scheduled_at", { ascending: true });
 
       setAllAppointments((allData as any) || []);
 
-      // Generate proximity alerts for upcoming appointments
+      // Proximity alerts
       const now = new Date();
       for (const apt of (todayData as any) || []) {
         const aptTime = new Date(apt.scheduled_at);
@@ -174,17 +130,6 @@ export default function Dashboard() {
           });
         }
       }
-
-      if (pending > 0) {
-        createNotification({
-          type: "payment",
-          title: "Pagamentos pendentes",
-          message: `Você tem R$ ${pending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a receber`,
-          action_path: "/financeiro",
-          action_label: "Ver",
-        });
-      }
-
     } catch (error) {
       console.error("Error loading dashboard:", error);
     }
@@ -207,7 +152,6 @@ export default function Dashboard() {
     return colors[status] || colors.scheduled;
   };
 
-  // Calculate completion rate
   const completedToday = todayAppointments.filter(a => a.status === "completed").length;
   const completionRate = todayAppointments.length > 0 
     ? (completedToday / todayAppointments.length) * 100 
@@ -215,7 +159,6 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      {/* Onboarding Tour */}
       {showOnboarding && (
         <OnboardingTour
           authProvider={authProvider}
@@ -225,12 +168,9 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Header with Welcome and Notifications */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-8">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
             Olá, {profile?.full_name?.split(' ')[0]}! 👋
           </h1>
@@ -238,7 +178,6 @@ export default function Dashboard() {
             {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
           </p>
         </motion.div>
-        
         <div className="flex items-center gap-2">
           <NotificationCenter
             notifications={notifications}
@@ -253,51 +192,21 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8">
-        <MetricCard
-          icon={Users}
-          title="Pacientes Ativos"
-          value={stats.patients}
-          variant="gradient"
-        />
-        <MetricCard
-          icon={Calendar}
-          title="Sessões Este Mês"
-          value={stats.appointments}
-        />
-        <MetricCard
-          icon={FileText}
-          title="Prontuários"
-          value={stats.records}
-        />
-        <MetricCard
-          icon={DollarSign}
-          title="Receita"
-          value={`R$ ${stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`}
-          variant="gradient"
-        />
+      {/* Strategic Metrics (replaces old static cards) */}
+      <div className="mb-6 lg:mb-8">
+        <StrategicMetrics metrics={metrics} isLoading={insightsLoading} />
       </div>
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-        {/* Left Column - 8 cols */}
+        {/* Left Column */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Revenue Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <RevenueChart data={chartData} />
           </motion.div>
 
           {/* Today's Schedule */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div>
@@ -327,11 +236,7 @@ export default function Dashboard() {
                   <div className="text-center py-8 text-muted-foreground">
                     <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
                     <p className="text-sm">Nenhum agendamento para hoje</p>
-                    <Button 
-                      variant="link" 
-                      className="mt-2 text-sm"
-                      onClick={() => navigate("/agenda")}
-                    >
+                    <Button variant="link" className="mt-2 text-sm" onClick={() => navigate("/agenda")}>
                       Criar agendamento
                     </Button>
                   </div>
@@ -365,20 +270,16 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
-        {/* Right Column - 4 cols */}
+        {/* Right Column */}
         <div className="lg:col-span-4 space-y-6">
           {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Ações Rápidas</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 p-4 pt-0">
-                {quickActions.map((action, index) => (
+                {quickActions.map((action) => (
                   <QuickActionCard
                     key={action.label}
                     icon={action.icon}
@@ -393,32 +294,28 @@ export default function Dashboard() {
             </Card>
           </motion.div>
 
+          {/* Proactive AI Insights */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <ProactiveInsightsPanel
+              insights={insights}
+              isLoading={insightsLoading}
+              onRefresh={refreshInsights}
+              onNavigate={navigate}
+            />
+          </motion.div>
+
+          {/* Automation Rules */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+            <AutomationRulesPanel />
+          </motion.div>
+
           {/* Weekly Calendar */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <WeeklyCalendar
               appointments={allAppointments}
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
               onAppointmentClick={() => navigate("/agenda")}
-            />
-          </motion.div>
-
-          {/* AI Insights */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-          >
-            <InsightsPanel
-              patientsCount={stats.patients}
-              appointmentsCount={stats.appointments}
-              pendingPayments={pendingPayments}
-              revenue={stats.revenue}
-              onNavigate={navigate}
             />
           </motion.div>
         </div>
