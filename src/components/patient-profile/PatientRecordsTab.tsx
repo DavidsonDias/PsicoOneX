@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { FileText, Search, Plus, Calendar, Eye, Hash, Edit2, Trash2 } from "lucide-react";
+import { SmartSearch } from "@/components/medical-records/SmartSearch";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ProntuarioEditor, type ProntuarioFormData } from "@/components/medical-records/ProntuarioEditor";
@@ -66,6 +67,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
 
   // View
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -245,11 +247,18 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Smart Search */}
+      <SmartSearch
+        patientId={patientId}
+        records={records}
+        onHighlight={setHighlightedIds}
+      />
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar nos prontuários..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Input placeholder="Filtrar por texto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-auto" />
         <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-auto" />
