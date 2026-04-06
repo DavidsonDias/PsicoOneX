@@ -31,6 +31,7 @@ import { StatsOverview } from "@/components/ui/stats-overview";
 import { FinancialChart } from "@/components/financial/FinancialChart";
 import { FinancialProjections } from "@/components/financial/FinancialProjections";
 import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
+import { FinancialGrowth } from "@/components/financial/FinancialGrowth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
@@ -1023,6 +1024,7 @@ export default function Financeiro() {
 
         {/* ========== RESUMO TAB ========== */}
         <TabsContent value="resumo" className="space-y-6">
+          <FinancialGrowth transactions={transactions} />
           <FinancialChart data={chartData} />
           <div className="grid lg:grid-cols-2 gap-6">
             <Card>
