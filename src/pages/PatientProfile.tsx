@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ArrowLeft, User, FileText, DollarSign, Calendar, File, Edit } from "lucide-react";
+import { ArrowLeft, User, FileText, DollarSign, Calendar, File, Edit, Brain } from "lucide-react";
 import { PatientForm, PatientFormData } from "@/components/patients/PatientForm";
 import { differenceInYears } from "date-fns";
 import { PatientOverviewTab } from "@/components/patient-profile/PatientOverviewTab";
@@ -18,6 +18,7 @@ import { PatientRecordsTab } from "@/components/patient-profile/PatientRecordsTa
 import { PatientFinancialTab } from "@/components/patient-profile/PatientFinancialTab";
 import { PatientAgendaTab } from "@/components/patient-profile/PatientAgendaTab";
 import { PatientDocumentsTab } from "@/components/patient-profile/PatientDocumentsTab";
+import { PatientClinicalProfile } from "@/components/patient-profile/PatientClinicalProfile";
 
 export interface PatientFull {
   id: string;
@@ -156,6 +157,7 @@ export default function PatientProfile() {
 
   const tabItems = [
     { value: "overview", label: "Visão Geral", icon: User },
+    { value: "clinical", label: "Perfil IA", icon: Brain },
     { value: "records", label: "Prontuários", icon: FileText },
     { value: "financial", label: "Financeiro", icon: DollarSign },
     { value: "agenda", label: "Agenda", icon: Calendar },
@@ -216,7 +218,7 @@ export default function PatientProfile() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-5 h-auto">
+          <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 h-auto gap-1">
             {tabItems.map((tab) => (
               <TabsTrigger
                 key={tab.value}
@@ -238,6 +240,9 @@ export default function PatientProfile() {
           >
             <TabsContent value="overview" className="mt-0">
               <PatientOverviewTab patient={patient} />
+            </TabsContent>
+            <TabsContent value="clinical" className="mt-0">
+              <PatientClinicalProfile patientId={patient.id} patientName={patient.full_name} />
             </TabsContent>
             <TabsContent value="records" className="mt-0">
               <PatientRecordsTab patientId={patient.id} patientName={patient.full_name} />
