@@ -354,7 +354,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
                 )}
               </CardContent>
             </Card>
-          ))}
+          )})}
         </div>
       )}
 
