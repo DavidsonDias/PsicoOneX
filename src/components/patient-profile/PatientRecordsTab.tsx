@@ -276,10 +276,12 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((record) => (
+          {filtered.map((record) => {
+            const isHighlighted = highlightedIds.includes(record.id);
+            return (
             <Card
               key={record.id}
-              className="hover:border-primary/50 transition-colors"
+              className={`hover:border-primary/50 transition-colors ${isHighlighted ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : ''}`}
             >
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
