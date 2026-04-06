@@ -43,7 +43,7 @@ export function SmartSearch({ patientId, records, onHighlight }: SmartSearchProp
           .filter(Boolean).join(' '),
       }));
 
-      const { data, error } = await supabase.functions.invoke("ai-insights", {
+      const { data, error } = await supabase.functions.invoke("clinical-ai", {
         body: { type: "search-records", query: query.trim(), records: recordsPayload },
       });
 

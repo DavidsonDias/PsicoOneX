@@ -44,7 +44,7 @@ export function PatientClinicalProfile({ patientId, patientName }: Props) {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("ai-insights", {
+      const { data, error } = await supabase.functions.invoke("clinical-ai", {
         body: {
           type: "clinical-profile",
           patientName,
