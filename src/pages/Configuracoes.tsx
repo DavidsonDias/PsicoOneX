@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import {
   Save, Bell, Palette, FileText, Database, Download, Lock, Loader2,
   Shield, Plug, HelpCircle, User, Package, CheckCircle2, FileJson, FileSpreadsheet, FileArchive,
-  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw
+  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw, Puzzle
 } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
@@ -500,6 +500,9 @@ export default function Configuracoes() {
           </TabsTrigger>
           <TabsTrigger value="help" className="gap-1.5 text-xs sm:text-sm flex-shrink-0">
             <HelpCircle className="h-3.5 w-3.5" /> Ajuda
+          </TabsTrigger>
+          <TabsTrigger value="plugins" className="gap-1.5 text-xs sm:text-sm flex-shrink-0">
+            <Puzzle className="h-3.5 w-3.5" /> Módulos
           </TabsTrigger>
         </TabsList>
 
