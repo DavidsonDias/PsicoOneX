@@ -1023,6 +1023,11 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── PLUGINS ── */}
+        <TabsContent value="plugins">
+          <PluginManagerComponent />
+        </TabsContent>
       </Tabs>
 
       {/* Export password dialog */}
