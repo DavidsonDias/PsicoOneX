@@ -19,6 +19,7 @@ import {
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PluginManager as PluginManagerComponent } from "@/components/settings/PluginManager";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
