@@ -13,6 +13,7 @@ import { SubscriptionCenter } from "@/components/subscription/SubscriptionCenter
 import { SubscriptionCenterProvider, useSubscriptionCenter } from "@/contexts/SubscriptionCenterContext";
 import { WriteBlockedProvider } from "@/components/subscription/WriteBlockedModal";
 import { SevenDevXFooter } from "./SevenDevXFooter";
+import { MobileBottomNav } from "./MobileBottomNav";
 import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useSyncStatus } from "@/contexts/SyncContext";
@@ -169,8 +170,8 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
           // Desktop: left padding for sidebar
           "lg:pl-[280px]",
           collapsed && "lg:pl-[72px]",
-          // Mobile: top padding for header
-          "pt-16 lg:pt-0"
+          // Mobile: top padding for header + bottom for tab bar
+          "pt-16 pb-20 lg:pt-0 lg:pb-0"
         )}
       >
         <div className="container mx-auto px-4 sm:px-6 py-6 lg:py-8 max-w-7xl">
@@ -218,6 +219,9 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
         {/* SevenDevX Institutional Footer */}
         <SevenDevXFooter />
       </main>
+
+      {/* Mobile Bottom Tab Bar */}
+      <MobileBottomNav />
     </div>
   );
 }

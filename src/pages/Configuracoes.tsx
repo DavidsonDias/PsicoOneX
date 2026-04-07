@@ -14,11 +14,12 @@ import { toast } from "sonner";
 import {
   Save, Bell, Palette, FileText, Database, Download, Lock, Loader2,
   Shield, Plug, HelpCircle, User, Package, CheckCircle2, FileJson, FileSpreadsheet, FileArchive,
-  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw
+  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw, Puzzle
 } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PluginManager as PluginManagerComponent } from "@/components/settings/PluginManager";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
@@ -500,6 +501,9 @@ export default function Configuracoes() {
           </TabsTrigger>
           <TabsTrigger value="help" className="gap-1.5 text-xs sm:text-sm flex-shrink-0">
             <HelpCircle className="h-3.5 w-3.5" /> Ajuda
+          </TabsTrigger>
+          <TabsTrigger value="plugins" className="gap-1.5 text-xs sm:text-sm flex-shrink-0">
+            <Puzzle className="h-3.5 w-3.5" /> Módulos
           </TabsTrigger>
         </TabsList>
 
@@ -1019,6 +1023,11 @@ export default function Configuracoes() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── PLUGINS ── */}
+        <TabsContent value="plugins">
+          <PluginManagerComponent />
         </TabsContent>
       </Tabs>
 
