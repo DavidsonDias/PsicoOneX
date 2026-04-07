@@ -22,7 +22,7 @@ export function MobileBottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border lg:hidden safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border lg:hidden safe-area-inset-bottom">
       <div className="flex items-center justify-around h-16 px-1">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;
