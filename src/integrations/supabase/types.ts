@@ -499,6 +499,57 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_access_links: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          is_revoked: boolean
+          patient_id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          created_by: string
+          expires_at: string
+          id?: string
+          is_revoked?: boolean
+          patient_id: string
+          token?: string
+          used_at?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          is_revoked?: boolean
+          patient_id?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_access_links_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_access_links_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patients: {
         Row: {
           address: string | null

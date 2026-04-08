@@ -10,9 +10,10 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Calendar, Clock, Video, MapPin, Plus, Sparkles } from "lucide-react";
+import { Calendar, Clock, Video, MapPin, Plus, Sparkles, Link2, Copy, Send } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
+import { createPatientAccessLink, getPortalUrl } from "@/lib/patient-access";
 import { ptBR } from "date-fns/locale";
 
 interface Appointment {
@@ -45,6 +46,7 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingLink, setSendingLink] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     time: "09:00",
@@ -97,11 +99,62 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
         notes: null,
         patient_name: patientName,
       });
+
+      // Auto-generate patient access link
+      const token = await createPatientAccessLink({
+        patientId,
+        appointmentId: newApt.id,
+        createdBy: session.user.id,
+        expiresInHours: 72,
+      });
+
+      if (token) {
+        const url = getPortalUrl(token);
+        toast.success(
+          <div className="space-y-2">
+            <p>Sessão agendada!</p>
+            <p className="text-xs text-muted-foreground">Link do paciente gerado automaticamente.</p>
+            <button
+              className="text-xs underline text-primary"
+              onClick={() => {
+                navigator.clipboard.writeText(url);
+                toast.info("Link copiado!");
+              }}
+            >
+              Copiar link
+            </button>
+          </div>,
+          { duration: 8000 }
+        );
+      } else {
+        toast.success("Sessão agendada!");
+      }
     }
 
-    toast.success("Sessão agendada!");
     setCreateOpen(false);
     loadAppointments();
+  };
+
+  const handleResendLink = async (aptId: string) => {
+    setSendingLink(aptId);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast.error("Sessão expirada"); setSendingLink(null); return; }
+
+    const token = await createPatientAccessLink({
+      patientId,
+      appointmentId: aptId,
+      createdBy: session.user.id,
+      expiresInHours: 48,
+    });
+
+    if (token) {
+      const url = getPortalUrl(token);
+      await navigator.clipboard.writeText(url);
+      toast.success("Novo link gerado e copiado para a área de transferência!");
+    } else {
+      toast.error("Erro ao gerar link");
+    }
+    setSendingLink(null);
   };
 
   if (loading) {
@@ -112,35 +165,54 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
     );
   }
 
-  const now = new Date();
   const upcoming = appointments.filter(a => isFuture(new Date(a.scheduled_at)) && a.status !== "cancelled");
   const past = appointments.filter(a => isPast(new Date(a.scheduled_at)) || a.status === "cancelled");
 
   const renderAppointment = (apt: Appointment) => {
     const date = new Date(apt.scheduled_at);
     const cfg = STATUS_CONFIG[apt.status] || STATUS_CONFIG.scheduled;
+    const isUpcoming = isFuture(date) && apt.status !== "cancelled";
+
     return (
       <Card key={apt.id} className="hover:border-primary/30 transition-colors">
-        <CardContent className="py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              {apt.type === "online" ? <Video className="h-4 w-4 text-primary" /> : <MapPin className="h-4 w-4 text-primary" />}
-            </div>
-            <div>
-              <p className="text-sm font-medium">
-                {format(date, "dd/MM/yyyy", { locale: ptBR })} às {format(date, "HH:mm")}
-              </p>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <Badge variant={cfg.variant} className="text-xs">{cfg.label}</Badge>
-                <span className="text-xs text-muted-foreground">{apt.duration_minutes || 50} min</span>
-                {apt.type === "online" && <Badge variant="outline" className="text-xs">Online</Badge>}
+        <CardContent className="py-3 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                {apt.type === "online" ? <Video className="h-4 w-4 text-primary" /> : <MapPin className="h-4 w-4 text-primary" />}
+              </div>
+              <div>
+                <p className="text-sm font-medium">
+                  {format(date, "dd/MM/yyyy", { locale: ptBR })} às {format(date, "HH:mm")}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <Badge variant={cfg.variant} className="text-xs">{cfg.label}</Badge>
+                  <span className="text-xs text-muted-foreground">{apt.duration_minutes || 50} min</span>
+                  {apt.type === "online" && <Badge variant="outline" className="text-xs">Online</Badge>}
+                </div>
               </div>
             </div>
+            {apt.session_value && (
+              <span className="text-sm font-medium text-muted-foreground shrink-0">
+                R$ {Number(apt.session_value).toFixed(0)}
+              </span>
+            )}
           </div>
-          {apt.session_value && (
-            <span className="text-sm font-medium text-muted-foreground shrink-0">
-              R$ {Number(apt.session_value).toFixed(0)}
-            </span>
+
+          {/* Resend link action for upcoming appointments */}
+          {isUpcoming && (
+            <div className="flex justify-end pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs h-7"
+                disabled={sendingLink === apt.id}
+                onClick={() => handleResendLink(apt.id)}
+              >
+                <Send className="h-3 w-3" />
+                {sendingLink === apt.id ? "Gerando..." : "Reenviar Acesso"}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -180,7 +252,7 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
         </div>
       )}
 
-      {/* Create Appointment Dialog — patient auto-filled */}
+      {/* Create Appointment Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -196,6 +268,11 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
                 <p className="font-medium text-sm">{patientName}</p>
               </div>
               <Badge variant="secondary" className="ml-auto text-xs">Contexto automático</Badge>
+            </div>
+
+            <div className="bg-primary/5 rounded-lg p-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <Link2 className="h-4 w-4 text-primary shrink-0" />
+              Link de acesso será gerado automaticamente para o paciente
             </div>
 
             <div className="grid grid-cols-2 gap-4">

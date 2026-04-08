@@ -37,6 +37,7 @@ const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const Lixeira = lazy(() => import("./pages/Lixeira"));
 const PatientProfile = lazy(() => import("./pages/PatientProfile"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PortalPacienteExterno = lazy(() => import("./pages/PortalPacienteExterno"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -90,6 +91,7 @@ const App = () => (
                   <Route path="/super-admin" element={<SuperAdmin />} />
                   <Route path="/lixeira" element={<Lixeira />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
+                  <Route path="/portal/:token" element={<PortalPacienteExterno />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
