@@ -110,6 +110,16 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
 
       if (token) {
         const url = getPortalUrl(token);
+
+        // Fire-and-forget email send
+        supabase.functions.invoke("send-appointment-email", {
+          body: { appointmentId: newApt.id, patientId, token },
+        }).then(({ data: emailResult }) => {
+          if (emailResult?.sent) {
+            toast.info("E-mail enviado para o paciente!");
+          }
+        }).catch(() => {});
+
         toast.success(
           <div className="space-y-2">
             <p>Sessão agendada!</p>
