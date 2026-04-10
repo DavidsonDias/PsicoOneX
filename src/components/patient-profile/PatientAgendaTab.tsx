@@ -111,58 +111,39 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
       if (token) {
         const url = getPortalUrl(token);
 
-        // Fetch psychologist profile for email
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("full_name, clinic_name")
-          .eq("id", session.user.id)
-          .single();
+        // Fetch patient email + psychologist profile for transactional email
+        const [{ data: pat }, { data: prof }] = await Promise.all([
+          supabase.from("patients").select("email").eq("id", patientId).single(),
+          supabase.from("profiles").select("full_name, clinic_name").eq("id", session.user.id).single(),
+        ]);
 
-        const aptDate = new Date(`${formData.date}T${formData.time}:00`);
-        const dateStr = aptDate.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-        const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        if (pat?.email) {
+          const aptDate = new Date(`${formData.date}T${formData.time}:00`);
+          const dateStr = aptDate.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+          const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-        // Fire-and-forget transactional email
-        supabase.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "appointment-confirmation",
-            recipientEmail: undefined, // Will be fetched server-side? No — we need patient email
-            idempotencyKey: `apt-confirm-${newApt.id}`,
-            templateData: {
-              patientName: patientName.split(" ")[0],
-              date: dateStr,
-              time: timeStr,
-              duration: formData.duration,
-              type: formData.type,
-              psychologistName: prof?.full_name,
-              clinicName: prof?.clinic_name,
-              portalUrl: url,
-            },
-          },
-        }).then(() => {}).catch(() => {});
-
-        // We need patient email - fetch it
-        supabase.from("patients").select("email").eq("id", patientId).single().then(({ data: pat }) => {
-          if (pat?.email) {
-            supabase.functions.invoke("send-transactional-email", {
-              body: {
-                templateName: "appointment-confirmation",
-                recipientEmail: pat.email,
-                idempotencyKey: `apt-confirm-${newApt.id}`,
-                templateData: {
-                  patientName: patientName.split(" ")[0],
-                  date: dateStr,
-                  time: timeStr,
-                  duration: formData.duration,
-                  type: formData.type,
-                  psychologistName: prof?.full_name,
-                  clinicName: prof?.clinic_name,
-                  portalUrl: url,
-                },
+          supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "appointment-confirmation",
+              recipientEmail: pat.email,
+              idempotencyKey: `apt-confirm-${newApt.id}`,
+              templateData: {
+                patientName: patientName.split(" ")[0],
+                date: dateStr,
+                time: timeStr,
+                duration: formData.duration,
+                type: formData.type,
+                psychologistName: prof?.full_name,
+                clinicName: prof?.clinic_name,
+                portalUrl: url,
               },
-            }).then(({ data: emailResult }) => {
-              if (emailResult?.success || emailResult?.queued) {
-                toast.info("E-mail de confirmação enviado para o paciente!");
+            },
+          }).then(({ data: emailResult }) => {
+            if (emailResult?.success || emailResult?.queued) {
+              toast.info("E-mail de confirmação enviado para o paciente!");
+            }
+          }).catch(() => {});
+        }
               }
             }).catch(() => {});
           }
