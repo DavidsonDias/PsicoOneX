@@ -27,3 +27,13 @@ project_id = "pnkhogpsadywdbgzqhfi"
     verify_jwt = false
   [functions.transcribe-audio]
     verify_jwt = false
+  [functions.send-transactional-email]
+    verify_jwt = true
+  [functions.preview-transactional-email]
+    verify_jwt = false
+  [functions.handle-email-unsubscribe]
+    verify_jwt = false
+  [functions.handle-email-suppression]
+    verify_jwt = false
+  [functions.send-appointment-email]
+    verify_jwt = false
