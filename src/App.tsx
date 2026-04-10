@@ -39,6 +39,7 @@ const PatientProfile = lazy(() => import("./pages/PatientProfile"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const PortalPacienteExterno = lazy(() => import("./pages/PortalPacienteExterno"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,7 @@ const App = () => (
                   <Route path="/lixeira" element={<Lixeira />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
                   <Route path="/portal/:token" element={<PortalPacienteExterno />} />
+                  <Route path="/unsubscribe" element={<Unsubscribe />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>

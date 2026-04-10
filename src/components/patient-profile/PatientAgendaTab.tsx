@@ -111,14 +111,39 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
       if (token) {
         const url = getPortalUrl(token);
 
-        // Fire-and-forget email send
-        supabase.functions.invoke("send-appointment-email", {
-          body: { appointmentId: newApt.id, patientId, token },
-        }).then(({ data: emailResult }) => {
-          if (emailResult?.sent) {
-            toast.info("E-mail enviado para o paciente!");
-          }
-        }).catch(() => {});
+        // Fetch patient email + psychologist profile for transactional email
+        const [{ data: pat }, { data: prof }] = await Promise.all([
+          supabase.from("patients").select("email").eq("id", patientId).single(),
+          supabase.from("profiles").select("full_name, clinic_name").eq("id", session.user.id).single(),
+        ]);
+
+        if (pat?.email) {
+          const aptDate = new Date(`${formData.date}T${formData.time}:00`);
+          const dateStr = aptDate.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+          const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+          supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "appointment-confirmation",
+              recipientEmail: pat.email,
+              idempotencyKey: `apt-confirm-${newApt.id}`,
+              templateData: {
+                patientName: patientName.split(" ")[0],
+                date: dateStr,
+                time: timeStr,
+                duration: formData.duration,
+                type: formData.type,
+                psychologistName: prof?.full_name,
+                clinicName: prof?.clinic_name,
+                portalUrl: url,
+              },
+            },
+          }).then(({ data: emailResult }) => {
+            if (emailResult?.success || emailResult?.queued) {
+              toast.info("E-mail de confirmação enviado para o paciente!");
+            }
+          }).catch(() => {});
+        }
 
         toast.success(
           <div className="space-y-2">
