@@ -144,10 +144,6 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
             }
           }).catch(() => {});
         }
-              }
-            }).catch(() => {});
-          }
-        });
 
         toast.success(
           <div className="space-y-2">
