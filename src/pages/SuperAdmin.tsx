@@ -14,8 +14,9 @@ import {
   UserCheck, Calendar, FileText, DollarSign, ChevronRight,
   Activity, Building2, CreditCard, Monitor, LogOut, Database,
   ArrowUpRight, ArrowDownRight, Clock, Ban, CheckCircle2, XCircle,
-  Menu, X
+  Menu, X, Mail
 } from "lucide-react";
+import { EmailMonitoringDashboard } from "@/components/admin/EmailMonitoringDashboard";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
@@ -75,6 +76,7 @@ const SIDEBAR_ITEMS = [
   { id: "recovery", label: "Data Recovery", icon: Database },
   { id: "logs", label: "Auditoria", icon: ScrollText },
   { id: "monitoring", label: "Monitoramento", icon: Monitor },
+  { id: "emails", label: "E-mails", icon: Mail },
   { id: "settings", label: "Configurações", icon: Settings },
 ];
 
