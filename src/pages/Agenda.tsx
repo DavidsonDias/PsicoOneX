@@ -534,6 +534,25 @@ export default function Agenda() {
     });
   };
 
+  const handleResendAccess = async (apt: Appointment) => {
+    const t = toast.loading("Gerando novo link de acesso...");
+    const result = await resendAppointmentAccess(apt.id);
+    toast.dismiss(t);
+
+    if (result.portalUrl) {
+      try { await navigator.clipboard.writeText(result.portalUrl); } catch {}
+      if (result.emailSent) {
+        toast.success(`✅ Acesso enviado para ${apt.patients.full_name}!`);
+      } else if (result.reason === "no_email") {
+        toast.info("Sem e-mail cadastrado. Link copiado para envio manual.");
+      } else {
+        toast.warning("Link copiado, mas e-mail não foi enviado.");
+      }
+    } else {
+      toast.error("❌ Erro ao gerar acesso");
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       patient_id: "",
