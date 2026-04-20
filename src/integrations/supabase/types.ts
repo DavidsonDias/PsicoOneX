@@ -14,8 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_requests: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          id: string
+          message: string | null
+          patient_id: string
+          proposed_date: string | null
+          psychologist_id: string
+          psychologist_response: string | null
+          reason: string | null
+          request_type: string
+          responded_at: string | null
+          responded_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          patient_id: string
+          proposed_date?: string | null
+          psychologist_id: string
+          psychologist_response?: string | null
+          reason?: string | null
+          request_type: string
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          patient_id?: string
+          proposed_date?: string | null
+          psychologist_id?: string
+          psychologist_response?: string | null
+          reason?: string | null
+          request_type?: string
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
+          cancellation_reason: string | null
           created_at: string | null
           deleted_at: string | null
           deleted_by: string | null
@@ -23,7 +75,10 @@ export type Database = {
           duration_minutes: number | null
           google_event_id: string | null
           id: string
+          meeting_status: string | null
           notes: string | null
+          patient_cancelled_at: string | null
+          patient_confirmed_at: string | null
           patient_id: string
           psychologist_id: string
           recurrence_end_date: string | null
@@ -37,6 +92,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          cancellation_reason?: string | null
           created_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
@@ -44,7 +100,10 @@ export type Database = {
           duration_minutes?: number | null
           google_event_id?: string | null
           id?: string
+          meeting_status?: string | null
           notes?: string | null
+          patient_cancelled_at?: string | null
+          patient_confirmed_at?: string | null
           patient_id: string
           psychologist_id: string
           recurrence_end_date?: string | null
@@ -58,6 +117,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          cancellation_reason?: string | null
           created_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
@@ -65,7 +125,10 @@ export type Database = {
           duration_minutes?: number | null
           google_event_id?: string | null
           id?: string
+          meeting_status?: string | null
           notes?: string | null
+          patient_cancelled_at?: string | null
+          patient_confirmed_at?: string | null
           patient_id?: string
           psychologist_id?: string
           recurrence_end_date?: string | null
