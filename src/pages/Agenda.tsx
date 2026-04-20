@@ -279,6 +279,22 @@ export default function Agenda() {
       patient_name: patient?.full_name || "Paciente",
     });
 
+    // Centralized notification: generate access link + send email (best-effort, non-blocking)
+    sendAppointmentNotification({
+      appointmentId: mainAppointment.id,
+      patientId: formData.patient_id,
+      psychologistId: userId,
+      scheduledAt,
+      durationMinutes: parseInt(formData.duration),
+      type: formData.type,
+    }).then(result => {
+      if (result.emailSent) {
+        toast.success("📩 E-mail de confirmação enviado ao paciente!");
+      } else if (result.reason === "no_email") {
+        toast.info("Paciente sem e-mail cadastrado — link gerado, envio manual.");
+      }
+    }).catch(err => console.error("[Agenda] Notification failed:", err));
+
     await createFinancialTransaction({
       patient_id: formData.patient_id,
       scheduled_at: scheduledAt,
