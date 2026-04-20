@@ -138,6 +138,21 @@ const Teleatendimento = () => {
       await supabase.from("telehealth_sessions")
         .update({ status: "active", started_at: new Date().toISOString() } as any)
         .eq("id", currentSession.id);
+      // Mark linked appointment as LIVE so patient can join the waiting room
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (authSession && currentSession.patient_id) {
+        const today = new Date();
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+        await supabase
+          .from("appointments")
+          .update({ meeting_status: "live" } as any)
+          .eq("psychologist_id", authSession.user.id)
+          .eq("patient_id", currentSession.patient_id)
+          .eq("type", "online")
+          .gte("scheduled_at", startOfToday)
+          .lt("scheduled_at", endOfToday);
+      }
       await webrtc.connect();
       setCallStartTime(Date.now());
       setViewState("in-call");
@@ -161,6 +176,21 @@ const Teleatendimento = () => {
       await supabase.from("telehealth_sessions")
         .update({ status: "ended", ended_at: new Date().toISOString(), duration_seconds: duration, chat_messages: chat.messages } as any)
         .eq("id", currentSession.id);
+      // Mark today's online appointments as finished for this patient
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (authSession && currentSession.patient_id) {
+        const today = new Date();
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+        await supabase
+          .from("appointments")
+          .update({ meeting_status: "finished" } as any)
+          .eq("psychologist_id", authSession.user.id)
+          .eq("patient_id", currentSession.patient_id)
+          .eq("type", "online")
+          .gte("scheduled_at", startOfToday)
+          .lt("scheduled_at", endOfToday);
+      }
       setCurrentSession({ ...currentSession, duration_seconds: duration } as any);
     }
     setViewState("post-session");
