@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Calendar, Clock, Video, MapPin, Plus, Sparkles, Link2, Copy, Send } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
-import { createPatientAccessLink, getPortalUrl } from "@/lib/patient-access";
+import { sendAppointmentNotification, resendAppointmentAccess } from "@/services/notification.service";
 import { ptBR } from "date-fns/locale";
 
 interface Appointment {
@@ -100,55 +100,28 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
         patient_name: patientName,
       });
 
-      // Auto-generate patient access link
-      const token = await createPatientAccessLink({
-        patientId,
+      // Centralized notification (link + email)
+      const result = await sendAppointmentNotification({
         appointmentId: newApt.id,
-        createdBy: session.user.id,
-        expiresInHours: 72,
+        patientId,
+        psychologistId: session.user.id,
+        scheduledAt,
+        durationMinutes: parseInt(formData.duration),
+        type: formData.type,
       });
 
-      if (token) {
-        const url = getPortalUrl(token);
-
-        // Fetch patient email + psychologist profile for transactional email
-        const [{ data: pat }, { data: prof }] = await Promise.all([
-          supabase.from("patients").select("email").eq("id", patientId).single(),
-          supabase.from("profiles").select("full_name, clinic_name").eq("id", session.user.id).single(),
-        ]);
-
-        if (pat?.email) {
-          const aptDate = new Date(`${formData.date}T${formData.time}:00`);
-          const dateStr = aptDate.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-          const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-
-          supabase.functions.invoke("send-transactional-email", {
-            body: {
-              templateName: "appointment-confirmation",
-              recipientEmail: pat.email,
-              idempotencyKey: `apt-confirm-${newApt.id}`,
-              templateData: {
-                patientName: patientName.split(" ")[0],
-                date: dateStr,
-                time: timeStr,
-                duration: formData.duration,
-                type: formData.type,
-                psychologistName: prof?.full_name,
-                clinicName: prof?.clinic_name,
-                portalUrl: url,
-              },
-            },
-          }).then(({ data: emailResult }) => {
-            if (emailResult?.success || emailResult?.queued) {
-              toast.info("E-mail de confirmação enviado para o paciente!");
-            }
-          }).catch(() => {});
-        }
-
+      if (result.portalUrl) {
+        const url = result.portalUrl;
         toast.success(
           <div className="space-y-2">
             <p>Sessão agendada!</p>
-            <p className="text-xs text-muted-foreground">Link do paciente gerado automaticamente.</p>
+            <p className="text-xs text-muted-foreground">
+              {result.emailSent
+                ? "E-mail enviado ao paciente."
+                : result.reason === "no_email"
+                ? "Paciente sem e-mail — copie o link manualmente."
+                : "Link gerado, mas e-mail não foi enviado."}
+            </p>
             <button
               className="text-xs underline text-primary"
               onClick={() => {
@@ -172,24 +145,21 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
 
   const handleResendLink = async (aptId: string) => {
     setSendingLink(aptId);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { toast.error("Sessão expirada"); setSendingLink(null); return; }
-
-    const token = await createPatientAccessLink({
-      patientId,
-      appointmentId: aptId,
-      createdBy: session.user.id,
-      expiresInHours: 48,
-    });
-
-    if (token) {
-      const url = getPortalUrl(token);
-      await navigator.clipboard.writeText(url);
-      toast.success("Novo link gerado e copiado para a área de transferência!");
-    } else {
-      toast.error("Erro ao gerar link");
-    }
+    const result = await resendAppointmentAccess(aptId);
     setSendingLink(null);
+
+    if (result.portalUrl) {
+      await navigator.clipboard.writeText(result.portalUrl);
+      if (result.emailSent) {
+        toast.success("✅ Acesso enviado e link copiado!");
+      } else if (result.reason === "no_email") {
+        toast.info("Paciente sem e-mail. Link copiado para envio manual.");
+      } else {
+        toast.warning("Link copiado, mas e-mail não foi enviado.");
+      }
+    } else {
+      toast.error("❌ Erro ao gerar acesso");
+    }
   };
 
   if (loading) {

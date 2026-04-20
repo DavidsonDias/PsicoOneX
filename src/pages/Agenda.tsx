@@ -14,8 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download, ExternalLink, AlertTriangle, Info, Sparkles } from "lucide-react";
+import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download, ExternalLink, AlertTriangle, Info, Sparkles, Send } from "lucide-react";
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
+import { sendAppointmentNotification, resendAppointmentAccess } from "@/services/notification.service";
 import { useNavigate } from "react-router-dom";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -278,6 +279,22 @@ export default function Agenda() {
       patient_name: patient?.full_name || "Paciente",
     });
 
+    // Centralized notification: generate access link + send email (best-effort, non-blocking)
+    sendAppointmentNotification({
+      appointmentId: mainAppointment.id,
+      patientId: formData.patient_id,
+      psychologistId: userId,
+      scheduledAt,
+      durationMinutes: parseInt(formData.duration),
+      type: formData.type,
+    }).then(result => {
+      if (result.emailSent) {
+        toast.success("📩 E-mail de confirmação enviado ao paciente!");
+      } else if (result.reason === "no_email") {
+        toast.info("Paciente sem e-mail cadastrado — link gerado, envio manual.");
+      }
+    }).catch(err => console.error("[Agenda] Notification failed:", err));
+
     await createFinancialTransaction({
       patient_id: formData.patient_id,
       scheduled_at: scheduledAt,
@@ -515,6 +532,25 @@ export default function Agenda() {
         toast.success(`Pagamento de ${apt.patients.full_name} registrado!`);
       })();
     });
+  };
+
+  const handleResendAccess = async (apt: Appointment) => {
+    const t = toast.loading("Gerando novo link de acesso...");
+    const result = await resendAppointmentAccess(apt.id);
+    toast.dismiss(t);
+
+    if (result.portalUrl) {
+      try { await navigator.clipboard.writeText(result.portalUrl); } catch {}
+      if (result.emailSent) {
+        toast.success(`✅ Acesso enviado para ${apt.patients.full_name}!`);
+      } else if (result.reason === "no_email") {
+        toast.info("Sem e-mail cadastrado. Link copiado para envio manual.");
+      } else {
+        toast.warning("Link copiado, mas e-mail não foi enviado.");
+      }
+    } else {
+      toast.error("❌ Erro ao gerar acesso");
+    }
   };
 
   const resetForm = () => {
@@ -1124,6 +1160,7 @@ export default function Agenda() {
                 onDelete={handleDeleteAppointment}
                 onStatusChange={handleStatusChange}
                 onMarkPaid={handleMarkPaid}
+                onResendAccess={handleResendAccess}
               />
             ) : (
               <div className="space-y-3">
@@ -1189,6 +1226,11 @@ export default function Agenda() {
                           deleteTitle="Excluir Agendamento"
                           deleteDescription="Tem certeza que deseja excluir este agendamento?"
                           extraActions={[
+                            ...(appointment.status !== "cancelled" && appointment.status !== "completed" ? [{
+                              label: "Reenviar Acesso",
+                              icon: <Send className="h-4 w-4" />,
+                              onClick: () => handleResendAccess(appointment),
+                            }] : []),
                             {
                               label: "Marcar como Pago",
                               icon: <DollarSign className="h-4 w-4" />,
