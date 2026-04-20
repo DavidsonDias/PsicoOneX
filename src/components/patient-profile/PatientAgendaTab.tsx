@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Calendar, Clock, Video, MapPin, Plus, Sparkles, Link2, Copy, Send } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
-import { createPatientAccessLink, getPortalUrl } from "@/lib/patient-access";
+import { sendAppointmentNotification, resendAppointmentAccess } from "@/services/notification.service";
 import { ptBR } from "date-fns/locale";
 
 interface Appointment {
