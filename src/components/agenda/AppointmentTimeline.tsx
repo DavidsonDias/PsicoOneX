@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, User, Video, MapPin, CalendarCheck2, FileText, DollarSign } from "lucide-react";
+import { Clock, User, Video, MapPin, CalendarCheck2, FileText, DollarSign, Send } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ interface AppointmentTimelineProps {
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: string) => void;
   onMarkPaid?: (apt: Appointment) => void;
+  onResendAccess?: (apt: Appointment) => void;
 }
 
 const timeSlots = Array.from({ length: 18 }, (_, i) => i + 6);
@@ -52,7 +53,7 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string; d
   no_show: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", label: "Não compareceu", dot: "bg-amber-500", border: "border-l-amber-500" },
 };
 
-export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusChange, onMarkPaid }: AppointmentTimelineProps) {
+export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusChange, onMarkPaid, onResendAccess }: AppointmentTimelineProps) {
   const navigate = useNavigate();
 
   const getStatusConfig = (status: string) => STATUS_CONFIG[status] || STATUS_CONFIG.scheduled;
@@ -170,6 +171,11 @@ export function AppointmentTimeline({ appointments, onEdit, onDelete, onStatusCh
                                   icon: <FileText className="h-4 w-4" />,
                                   onClick: () => navigate(`/prontuarios?patient=${apt.patient_id}`),
                                 },
+                                ...(onResendAccess && apt.status !== "cancelled" && apt.status !== "completed" ? [{
+                                  label: "Reenviar Acesso",
+                                  icon: <Send className="h-4 w-4" />,
+                                  onClick: () => onResendAccess(apt),
+                                }] : []),
                                 ...(onMarkPaid && apt.status !== "cancelled" ? [{
                                   label: "Marcar como Pago",
                                   icon: <DollarSign className="h-4 w-4" />,
