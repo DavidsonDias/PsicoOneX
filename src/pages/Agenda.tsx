@@ -1160,6 +1160,7 @@ export default function Agenda() {
                 onDelete={handleDeleteAppointment}
                 onStatusChange={handleStatusChange}
                 onMarkPaid={handleMarkPaid}
+                onResendAccess={handleResendAccess}
               />
             ) : (
               <div className="space-y-3">
@@ -1225,6 +1226,11 @@ export default function Agenda() {
                           deleteTitle="Excluir Agendamento"
                           deleteDescription="Tem certeza que deseja excluir este agendamento?"
                           extraActions={[
+                            ...(appointment.status !== "cancelled" && appointment.status !== "completed" ? [{
+                              label: "Reenviar Acesso",
+                              icon: <Send className="h-4 w-4" />,
+                              onClick: () => handleResendAccess(appointment),
+                            }] : []),
                             {
                               label: "Marcar como Pago",
                               icon: <DollarSign className="h-4 w-4" />,
