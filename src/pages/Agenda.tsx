@@ -29,6 +29,7 @@ import { DayOverview } from "@/components/agenda/DayOverview";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { StatsOverview } from "@/components/ui/stats-overview";
 import { StatusLegend } from "@/components/agenda/StatusLegend";
+import { AppointmentRequestsPanel } from "@/components/agenda/AppointmentRequestsPanel";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
@@ -1119,6 +1120,7 @@ export default function Agenda() {
             </CardContent>
           </Card>
           <DayOverview stats={dayStats} selectedDate={selectedDate} />
+          <AppointmentRequestsPanel psychologistId={userId} />
         </div>
 
         <Card>
@@ -1156,11 +1158,13 @@ export default function Agenda() {
             ) : viewMode === "timeline" ? (
               <AppointmentTimeline
                 appointments={filteredAppointments}
+                selectedDate={selectedDate}
                 onEdit={openEditDialog}
                 onDelete={handleDeleteAppointment}
                 onStatusChange={handleStatusChange}
                 onMarkPaid={handleMarkPaid}
                 onResendAccess={handleResendAccess}
+                onJoinSession={(apt) => navigate(`/teleatendimento?patient=${apt.patient_id}`)}
               />
             ) : (
               <div className="space-y-3">
