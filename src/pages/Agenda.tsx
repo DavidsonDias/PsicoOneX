@@ -105,6 +105,7 @@ function SmallTooltip({ text }: { text: string }) {
 
 export default function Agenda() {
   const navigate = useNavigate();
+  const { setActivePatient } = usePatientContext();
   const { guardWrite } = useWriteGuard();
   const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
