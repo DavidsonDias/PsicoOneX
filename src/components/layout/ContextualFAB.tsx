@@ -144,8 +144,10 @@ export function ContextualFAB() {
         onClick: () => setOpen((o) => !o),
       },
       secondary: [
-        { icon: CalendarPlus, label: "Nova consulta", onClick: () => navigate("/agenda") },
-        { icon: UserPlus, label: "Novo paciente", onClick: () => navigate("/pacientes") },
+        { icon: CalendarPlus, label: "Novo Agendamento", onClick: () => navigate("/agenda") },
+        { icon: UserPlus, label: "Novo Paciente", onClick: () => navigate("/pacientes") },
+        { icon: FileText, label: "Novo Prontuário", onClick: () => navigate("/prontuarios") },
+        { icon: DollarSign, label: "Nova Transação", onClick: () => navigate("/financeiro") },
       ],
     };
   }, [location.pathname, navigate]);
