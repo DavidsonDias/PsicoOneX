@@ -93,6 +93,10 @@ export async function sendAppointmentNotification(
           portalUrl,
           hoursAhead: options.hoursAhead ? String(options.hoursAhead) : undefined,
         },
+        metadata: {
+          appointment_id: ctx.appointmentId,
+          patient_id: ctx.patientId,
+        },
       },
     });
 
