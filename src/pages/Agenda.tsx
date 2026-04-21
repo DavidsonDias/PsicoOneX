@@ -1178,7 +1178,23 @@ export default function Agenda() {
                   await handleResendAccess(apt);
                   refreshEmailStatuses();
                 }}
-                onJoinSession={(apt) => navigate(`/teleatendimento?patient=${apt.patient_id}`)}
+                onJoinSession={async (apt) => {
+                  const patient = patients.find(p => p.id === apt.patient_id);
+                  if (patient) {
+                    setActivePatient({
+                      id: patient.id,
+                      full_name: patient.full_name,
+                      default_session_value: patient.default_session_value ?? null,
+                      payment_day: patient.payment_day ?? null,
+                    });
+                  }
+                  toast.loading("Preparando sala…", { id: "start-session" });
+                  const token = await resolveSessionTokenForAppointment(apt.id);
+                  toast.dismiss("start-session");
+                  if (!token) return;
+                  markAppointmentLive(apt.id).catch(() => {});
+                  navigate(`/sala/${token}?host=1&appointment=${apt.id}`);
+                }}
               />
             ) : (
               <div className="space-y-3">
