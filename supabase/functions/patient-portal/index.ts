@@ -234,6 +234,7 @@ Deno.serve(async (req) => {
           responded_at: new Date().toISOString(),
         });
 
+        const aptFmt = await formatAptDateTime();
         await notifyPsychologist(
           psychId,
           "❌ Sessão cancelada pelo paciente",
@@ -242,10 +243,8 @@ Deno.serve(async (req) => {
           {
             actionType: "cancel",
             patientName: pat?.full_name,
-            ...(await formatAptDateTime()).date ? await (async () => {
-              const f = await formatAptDateTime();
-              return { appointmentDate: f.date, appointmentTime: f.time };
-            })() : {},
+            appointmentDate: aptFmt.date,
+            appointmentTime: aptFmt.time,
             reason: reason || undefined,
           }
         );
@@ -302,11 +301,20 @@ Deno.serve(async (req) => {
         dateStyle: "short",
         timeStyle: "short",
       });
+      const aptFmtR = await formatAptDateTime();
       await notifyPsychologist(
         psychId,
         "🔄 Solicitação de reagendamento",
         `${pat?.full_name || "Paciente"} solicitou reagendar para ${newDate}.${reason ? ` Motivo: ${reason}` : ""}`,
-        "reschedule_request"
+        "reschedule_request",
+        {
+          actionType: "reschedule",
+          patientName: pat?.full_name,
+          appointmentDate: aptFmtR.date,
+          appointmentTime: aptFmtR.time,
+          proposedDate: newDate,
+          reason: reason || undefined,
+        }
       );
 
       return new Response(JSON.stringify({ success: true }), {
