@@ -54,11 +54,12 @@ export function ContextualFAB() {
     if (path.startsWith("/agenda")) {
       return {
         primary: {
-          icon: CalendarPlus,
-          label: "Nova consulta",
-          onClick: () => window.dispatchEvent(new CustomEvent("psicoone:new-appointment")),
+          icon: Plus,
+          label: "Ações da Agenda",
+          onClick: () => setOpen((o) => !o),
         },
         secondary: [
+          { icon: CalendarPlus, label: "Novo Agendamento", onClick: () => window.dispatchEvent(new CustomEvent("psicoone:new-appointment")) },
           { icon: Calendar, label: "Ir para hoje", onClick: () => window.dispatchEvent(new CustomEvent("psicoone:agenda-today")) },
           { icon: Video, label: "Teleatendimento", onClick: () => navigate("/teleatendimento") },
         ],
@@ -68,13 +69,14 @@ export function ContextualFAB() {
     if (path.startsWith("/pacientes")) {
       return {
         primary: {
-          icon: UserPlus,
-          label: "Novo paciente",
-          onClick: () => window.dispatchEvent(new CustomEvent("psicoone:new-patient")),
+          icon: Plus,
+          label: "Ações de Pacientes",
+          onClick: () => setOpen((o) => !o),
         },
         secondary: [
+          { icon: UserPlus, label: "Novo Paciente", onClick: () => window.dispatchEvent(new CustomEvent("psicoone:new-patient")) },
           { icon: Search, label: "Buscar paciente", onClick: () => window.dispatchEvent(new CustomEvent("psicoone:search-patient")) },
-          { icon: CalendarPlus, label: "Nova consulta", onClick: () => navigate("/agenda") },
+          { icon: CalendarPlus, label: "Novo Agendamento", onClick: () => navigate("/agenda") },
         ],
       };
     }
@@ -87,8 +89,10 @@ export function ContextualFAB() {
           onClick: () => setOpen((o) => !o),
         },
         secondary: [
-          { icon: CalendarPlus, label: "Nova consulta", onClick: () => navigate("/agenda") },
-          { icon: UserPlus, label: "Novo paciente", onClick: () => navigate("/pacientes") },
+          { icon: CalendarPlus, label: "Novo Agendamento", onClick: () => navigate("/agenda") },
+          { icon: UserPlus, label: "Novo Paciente", onClick: () => navigate("/pacientes") },
+          { icon: FileText, label: "Novo Prontuário", onClick: () => navigate("/prontuarios") },
+          { icon: DollarSign, label: "Nova Transação", onClick: () => navigate("/financeiro") },
           { icon: BarChart3, label: "Relatórios", onClick: () => navigate("/relatorios") },
         ],
       };
@@ -97,11 +101,12 @@ export function ContextualFAB() {
     if (path.startsWith("/prontuarios")) {
       return {
         primary: {
-          icon: FileText,
-          label: "Novo prontuário",
-          onClick: () => window.dispatchEvent(new CustomEvent("psicoone:new-record")),
+          icon: Plus,
+          label: "Ações de Prontuário",
+          onClick: () => setOpen((o) => !o),
         },
         secondary: [
+          { icon: FileText, label: "Novo Prontuário", onClick: () => window.dispatchEvent(new CustomEvent("psicoone:new-record")) },
           { icon: Sparkles, label: "Assistente IA", onClick: () => navigate("/assistente-ia") },
         ],
       };
@@ -110,11 +115,12 @@ export function ContextualFAB() {
     if (path.startsWith("/financeiro")) {
       return {
         primary: {
-          icon: DollarSign,
-          label: "Nova transação",
-          onClick: () => window.dispatchEvent(new CustomEvent("psicoone:new-transaction")),
+          icon: Plus,
+          label: "Ações Financeiras",
+          onClick: () => setOpen((o) => !o),
         },
         secondary: [
+          { icon: DollarSign, label: "Nova Transação", onClick: () => window.dispatchEvent(new CustomEvent("psicoone:new-transaction")) },
           { icon: BarChart3, label: "Relatórios", onClick: () => navigate("/relatorios") },
         ],
       };
@@ -138,8 +144,10 @@ export function ContextualFAB() {
         onClick: () => setOpen((o) => !o),
       },
       secondary: [
-        { icon: CalendarPlus, label: "Nova consulta", onClick: () => navigate("/agenda") },
-        { icon: UserPlus, label: "Novo paciente", onClick: () => navigate("/pacientes") },
+        { icon: CalendarPlus, label: "Novo Agendamento", onClick: () => navigate("/agenda") },
+        { icon: UserPlus, label: "Novo Paciente", onClick: () => navigate("/pacientes") },
+        { icon: FileText, label: "Novo Prontuário", onClick: () => navigate("/prontuarios") },
+        { icon: DollarSign, label: "Nova Transação", onClick: () => navigate("/financeiro") },
       ],
     };
   }, [location.pathname, navigate]);
