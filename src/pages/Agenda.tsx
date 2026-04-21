@@ -18,6 +18,8 @@ import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { sendAppointmentNotification, resendAppointmentAccess } from "@/services/notification.service";
 import { useAppointmentEmailStatus } from "@/hooks/useAppointmentEmailStatus";
+import { resolveSessionTokenForAppointment, markAppointmentLive } from "@/lib/start-session";
+import { usePatientContext } from "@/contexts/PatientContext";
 import { useNavigate } from "react-router-dom";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
