@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download, ExternalLink, AlertTriangle, Info, Sparkles, Send } from "lucide-react";
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { sendAppointmentNotification, resendAppointmentAccess } from "@/services/notification.service";
+import { useAppointmentEmailStatus } from "@/hooks/useAppointmentEmailStatus";
 import { useNavigate } from "react-router-dom";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
