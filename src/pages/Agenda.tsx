@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Zap, Bell, RefreshCw, Repeat, DollarSign, Trash2, Filter, Download, ExternalLink, AlertTriangle, Info, Sparkles, Send } from "lucide-react";
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { sendAppointmentNotification, resendAppointmentAccess } from "@/services/notification.service";
+import { useAppointmentEmailStatus } from "@/hooks/useAppointmentEmailStatus";
 import { useNavigate } from "react-router-dom";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -596,6 +597,13 @@ export default function Agenda() {
     return true;
   });
 
+  // Batch-fetch latest email status for visible appointments
+  const filteredIds = useMemo(
+    () => filteredAppointments.map((a) => a.id),
+    [filteredAppointments.map((a) => a.id).join(",")]
+  );
+  const { statusMap: emailStatusMap, refresh: refreshEmailStatuses } = useAppointmentEmailStatus(filteredIds);
+
   const handleExportAgenda = (fmt: "csv" | "xlsx" | "pdf") => {
     const data = filteredAppointments.map(a => ({
       paciente: a.patients.full_name,
@@ -1159,11 +1167,15 @@ export default function Agenda() {
               <AppointmentTimeline
                 appointments={filteredAppointments}
                 selectedDate={selectedDate}
+                emailStatusMap={emailStatusMap}
                 onEdit={openEditDialog}
                 onDelete={handleDeleteAppointment}
                 onStatusChange={handleStatusChange}
                 onMarkPaid={handleMarkPaid}
-                onResendAccess={handleResendAccess}
+                onResendAccess={async (apt) => {
+                  await handleResendAccess(apt);
+                  refreshEmailStatuses();
+                }}
                 onJoinSession={(apt) => navigate(`/teleatendimento?patient=${apt.patient_id}`)}
               />
             ) : (

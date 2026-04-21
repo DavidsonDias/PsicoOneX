@@ -64,13 +64,23 @@ Deno.serve(async (req) => {
       return data?.psychologist_id || null;
     };
 
-    // Helper: notify psychologist via internal notifications + (best-effort) email
+    // Helper: notify psychologist via internal notifications + email
     const notifyPsychologist = async (
       psychologistId: string,
       title: string,
       message: string,
-      type: string = "patient_action"
+      type: string = "patient_action",
+      emailContext?: {
+        actionType: "cancel" | "reschedule" | "message" | "confirm";
+        patientName?: string;
+        appointmentDate?: string;
+        appointmentTime?: string;
+        reason?: string;
+        userMessage?: string;
+        proposedDate?: string;
+      }
     ) => {
+      // 1) Internal realtime notification (sino)
       await supabase.from("notifications").insert({
         user_id: psychologistId,
         title,
@@ -79,6 +89,65 @@ Deno.serve(async (req) => {
         action_path: "/agenda",
         action_label: "Abrir agenda",
       });
+
+      // 2) Email (best-effort, never blocks the flow)
+      if (!emailContext) return;
+      try {
+        // Resolve psychologist email + name from auth.users + profiles
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", psychologistId)
+          .single();
+        const { data: authUser } = await supabase.auth.admin.getUserById(psychologistId);
+        const recipientEmail = authUser?.user?.email;
+        if (!recipientEmail) return;
+
+        const siteUrl =
+          Deno.env.get("SITE_URL") ||
+          "https://psicoone.lovable.app";
+
+        await supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "psychologist-patient-action",
+            recipientEmail,
+            idempotencyKey: `psy-action-${emailContext.actionType}-${link.appointment_id}-${Date.now()}`,
+            templateData: {
+              psychologistName: prof?.full_name,
+              patientName: emailContext.patientName,
+              actionType: emailContext.actionType,
+              appointmentDate: emailContext.appointmentDate,
+              appointmentTime: emailContext.appointmentTime,
+              reason: emailContext.reason,
+              message: emailContext.userMessage,
+              proposedDate: emailContext.proposedDate,
+              agendaUrl: `${siteUrl}/agenda`,
+            },
+            metadata: {
+              appointment_id: link.appointment_id,
+              action_type: emailContext.actionType,
+            },
+          },
+        });
+      } catch (e) {
+        console.warn("[patient-portal] Psychologist email failed:", e);
+      }
+    };
+
+    // Helper: format appointment date/time for emails
+    const formatAptDateTime = async () => {
+      if (!link.appointment_id) return { date: "", time: "" };
+      const { data: apt } = await supabase
+        .from("appointments")
+        .select("scheduled_at")
+        .eq("id", link.appointment_id)
+        .single();
+      if (!apt?.scheduled_at) return { date: "", time: "" };
+      const d = new Date(apt.scheduled_at);
+      return {
+        date: d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }),
+        time: d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      };
     };
 
     // ====== ACTION: confirm presence ======
@@ -165,11 +234,19 @@ Deno.serve(async (req) => {
           responded_at: new Date().toISOString(),
         });
 
+        const aptFmt = await formatAptDateTime();
         await notifyPsychologist(
           psychId,
           "❌ Sessão cancelada pelo paciente",
           `${pat?.full_name || "Paciente"} cancelou a sessão.${reason ? ` Motivo: ${reason}` : ""}`,
-          "appointment_cancelled"
+          "appointment_cancelled",
+          {
+            actionType: "cancel",
+            patientName: pat?.full_name,
+            appointmentDate: aptFmt.date,
+            appointmentTime: aptFmt.time,
+            reason: reason || undefined,
+          }
         );
       }
 
@@ -224,11 +301,20 @@ Deno.serve(async (req) => {
         dateStyle: "short",
         timeStyle: "short",
       });
+      const aptFmtR = await formatAptDateTime();
       await notifyPsychologist(
         psychId,
         "🔄 Solicitação de reagendamento",
         `${pat?.full_name || "Paciente"} solicitou reagendar para ${newDate}.${reason ? ` Motivo: ${reason}` : ""}`,
-        "reschedule_request"
+        "reschedule_request",
+        {
+          actionType: "reschedule",
+          patientName: pat?.full_name,
+          appointmentDate: aptFmtR.date,
+          appointmentTime: aptFmtR.time,
+          proposedDate: newDate,
+          reason: reason || undefined,
+        }
       );
 
       return new Response(JSON.stringify({ success: true }), {
@@ -275,11 +361,19 @@ Deno.serve(async (req) => {
         message,
       });
 
+      const aptFmtM = await formatAptDateTime();
       await notifyPsychologist(
         psychId,
         "💬 Nova mensagem do paciente",
         `${pat?.full_name || "Paciente"}: ${message.slice(0, 120)}${message.length > 120 ? "..." : ""}`,
-        "patient_message"
+        "patient_message",
+        {
+          actionType: "message",
+          patientName: pat?.full_name,
+          appointmentDate: aptFmtM.date,
+          appointmentTime: aptFmtM.time,
+          userMessage: message,
+        }
       );
 
       return new Response(JSON.stringify({ success: true }), {

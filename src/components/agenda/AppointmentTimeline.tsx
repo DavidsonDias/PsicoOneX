@@ -5,7 +5,7 @@ import { ActionMenu } from "@/components/ui/action-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Clock, Video, MapPin, CalendarCheck2, FileText, DollarSign, Send, AlertTriangle, MoonStar } from "lucide-react";
+import { Clock, Video, MapPin, CalendarCheck2, FileText, DollarSign, Send, AlertTriangle, MoonStar, MailCheck, MailWarning, MailX } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,12 @@ interface Appointment {
   };
 }
 
+interface EmailStatusRecord {
+  status: string;
+  template_name: string;
+  sent_at: string;
+}
+
 interface AppointmentTimelineProps {
   appointments: Appointment[];
   onEdit: (apt: Appointment) => void;
@@ -37,6 +43,7 @@ interface AppointmentTimelineProps {
   onResendAccess?: (apt: Appointment) => void;
   onJoinSession?: (apt: Appointment) => void;
   selectedDate?: Date;
+  emailStatusMap?: Record<string, EmailStatusRecord>;
 }
 
 const STATUS_OPTIONS = [
@@ -68,6 +75,7 @@ export function AppointmentTimeline({
   onResendAccess,
   onJoinSession,
   selectedDate,
+  emailStatusMap,
 }: AppointmentTimelineProps) {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -218,6 +226,59 @@ export function AppointmentTimeline({
                                     🔴 AO VIVO
                                   </Badge>
                                 )}
+                                {(() => {
+                                  const emailRec = emailStatusMap?.[apt.id];
+                                  if (!emailRec) {
+                                    return (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-1 border-muted-foreground/30 text-muted-foreground cursor-help">
+                                            <MailX className="h-2.5 w-2.5" />
+                                            Sem e-mail
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Nenhum e-mail enviado para este agendamento</TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  }
+                                  if (emailRec.status === "sent") {
+                                    return (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-1 border-green-500/40 text-green-700 dark:text-green-400 cursor-help">
+                                            <MailCheck className="h-2.5 w-2.5" />
+                                            Enviado
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          E-mail enviado em {format(new Date(emailRec.sent_at), "dd/MM HH:mm")}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  }
+                                  if (emailRec.status === "failed" || emailRec.status === "suppressed") {
+                                    return (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-1 border-destructive/40 text-destructive cursor-help">
+                                            <MailWarning className="h-2.5 w-2.5" />
+                                            Falhou
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {emailRec.status === "suppressed"
+                                            ? "E-mail bloqueado (endereço suprimido)"
+                                            : "Falha no envio. Use 'Reenviar acesso'."}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  }
+                                  return (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-1 border-muted-foreground/30 text-muted-foreground">
+                                      Aguardando
+                                    </Badge>
+                                  );
+                                })()}
                               </div>
                               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
