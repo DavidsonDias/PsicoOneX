@@ -1038,6 +1038,15 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_appointment_email_status: {
+        Args: { _appointment_ids: string[] }
+        Returns: {
+          appointment_id: string
+          sent_at: string
+          status: string
+          template_name: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
