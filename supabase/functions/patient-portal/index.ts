@@ -238,7 +238,16 @@ Deno.serve(async (req) => {
           psychId,
           "❌ Sessão cancelada pelo paciente",
           `${pat?.full_name || "Paciente"} cancelou a sessão.${reason ? ` Motivo: ${reason}` : ""}`,
-          "appointment_cancelled"
+          "appointment_cancelled",
+          {
+            actionType: "cancel",
+            patientName: pat?.full_name,
+            ...(await formatAptDateTime()).date ? await (async () => {
+              const f = await formatAptDateTime();
+              return { appointmentDate: f.date, appointmentTime: f.time };
+            })() : {},
+            reason: reason || undefined,
+          }
         );
       }
 
