@@ -79,6 +79,36 @@ const Teleatendimento = () => {
 
   useEffect(() => { loadData(); }, []);
 
+  // Auto-start from Agenda: /teleatendimento?session=TOKEN&appointment=ID&autostart=1
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionToken = params.get("session");
+    const autostart = params.get("autostart");
+    if (!sessionToken || !autostart) return;
+    (async () => {
+      const { data } = await supabase
+        .from("telehealth_sessions")
+        .select("*")
+        .eq("room_token", sessionToken)
+        .maybeSingle();
+      if (!data) return;
+      setCurrentSession(data as any);
+      setSelectedPatient((data as any).patient_id || "");
+      // Skip privacy gate, jump straight into pre-call
+      setPrivacyAccepted(true);
+      setViewState("pre-call");
+      // Clean URL
+      window.history.replaceState({}, "", "/teleatendimento");
+    })();
+  }, []);
+
+  // FAB integration
+  useEffect(() => {
+    const handler = () => setViewState("lobby");
+    window.addEventListener("psicoone:new-session", handler);
+    return () => window.removeEventListener("psicoone:new-session", handler);
+  }, []);
+
   useEffect(() => {
     if (viewState !== "in-call" || !callStartTime) return;
     const interval = setInterval(() => setElapsed(Math.floor((Date.now() - callStartTime) / 1000)), 1000);

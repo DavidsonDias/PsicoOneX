@@ -18,6 +18,8 @@ import { Plus, Clock, User, Calendar as CalendarIcon, Video, MapPin, ChevronLeft
 import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { sendAppointmentNotification, resendAppointmentAccess } from "@/services/notification.service";
 import { useAppointmentEmailStatus } from "@/hooks/useAppointmentEmailStatus";
+import { resolveSessionTokenForAppointment, markAppointmentLive } from "@/lib/start-session";
+import { usePatientContext } from "@/contexts/PatientContext";
 import { useNavigate } from "react-router-dom";
 import { format, isSameDay, startOfMonth, endOfMonth, addWeeks, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -103,6 +105,7 @@ function SmallTooltip({ text }: { text: string }) {
 
 export default function Agenda() {
   const navigate = useNavigate();
+  const { setActivePatient } = usePatientContext();
   const { guardWrite } = useWriteGuard();
   const { checkSubscriptionBeforeWrite } = useSubscriptionGuard();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -133,6 +136,17 @@ export default function Agenda() {
     checkAuthAndLoadData();
   }, []);
 
+  // FAB integration: respond to global events
+  useEffect(() => {
+    const newApt = () => setDialogOpen(true);
+    const goToday = () => setSelectedDate(new Date());
+    window.addEventListener("psicoone:new-appointment", newApt);
+    window.addEventListener("psicoone:agenda-today", goToday);
+    return () => {
+      window.removeEventListener("psicoone:new-appointment", newApt);
+      window.removeEventListener("psicoone:agenda-today", goToday);
+    };
+  }, []);
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
@@ -1176,7 +1190,23 @@ export default function Agenda() {
                   await handleResendAccess(apt);
                   refreshEmailStatuses();
                 }}
-                onJoinSession={(apt) => navigate(`/teleatendimento?patient=${apt.patient_id}`)}
+                onJoinSession={async (apt) => {
+                  const patient = patients.find(p => p.id === apt.patient_id);
+                  if (patient) {
+                    setActivePatient({
+                      id: patient.id,
+                      full_name: patient.full_name,
+                      default_session_value: patient.default_session_value ?? null,
+                      payment_day: patient.payment_day ?? null,
+                    });
+                  }
+                  toast.loading("Preparando sala…", { id: "start-session" });
+                  const token = await resolveSessionTokenForAppointment(apt.id);
+                  toast.dismiss("start-session");
+                  if (!token) return;
+                  // Navigate to the dedicated host page, which will auto-start pre-call
+                  navigate(`/teleatendimento?session=${token}&appointment=${apt.id}&autostart=1`);
+                }}
               />
             ) : (
               <div className="space-y-3">

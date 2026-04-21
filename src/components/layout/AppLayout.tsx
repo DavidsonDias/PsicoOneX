@@ -18,6 +18,7 @@ import { Brain } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useSyncStatus } from "@/contexts/SyncContext";
 import { SystemStatusBar } from "./SystemStatusBar";
+import { ContextualFAB } from "./ContextualFAB";
 import { cn } from "@/lib/utils";
 
 // Context to expose canWrite to child components
@@ -222,6 +223,9 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
 
       {/* Mobile Bottom Tab Bar */}
       <MobileBottomNav />
+
+      {/* Contextual Floating Action Button */}
+      <ContextualFAB />
     </div>
   );
 }
