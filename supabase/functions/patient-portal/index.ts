@@ -361,11 +361,19 @@ Deno.serve(async (req) => {
         message,
       });
 
+      const aptFmtM = await formatAptDateTime();
       await notifyPsychologist(
         psychId,
         "💬 Nova mensagem do paciente",
         `${pat?.full_name || "Paciente"}: ${message.slice(0, 120)}${message.length > 120 ? "..." : ""}`,
-        "patient_message"
+        "patient_message",
+        {
+          actionType: "message",
+          patientName: pat?.full_name,
+          appointmentDate: aptFmtM.date,
+          appointmentTime: aptFmtM.time,
+          userMessage: message,
+        }
       );
 
       return new Response(JSON.stringify({ success: true }), {
