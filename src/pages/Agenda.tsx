@@ -597,6 +597,13 @@ export default function Agenda() {
     return true;
   });
 
+  // Batch-fetch latest email status for visible appointments
+  const filteredIds = useMemo(
+    () => filteredAppointments.map((a) => a.id),
+    [filteredAppointments.map((a) => a.id).join(",")]
+  );
+  const { statusMap: emailStatusMap, refresh: refreshEmailStatuses } = useAppointmentEmailStatus(filteredIds);
+
   const handleExportAgenda = (fmt: "csv" | "xlsx" | "pdf") => {
     const data = filteredAppointments.map(a => ({
       paciente: a.patients.full_name,
@@ -1160,11 +1167,15 @@ export default function Agenda() {
               <AppointmentTimeline
                 appointments={filteredAppointments}
                 selectedDate={selectedDate}
+                emailStatusMap={emailStatusMap}
                 onEdit={openEditDialog}
                 onDelete={handleDeleteAppointment}
                 onStatusChange={handleStatusChange}
                 onMarkPaid={handleMarkPaid}
-                onResendAccess={handleResendAccess}
+                onResendAccess={async (apt) => {
+                  await handleResendAccess(apt);
+                  refreshEmailStatuses();
+                }}
                 onJoinSession={(apt) => navigate(`/teleatendimento?patient=${apt.patient_id}`)}
               />
             ) : (
