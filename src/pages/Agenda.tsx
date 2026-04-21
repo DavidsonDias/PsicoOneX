@@ -1204,8 +1204,8 @@ export default function Agenda() {
                   const token = await resolveSessionTokenForAppointment(apt.id);
                   toast.dismiss("start-session");
                   if (!token) return;
-                  markAppointmentLive(apt.id).catch(() => {});
-                  navigate(`/sala/${token}?host=1&appointment=${apt.id}`);
+                  // Navigate to the dedicated host page, which will auto-start pre-call
+                  navigate(`/teleatendimento?session=${token}&appointment=${apt.id}&autostart=1`);
                 }}
               />
             ) : (
