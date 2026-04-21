@@ -8,6 +8,7 @@ import { CallControls } from "@/components/telehealth/CallControls";
 import { ChatPanel } from "@/components/telehealth/ChatPanel";
 import { ConnectionIndicator } from "@/components/telehealth/ConnectionIndicator";
 import { PreCallCheck } from "@/components/telehealth/PreCallCheck";
+import { WaitingRoom } from "@/components/telehealth/WaitingRoom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -181,10 +182,20 @@ const SalaTeleatendimento = () => {
 
       <div className="flex-1 p-3 flex gap-3 min-h-0">
         <div className={`flex-1 flex flex-col gap-3 ${chat.isOpen ? "lg:w-2/3" : "w-full"}`}>
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <VideoPanel stream={remoteStream} label="Profissional" />
-            <VideoPanel stream={webrtc.localStream} label={patientName} muted mirrored />
-          </div>
+          {!remoteStream ? (
+            <div className="flex-1 flex items-center justify-center">
+              <WaitingRoom
+                patientName={patientName}
+                psychologistName={sessionInfo?.psychologist_name}
+                onCancel={leaveRoom}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <VideoPanel stream={remoteStream} label="Profissional" />
+              <VideoPanel stream={webrtc.localStream} label={patientName} muted mirrored />
+            </div>
+          )}
 
           <CallControls
             videoEnabled={webrtc.videoEnabled}
