@@ -136,6 +136,17 @@ export default function Agenda() {
     checkAuthAndLoadData();
   }, []);
 
+  // FAB integration: respond to global events
+  useEffect(() => {
+    const newApt = () => setDialogOpen(true);
+    const goToday = () => setSelectedDate(new Date());
+    window.addEventListener("psicoone:new-appointment", newApt);
+    window.addEventListener("psicoone:agenda-today", goToday);
+    return () => {
+      window.removeEventListener("psicoone:new-appointment", newApt);
+      window.removeEventListener("psicoone:agenda-today", goToday);
+    };
+  }, []);
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
