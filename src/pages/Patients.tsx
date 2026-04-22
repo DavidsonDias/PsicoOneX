@@ -135,6 +135,21 @@ export default function Patients() {
 
   useEffect(() => { loadPatients(); }, []);
 
+  // FAB events
+  useEffect(() => {
+    const openNew = () => guardWrite(() => setDialogOpen(true));
+    const focusSearch = () => {
+      const el = document.querySelector<HTMLInputElement>('input[placeholder*="Buscar"], input[type="search"]');
+      el?.focus();
+    };
+    window.addEventListener("psicoone:new-patient", openNew);
+    window.addEventListener("psicoone:search-patient", focusSearch);
+    return () => {
+      window.removeEventListener("psicoone:new-patient", openNew);
+      window.removeEventListener("psicoone:search-patient", focusSearch);
+    };
+  }, [guardWrite]);
+
   // Smart date: auto-calculate start date based on selected weekday
   const getNextDateForWeekday = useCallback((weekdayStr: string) => {
     const target = parseInt(weekdayStr);

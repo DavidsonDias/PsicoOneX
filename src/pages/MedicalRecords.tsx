@@ -256,6 +256,13 @@ const MedicalRecords = () => {
     setLastCommittedSnapshot(nextSnapshot);
   }, []);
 
+  // FAB event
+  useEffect(() => {
+    const openNew = () => guardWrite(() => setDialogOpen(true));
+    window.addEventListener("psicoone:new-record", openNew);
+    return () => window.removeEventListener("psicoone:new-record", openNew);
+  }, [guardWrite]);
+
   useEffect(() => {
     checkAuthAndLoadData();
   }, []);

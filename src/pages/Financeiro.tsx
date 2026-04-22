@@ -138,6 +138,13 @@ export default function Financeiro() {
 
   useEffect(() => { checkAuthAndLoadData(); }, []);
 
+  // FAB event
+  useEffect(() => {
+    const openNew = () => guardWrite(() => setDialogOpen(true));
+    window.addEventListener("psicoone:new-transaction", openNew);
+    return () => window.removeEventListener("psicoone:new-transaction", openNew);
+  }, [guardWrite]);
+
   const checkAuthAndLoadData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
