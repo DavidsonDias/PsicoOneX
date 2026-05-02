@@ -40,6 +40,8 @@ const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const PortalPacienteExterno = lazy(() => import("./pages/PortalPacienteExterno"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
+const PortalAcceptInvite = lazy(() => import("./pages/portal/PortalAcceptInvite"));
 
 const queryClient = new QueryClient();
 
@@ -92,6 +94,8 @@ const App = () => (
                   <Route path="/super-admin" element={<SuperAdmin />} />
                   <Route path="/lixeira" element={<Lixeira />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
+                  <Route path="/portal/login" element={<PortalLogin />} />
+                  <Route path="/portal/aceitar-convite/:token" element={<PortalAcceptInvite />} />
                   <Route path="/portal/:token" element={<PortalPacienteExterno />} />
                   <Route path="/unsubscribe" element={<Unsubscribe />} />
                   <Route path="*" element={<NotFound />} />

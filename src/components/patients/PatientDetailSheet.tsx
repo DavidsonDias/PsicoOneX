@@ -1,37 +1,42 @@
- import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
- import { Button } from "@/components/ui/button";
- import { Badge } from "@/components/ui/badge";
- import { Avatar, AvatarFallback } from "@/components/ui/avatar";
- import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
- import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
- import { Timeline } from "@/components/ui/timeline";
- import { Mail, Phone, Calendar, MapPin, User, FileText, Clock, AlertCircle, Edit } from "lucide-react";
- import { format, differenceInYears } from "date-fns";
- import { ptBR } from "date-fns/locale";
+import { useState } from "react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Timeline } from "@/components/ui/timeline";
+import { Mail, Phone, Calendar, MapPin, User, FileText, Clock, AlertCircle, Edit, UserPlus, Loader2, CheckCircle2 } from "lucide-react";
+import { format, differenceInYears } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
  
- interface Patient {
-   id: string;
-   full_name: string;
-   email: string | null;
-   phone: string | null;
-   birth_date: string | null;
-   notes: string | null;
-   status: string;
-   cpf: string | null;
-   address: string | null;
-   emergency_contact: string | null;
-   emergency_phone: string | null;
-   created_at?: string;
- }
- 
- interface PatientDetailSheetProps {
-   patient: Patient | null;
-   open: boolean;
-   onClose: () => void;
-   onEdit: () => void;
-   appointments?: any[];
-   records?: any[];
- }
+interface Patient {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  birth_date: string | null;
+  notes: string | null;
+  status: string;
+  cpf: string | null;
+  address: string | null;
+  emergency_contact: string | null;
+  emergency_phone: string | null;
+  user_id?: string | null;
+  portal_activated_at?: string | null;
+  created_at?: string;
+}
+
+interface PatientDetailSheetProps {
+  patient: Patient | null;
+  open: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  appointments?: any[];
+  records?: any[];
+}
  
  export function PatientDetailSheet({
    patient,
@@ -41,14 +46,40 @@
    appointments = [],
    records = [],
  }: PatientDetailSheetProps) {
-   if (!patient) return null;
- 
-   const initials = patient.full_name
-     .split(" ")
-     .map((n) => n[0])
-     .slice(0, 2)
-     .join("")
-     .toUpperCase();
+  const [inviting, setInviting] = useState(false);
+
+  if (!patient) return null;
+
+  const initials = patient.full_name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const portalActive = !!patient.user_id;
+
+  const handleInvite = async () => {
+    if (!patient.email) {
+      toast.error("Cadastre um e-mail no paciente antes de enviar o convite.");
+      return;
+    }
+    setInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("invite-patient", {
+        body: { patient_id: patient.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success("Convite enviado por e-mail!", {
+        description: `Válido por 7 dias. ${patient.email}`,
+      });
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao enviar convite");
+    } finally {
+      setInviting(false);
+    }
+  };
  
    const age = patient.birth_date
      ? differenceInYears(new Date(), new Date(patient.birth_date))
@@ -86,20 +117,40 @@
                </Avatar>
                <div>
                  <SheetTitle className="text-xl">{patient.full_name}</SheetTitle>
-                 <div className="flex items-center gap-2 mt-1">
-                   <Badge variant={patient.status === "active" ? "default" : "secondary"}>
-                     {patient.status === "active" ? "Ativo" : "Inativo"}
-                   </Badge>
-                   {age && <span className="text-sm text-muted-foreground">{age} anos</span>}
-                 </div>
-               </div>
-             </div>
-             <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
-               <Edit className="h-4 w-4" />
-               Editar
-             </Button>
-           </div>
-         </SheetHeader>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <Badge variant={patient.status === "active" ? "default" : "secondary"}>
+                      {patient.status === "active" ? "Ativo" : "Inativo"}
+                    </Badge>
+                    {age && <span className="text-sm text-muted-foreground">{age} anos</span>}
+                    {portalActive && (
+                      <Badge variant="outline" className="gap-1 border-emerald-500/50 text-emerald-600">
+                        <CheckCircle2 className="h-3 w-3" /> Portal ativo
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
+                  <Edit className="h-4 w-4" />
+                  Editar
+                </Button>
+                {!portalActive && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleInvite}
+                    disabled={inviting || !patient.email}
+                    className="gap-2"
+                    title={!patient.email ? "Cadastre um e-mail no paciente" : "Enviar convite por e-mail"}
+                  >
+                    {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                    {inviting ? "Enviando..." : "Convidar"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </SheetHeader>
  
          <Tabs defaultValue="info" className="mt-6">
            <TabsList className="grid w-full grid-cols-3">
