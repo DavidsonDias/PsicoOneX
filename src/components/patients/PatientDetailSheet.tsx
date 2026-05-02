@@ -117,20 +117,40 @@ interface PatientDetailSheetProps {
                </Avatar>
                <div>
                  <SheetTitle className="text-xl">{patient.full_name}</SheetTitle>
-                 <div className="flex items-center gap-2 mt-1">
-                   <Badge variant={patient.status === "active" ? "default" : "secondary"}>
-                     {patient.status === "active" ? "Ativo" : "Inativo"}
-                   </Badge>
-                   {age && <span className="text-sm text-muted-foreground">{age} anos</span>}
-                 </div>
-               </div>
-             </div>
-             <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
-               <Edit className="h-4 w-4" />
-               Editar
-             </Button>
-           </div>
-         </SheetHeader>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <Badge variant={patient.status === "active" ? "default" : "secondary"}>
+                      {patient.status === "active" ? "Ativo" : "Inativo"}
+                    </Badge>
+                    {age && <span className="text-sm text-muted-foreground">{age} anos</span>}
+                    {portalActive && (
+                      <Badge variant="outline" className="gap-1 border-emerald-500/50 text-emerald-600">
+                        <CheckCircle2 className="h-3 w-3" /> Portal ativo
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
+                  <Edit className="h-4 w-4" />
+                  Editar
+                </Button>
+                {!portalActive && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleInvite}
+                    disabled={inviting || !patient.email}
+                    className="gap-2"
+                    title={!patient.email ? "Cadastre um e-mail no paciente" : "Enviar convite por e-mail"}
+                  >
+                    {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                    {inviting ? "Enviando..." : "Convidar"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </SheetHeader>
  
          <Tabs defaultValue="info" className="mt-6">
            <TabsList className="grid w-full grid-cols-3">
