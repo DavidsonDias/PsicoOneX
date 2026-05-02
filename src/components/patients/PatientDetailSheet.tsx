@@ -1,13 +1,16 @@
- import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
- import { Button } from "@/components/ui/button";
- import { Badge } from "@/components/ui/badge";
- import { Avatar, AvatarFallback } from "@/components/ui/avatar";
- import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
- import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
- import { Timeline } from "@/components/ui/timeline";
- import { Mail, Phone, Calendar, MapPin, User, FileText, Clock, AlertCircle, Edit } from "lucide-react";
- import { format, differenceInYears } from "date-fns";
- import { ptBR } from "date-fns/locale";
+import { useState } from "react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Timeline } from "@/components/ui/timeline";
+import { Mail, Phone, Calendar, MapPin, User, FileText, Clock, AlertCircle, Edit, UserPlus, Loader2, CheckCircle2 } from "lucide-react";
+import { format, differenceInYears } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
  
  interface Patient {
    id: string;
