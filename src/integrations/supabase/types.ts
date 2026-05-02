@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_messages: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          id: string
+          message: string
+          read_at: string | null
+          sender_role: string
+          sender_user_id: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          id?: string
+          message: string
+          read_at?: string | null
+          sender_role: string
+          sender_user_id: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          read_at?: string | null
+          sender_role?: string
+          sender_user_id?: string
+        }
+        Relationships: []
+      }
       appointment_requests: {
         Row: {
           appointment_id: string
@@ -700,6 +730,75 @@ export type Database = {
           },
         ]
       }
+      patient_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_user_id: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          is_revoked: boolean
+          patient_id: string
+          psychologist_id: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          is_revoked?: boolean
+          patient_id: string
+          psychologist_id: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          is_revoked?: boolean
+          patient_id?: string
+          psychologist_id?: string
+          token?: string
+        }
+        Relationships: []
+      }
+      patient_portal_audit: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          patient_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          patient_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          patient_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       patients: {
         Row: {
           address: string | null
@@ -719,10 +818,12 @@ export type Database = {
           notes: string | null
           payment_day: number | null
           phone: string | null
+          portal_activated_at: string | null
           psychologist_id: string
           status: string | null
           treatment_start_date: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           address?: string | null
@@ -742,10 +843,12 @@ export type Database = {
           notes?: string | null
           payment_day?: number | null
           phone?: string | null
+          portal_activated_at?: string | null
           psychologist_id: string
           status?: string | null
           treatment_start_date?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           address?: string | null
@@ -765,10 +868,12 @@ export type Database = {
           notes?: string | null
           payment_day?: number | null
           phone?: string | null
+          portal_activated_at?: string | null
           psychologist_id?: string
           status?: string | null
           treatment_start_date?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1029,6 +1134,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_patient_invite: {
+        Args: { _token: string; _user_id: string }
+        Returns: string
+      }
       calculate_trial_end: { Args: { start_date: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -1081,7 +1190,12 @@ export type Database = {
       validate_system_signature: { Args: never; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "psychologist" | "secretary" | "super_admin"
+      app_role:
+        | "admin"
+        | "psychologist"
+        | "secretary"
+        | "super_admin"
+        | "patient"
       plan_type: "trial" | "basic" | "pro" | "enterprise"
       subscription_status:
         | "active"
@@ -1217,7 +1331,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "psychologist", "secretary", "super_admin"],
+      app_role: [
+        "admin",
+        "psychologist",
+        "secretary",
+        "super_admin",
+        "patient",
+      ],
       plan_type: ["trial", "basic", "pro", "enterprise"],
       subscription_status: [
         "active",
