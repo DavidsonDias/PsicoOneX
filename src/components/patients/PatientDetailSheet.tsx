@@ -12,29 +12,31 @@ import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
  
- interface Patient {
-   id: string;
-   full_name: string;
-   email: string | null;
-   phone: string | null;
-   birth_date: string | null;
-   notes: string | null;
-   status: string;
-   cpf: string | null;
-   address: string | null;
-   emergency_contact: string | null;
-   emergency_phone: string | null;
-   created_at?: string;
- }
- 
- interface PatientDetailSheetProps {
-   patient: Patient | null;
-   open: boolean;
-   onClose: () => void;
-   onEdit: () => void;
-   appointments?: any[];
-   records?: any[];
- }
+interface Patient {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  birth_date: string | null;
+  notes: string | null;
+  status: string;
+  cpf: string | null;
+  address: string | null;
+  emergency_contact: string | null;
+  emergency_phone: string | null;
+  user_id?: string | null;
+  portal_activated_at?: string | null;
+  created_at?: string;
+}
+
+interface PatientDetailSheetProps {
+  patient: Patient | null;
+  open: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  appointments?: any[];
+  records?: any[];
+}
  
  export function PatientDetailSheet({
    patient,
@@ -44,14 +46,40 @@ import { toast } from "sonner";
    appointments = [],
    records = [],
  }: PatientDetailSheetProps) {
-   if (!patient) return null;
- 
-   const initials = patient.full_name
-     .split(" ")
-     .map((n) => n[0])
-     .slice(0, 2)
-     .join("")
-     .toUpperCase();
+  const [inviting, setInviting] = useState(false);
+
+  if (!patient) return null;
+
+  const initials = patient.full_name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const portalActive = !!patient.user_id;
+
+  const handleInvite = async () => {
+    if (!patient.email) {
+      toast.error("Cadastre um e-mail no paciente antes de enviar o convite.");
+      return;
+    }
+    setInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("invite-patient", {
+        body: { patient_id: patient.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success("Convite enviado por e-mail!", {
+        description: `Válido por 7 dias. ${patient.email}`,
+      });
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao enviar convite");
+    } finally {
+      setInviting(false);
+    }
+  };
  
    const age = patient.birth_date
      ? differenceInYears(new Date(), new Date(patient.birth_date))
