@@ -19,6 +19,7 @@ import { PatientFinancialTab } from "@/components/patient-profile/PatientFinanci
 import { PatientAgendaTab } from "@/components/patient-profile/PatientAgendaTab";
 import { PatientDocumentsTab } from "@/components/patient-profile/PatientDocumentsTab";
 import { PatientClinicalProfile } from "@/components/patient-profile/PatientClinicalProfile";
+import { PatientInviteButton } from "@/components/patients/PatientInviteButton";
 
 export interface PatientFull {
   id: string;
@@ -33,6 +34,8 @@ export interface PatientFull {
   emergency_contact: string | null;
   emergency_phone: string | null;
   created_at: string | null;
+  user_id?: string | null;
+  portal_activated_at?: string | null;
   default_session_value: number | null;
   payment_day: number | null;
   treatment_start_date: string | null;
@@ -194,10 +197,19 @@ export default function PatientProfile() {
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="gap-2 self-start sm:self-auto" onClick={() => setEditOpen(true)}>
-            <Edit className="h-4 w-4" />
-            Editar Cadastro
-          </Button>
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <PatientInviteButton
+              patientId={patient.id}
+              patientEmail={patient.email}
+              portalActive={!!patient.user_id}
+              variant="outline"
+              size="sm"
+            />
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setEditOpen(true)}>
+              <Edit className="h-4 w-4" />
+              Editar Cadastro
+            </Button>
+          </div>
         </motion.div>
 
         {/* Edit Modal */}
