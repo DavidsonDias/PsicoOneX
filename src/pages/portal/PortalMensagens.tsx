@@ -37,14 +37,30 @@ export default function PortalMensagens() {
 
   useEffect(() => {
     if (!selected) return;
-    (async () => {
+    let cancelled = false;
+    const fetchMsgs = async () => {
       const { data } = await supabase
         .from("appointment_messages")
         .select("*")
         .eq("appointment_id", selected.id)
         .order("created_at", { ascending: true });
-      setMessages(data || []);
-    })();
+      if (!cancelled) setMessages(data || []);
+    };
+    fetchMsgs();
+
+    const channel = supabase
+      .channel(`portal-msgs-${selected.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "appointment_messages", filter: `appointment_id=eq.${selected.id}` },
+        () => fetchMsgs()
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [selected]);
 
   const send = async () => {
