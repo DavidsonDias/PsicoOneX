@@ -19,6 +19,7 @@ import { PatientFinancialTab } from "@/components/patient-profile/PatientFinanci
 import { PatientAgendaTab } from "@/components/patient-profile/PatientAgendaTab";
 import { PatientDocumentsTab } from "@/components/patient-profile/PatientDocumentsTab";
 import { PatientClinicalProfile } from "@/components/patient-profile/PatientClinicalProfile";
+import { PatientInviteButton } from "@/components/patients/PatientInviteButton";
 
 export interface PatientFull {
   id: string;
