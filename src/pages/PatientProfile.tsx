@@ -34,6 +34,8 @@ export interface PatientFull {
   emergency_contact: string | null;
   emergency_phone: string | null;
   created_at: string | null;
+  user_id?: string | null;
+  portal_activated_at?: string | null;
   default_session_value: number | null;
   payment_day: number | null;
   treatment_start_date: string | null;
