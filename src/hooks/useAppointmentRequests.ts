@@ -92,9 +92,26 @@ export function useAppointmentRequests(psychologistId: string | undefined) {
     };
   }, [psychologistId, load]);
 
+  // Helper: send a portal notification to the patient (if account is activated)
+  const notifyPatient = async (patientId: string, title: string, message: string) => {
+    const { data: p } = await supabase
+      .from("patients")
+      .select("user_id")
+      .eq("id", patientId)
+      .maybeSingle();
+    if (!p?.user_id) return;
+    await supabase.from("notifications").insert({
+      user_id: p.user_id,
+      type: "appointment",
+      title,
+      message,
+      action_path: "/portal/agenda",
+      action_label: "Ver agenda",
+    });
+  };
+
   const approveReschedule = async (request: AppointmentRequest) => {
     if (!request.proposed_date) return;
-    // Update appointment to new date
     const { error: aptErr } = await supabase
       .from("appointments")
       .update({
@@ -117,11 +134,18 @@ export function useAppointmentRequests(psychologistId: string | undefined) {
       })
       .eq("id", request.id);
 
+    await notifyPatient(
+      request.patient_id,
+      "✅ Reagendamento aprovado",
+      "Seu pedido foi aprovado. A nova data já está na sua agenda."
+    );
+
     toast.success("Reagendamento aprovado");
     load();
   };
 
   const rejectRequest = async (requestId: string, response?: string) => {
+    const req = requests.find((r) => r.id === requestId);
     await supabase
       .from("appointment_requests")
       .update({
@@ -131,6 +155,20 @@ export function useAppointmentRequests(psychologistId: string | undefined) {
         psychologist_response: response || null,
       })
       .eq("id", requestId);
+
+    // Restore appointment status when a reschedule is rejected
+    if (req?.request_type === "reschedule" && req.appointment_id) {
+      await supabase
+        .from("appointments")
+        .update({ status: "scheduled" })
+        .eq("id", req.appointment_id);
+      await notifyPatient(
+        req.patient_id,
+        "❌ Reagendamento recusado",
+        response || "Seu pedido de reagendamento não foi aceito. Entre em contato para combinar outra data."
+      );
+    }
+
     toast.success("Solicitação recusada");
     load();
   };
