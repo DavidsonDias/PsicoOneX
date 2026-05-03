@@ -42,6 +42,11 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
 const PortalAcceptInvite = lazy(() => import("./pages/portal/PortalAcceptInvite"));
+const PatientPortalLayout = lazy(() => import("./components/portal/PatientPortalLayout"));
+const PortalDashboard = lazy(() => import("./pages/portal/PortalDashboard"));
+const PortalAgenda = lazy(() => import("./pages/portal/PortalAgenda"));
+const PortalFinanceiro = lazy(() => import("./pages/portal/PortalFinanceiro"));
+const PortalMensagens = lazy(() => import("./pages/portal/PortalMensagens"));
 
 const queryClient = new QueryClient();
 
@@ -96,6 +101,12 @@ const App = () => (
                   <Route path="/payment-success" element={<PaymentSuccess />} />
                   <Route path="/portal/login" element={<PortalLogin />} />
                   <Route path="/portal/aceitar-convite/:token" element={<PortalAcceptInvite />} />
+                  <Route path="/portal" element={<PatientPortalLayout />}>
+                    <Route path="dashboard" element={<PortalDashboard />} />
+                    <Route path="agenda" element={<PortalAgenda />} />
+                    <Route path="financeiro" element={<PortalFinanceiro />} />
+                    <Route path="mensagens" element={<PortalMensagens />} />
+                  </Route>
                   <Route path="/portal/:token" element={<PortalPacienteExterno />} />
                   <Route path="/unsubscribe" element={<Unsubscribe />} />
                   <Route path="*" element={<NotFound />} />
