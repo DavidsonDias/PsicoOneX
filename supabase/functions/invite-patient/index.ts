@@ -105,12 +105,8 @@ Deno.serve(async (req) => {
     }
 
     // Build invite URL — use Origin header for proper environment
-    const origin =
-      req.headers.get('origin') ||
-      req.headers.get('x-forwarded-host')?.startsWith('http')
-        ? req.headers.get('origin') || ''
-        : 'https://psicoone.app'
-    const inviteUrl = `${origin || 'https://psicoone.app'}/portal/aceitar-convite/${invite.token}`
+    const origin = req.headers.get('origin') || 'https://psicoone.vercel.app'
+    const inviteUrl = `${origin}/portal/aceitar-convite/${invite.token}`
 
     // Send email via send-transactional-email
     const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
@@ -120,7 +116,7 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${serviceKey}`,
       },
       body: JSON.stringify({
-        template: 'patient-portal-invite',
+        templateName: 'patient-portal-invite',
         to: patient.email,
         data: {
           patientName: patient.full_name,
