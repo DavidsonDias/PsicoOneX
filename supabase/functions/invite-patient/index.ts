@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${serviceKey}`,
       },
       body: JSON.stringify({
-        template: 'patient-portal-invite',
+        templateName: 'patient-portal-invite',
         to: patient.email,
         data: {
           patientName: patient.full_name,
