@@ -5,7 +5,7 @@
 <h1 align="center">🧠 PsicoOne</h1>
 
 <p align="center">
-  <strong>Sistema SaaS inteligente para gestão completa de psicólogos e clínicas</strong>
+  <strong>Sistema SaaS inteligente para gestão completa de psicólogos e clínicass</strong>
 </p>
 
 <p align="center">
