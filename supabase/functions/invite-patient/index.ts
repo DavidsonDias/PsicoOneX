@@ -117,8 +117,8 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         templateName: 'patient-portal-invite',
-        to: patient.email,
-        data: {
+        recipientEmail: patient.email,
+        templateData: {
           patientName: patient.full_name,
           psychologistName: psyProfile?.full_name || 'Seu profissional',
           inviteUrl,
