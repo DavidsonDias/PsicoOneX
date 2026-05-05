@@ -128,9 +128,12 @@ Deno.serve(async (req) => {
       }),
     })
 
+    let emailSent = true
+    let emailError: string | null = null
     if (!emailRes.ok) {
-      const txt = await emailRes.text()
-      console.error('Email send failed:', txt)
+      emailSent = false
+      emailError = await emailRes.text().catch(() => 'unknown')
+      console.error('Email send failed:', emailError)
     }
 
     return new Response(
@@ -138,6 +141,8 @@ Deno.serve(async (req) => {
         success: true,
         invite_url: inviteUrl,
         expires_at: invite.expires_at,
+        email_sent: emailSent,
+        email_error: emailError,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
