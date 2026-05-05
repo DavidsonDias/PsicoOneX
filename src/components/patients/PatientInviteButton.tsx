@@ -58,9 +58,15 @@ export function PatientInviteButton({
       if (payload?.error) throw new Error(payload.error);
       setInviteUrl(payload.invite_url);
       setOpen(true);
-      toast.success("Convite criado!", {
-        description: `E-mail enviado para ${patientEmail}. Válido por 7 dias.`,
-      });
+      if (payload.email_sent === false) {
+        toast.warning("Convite criado, mas o e-mail falhou", {
+          description: "Copie o link abaixo e envie manualmente ao paciente.",
+        });
+      } else {
+        toast.success("Convite enviado!", {
+          description: `E-mail enviado para ${patientEmail}. Validade: 7 dias.`,
+        });
+      }
     } catch (e: any) {
       toast.error(e?.message || "Falha ao enviar convite");
     } finally {
