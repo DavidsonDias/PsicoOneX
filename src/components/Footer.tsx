@@ -95,17 +95,17 @@ export const Footer = () => {
             
             {/* Contact Info */}
             <div className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-3">
+              <a href="mailto:contato@psicoone.com.br" className="flex items-center gap-3 hover:text-primary transition-colors">
                 <Mail className="w-4 h-4 text-primary" />
                 <span>contato@psicoone.com.br</span>
-              </div>
-              <div className="flex items-center gap-3">
+              </a>
+              <a href="tel:+5531984740625" className="flex items-center gap-3 hover:text-primary transition-colors">
                 <Phone className="w-4 h-4 text-primary" />
-                <span>+55 (11) 99999-9999</span>
-              </div>
+                <span>(31) 98474-0625</span>
+              </a>
               <div className="flex items-center gap-3">
                 <MapPin className="w-4 h-4 text-primary" />
-                <span>São Paulo, Brasil</span>
+                <span>Belo Horizonte, Minas Gerais — Brasil</span>
               </div>
             </div>
 
