@@ -1,9 +1,25 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Brain, Calendar, FileText, CreditCard, Video, Shield, Sparkles, Play } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowRight, Brain, Calendar, FileText, CreditCard, Video, Shield, Sparkles, Play, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { FloatingElement } from "@/components/ui/floating-element";
+import { useState, useEffect } from "react";
+
+const DEMO_VIDEO_URL = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0";
 
 export const Hero = () => {
+  const [demoOpen, setDemoOpen] = useState(false);
+
+  useEffect(() => {
+    if (!demoOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDemoOpen(false);
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [demoOpen]);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -111,6 +127,7 @@ export const Hero = () => {
               variant="outline" 
               size="lg"
               className="group text-lg px-8 py-6"
+              onClick={() => setDemoOpen(true)}
             >
               <Play className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
               Ver Demonstração
@@ -170,6 +187,44 @@ export const Hero = () => {
           ))}
         </motion.div>
       </div>
+
+      {/* Demo Video Modal */}
+      <AnimatePresence>
+        {demoOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setDemoOpen(false)}
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-4xl aspect-video bg-card rounded-2xl overflow-hidden shadow-2xl border border-border"
+            >
+              <button
+                onClick={() => setDemoOpen(false)}
+                aria-label="Fechar"
+                className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-background/80 backdrop-blur-md hover:bg-background flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <iframe
+                src={DEMO_VIDEO_URL}
+                title="Demonstração PsicoOne"
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 };
