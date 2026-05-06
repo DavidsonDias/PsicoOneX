@@ -215,13 +215,14 @@ export const Hero = () => {
               >
                 <X className="w-5 h-5" />
               </button>
-              <iframe
+              <video
                 src={DEMO_VIDEO_URL}
-                title="Demonstração PsicoOne"
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
+                className="w-full h-full object-cover"
+                controls
+                autoPlay
+                playsInline
               />
+
             </motion.div>
           </motion.div>
         )}
