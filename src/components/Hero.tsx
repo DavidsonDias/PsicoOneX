@@ -1,9 +1,25 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Brain, Calendar, FileText, CreditCard, Video, Shield, Sparkles, Play } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowRight, Brain, Calendar, FileText, CreditCard, Video, Shield, Sparkles, Play, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { FloatingElement } from "@/components/ui/floating-element";
+import { useState, useEffect } from "react";
+
+const DEMO_VIDEO_URL = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0";
 
 export const Hero = () => {
+  const [demoOpen, setDemoOpen] = useState(false);
+
+  useEffect(() => {
+    if (!demoOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDemoOpen(false);
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [demoOpen]);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -111,6 +127,7 @@ export const Hero = () => {
               variant="outline" 
               size="lg"
               className="group text-lg px-8 py-6"
+              onClick={() => setDemoOpen(true)}
             >
               <Play className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
               Ver Demonstração
