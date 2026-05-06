@@ -3,8 +3,9 @@ import { ArrowRight, Brain, Calendar, FileText, CreditCard, Video, Shield, Spark
 import { motion, AnimatePresence } from "framer-motion";
 import { FloatingElement } from "@/components/ui/floating-element";
 import { useState, useEffect } from "react";
+import demoVideo from "@/../public/videos/demo-psicoone.mp4.asset.json";
 
-const DEMO_VIDEO_URL = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0";
+const DEMO_VIDEO_URL = demoVideo.url;
 
 export const Hero = () => {
   const [demoOpen, setDemoOpen] = useState(false);
