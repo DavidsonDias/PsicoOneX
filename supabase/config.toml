@@ -39,3 +39,7 @@ project_id = "pnkhogpsadywdbgzqhfi"
     verify_jwt = false
   [functions.invite-patient]
     verify_jwt = true
+  [functions.whatsapp-send]
+    verify_jwt = true
+  [functions.whatsapp-webhook]
+    verify_jwt = false
