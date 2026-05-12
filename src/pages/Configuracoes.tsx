@@ -576,8 +576,9 @@ export default function Configuracoes() {
         </TabsContent>
 
         {/* ── INTEGRATIONS ── */}
-        <TabsContent value="integrations">
+        <TabsContent value="integrations" className="space-y-4">
           <GoogleCalendarSettings />
+          <WhatsAppLogsPanel />
         </TabsContent>
 
         {/* ── NOTIFICATIONS ── */}
