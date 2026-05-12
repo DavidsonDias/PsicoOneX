@@ -819,11 +819,13 @@ export type Database = {
           payment_day: number | null
           phone: string | null
           portal_activated_at: string | null
+          preferred_notification_channel: string
           psychologist_id: string
           status: string | null
           treatment_start_date: string | null
           updated_at: string | null
           user_id: string | null
+          whatsapp_phone: string | null
         }
         Insert: {
           address?: string | null
@@ -844,11 +846,13 @@ export type Database = {
           payment_day?: number | null
           phone?: string | null
           portal_activated_at?: string | null
+          preferred_notification_channel?: string
           psychologist_id: string
           status?: string | null
           treatment_start_date?: string | null
           updated_at?: string | null
           user_id?: string | null
+          whatsapp_phone?: string | null
         }
         Update: {
           address?: string | null
@@ -869,11 +873,13 @@ export type Database = {
           payment_day?: number | null
           phone?: string | null
           portal_activated_at?: string | null
+          preferred_notification_channel?: string
           psychologist_id?: string
           status?: string | null
           treatment_start_date?: string | null
           updated_at?: string | null
           user_id?: string | null
+          whatsapp_phone?: string | null
         }
         Relationships: [
           {
@@ -1126,6 +1132,72 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_logs: {
+        Row: {
+          appointment_id: string | null
+          attempts: number
+          body_preview: string | null
+          created_at: string
+          delivered_at: string | null
+          error: string | null
+          id: string
+          message_type: string
+          patient_id: string | null
+          payload: Json | null
+          phone: string
+          psychologist_id: string
+          read_at: string | null
+          response: Json | null
+          sent_at: string | null
+          status: string
+          template: string | null
+          updated_at: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          attempts?: number
+          body_preview?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          error?: string | null
+          id?: string
+          message_type?: string
+          patient_id?: string | null
+          payload?: Json | null
+          phone: string
+          psychologist_id: string
+          read_at?: string | null
+          response?: Json | null
+          sent_at?: string | null
+          status?: string
+          template?: string | null
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          attempts?: number
+          body_preview?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          error?: string | null
+          id?: string
+          message_type?: string
+          patient_id?: string | null
+          payload?: Json | null
+          phone?: string
+          psychologist_id?: string
+          read_at?: string | null
+          response?: Json | null
+          sent_at?: string | null
+          status?: string
+          template?: string | null
+          updated_at?: string
+          wa_message_id?: string | null
         }
         Relationships: []
       }
