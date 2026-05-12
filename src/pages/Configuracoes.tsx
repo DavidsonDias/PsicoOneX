@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
+import WhatsAppLogsPanel from "@/components/settings/WhatsAppLogsPanel";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PluginManager as PluginManagerComponent } from "@/components/settings/PluginManager";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
@@ -576,8 +577,9 @@ export default function Configuracoes() {
         </TabsContent>
 
         {/* ── INTEGRATIONS ── */}
-        <TabsContent value="integrations">
+        <TabsContent value="integrations" className="space-y-4">
           <GoogleCalendarSettings />
+          <WhatsAppLogsPanel />
         </TabsContent>
 
         {/* ── NOTIFICATIONS ── */}

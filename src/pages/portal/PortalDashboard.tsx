@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePatientPortalAuth } from "@/contexts/PatientPortalAuthContext";
 import { format, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import PortalNotificationPreferences from "@/components/portal/PortalNotificationPreferences";
 
 export default function PortalDashboard() {
   const { patient } = usePatientPortalAuth();
@@ -104,6 +105,8 @@ export default function PortalDashboard() {
         <QuickLink to="/portal/agenda" title="Minhas sessões" desc="Confirmar, reagendar ou cancelar" icon={Calendar} />
         <QuickLink to="/portal/financeiro" title="Pagamentos" desc="Histórico e cobranças pendentes" icon={DollarSign} />
       </div>
+
+      <PortalNotificationPreferences />
     </div>
   );
 }
