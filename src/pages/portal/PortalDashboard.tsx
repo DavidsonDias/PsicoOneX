@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePatientPortalAuth } from "@/contexts/PatientPortalAuthContext";
 import { format, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import PortalNotificationPreferences from "@/components/portal/PortalNotificationPreferences";
 
 export default function PortalDashboard() {
   const { patient } = usePatientPortalAuth();
