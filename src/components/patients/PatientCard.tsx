@@ -91,12 +91,17 @@ interface PatientCardProps {
                <span className="truncate">{patient.email}</span>
              </div>
            )}
-           {patient.phone && (
-             <div className="flex items-center gap-2 text-muted-foreground">
-               <Phone className="w-4 h-4 shrink-0 text-primary/60" />
-               <span>{patient.phone}</span>
-             </div>
-           )}
+          {patient.phone && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground min-w-0">
+                <Phone className="w-4 h-4 shrink-0 text-primary/60" />
+                <span className="truncate">{patient.phone}</span>
+              </div>
+              <div onClick={(e) => e.stopPropagation()}>
+                <WhatsAppButton patientId={patient.id} defaultPhone={patient.phone} />
+              </div>
+            </div>
+          )}
            {patient.birth_date && (
              <div className="flex items-center gap-2 text-muted-foreground">
                <Calendar className="w-4 h-4 shrink-0 text-primary/60" />
