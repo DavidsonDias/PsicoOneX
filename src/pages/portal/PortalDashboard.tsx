@@ -104,6 +104,8 @@ export default function PortalDashboard() {
         <QuickLink to="/portal/agenda" title="Minhas sessões" desc="Confirmar, reagendar ou cancelar" icon={Calendar} />
         <QuickLink to="/portal/financeiro" title="Pagamentos" desc="Histórico e cobranças pendentes" icon={DollarSign} />
       </div>
+
+      <PortalNotificationPreferences />
     </div>
   );
 }
