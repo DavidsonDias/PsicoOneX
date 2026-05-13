@@ -20,7 +20,10 @@ interface SendBody {
 }
 
 function sanitizePhone(p: string): string {
-  return (p || "").replace(/\D+/g, "");
+  let d = (p || "").replace(/\D+/g, "");
+  // Auto-prepend Brazil country code (55) if user typed a local 10-11 digit number
+  if (d.length === 10 || d.length === 11) d = "55" + d;
+  return d;
 }
 
 async function sendOnce(payload: any, accessToken: string, phoneNumberId: string) {

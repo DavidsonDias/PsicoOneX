@@ -10,8 +10,15 @@ export interface WhatsAppSendArgs {
 
 export async function sendWhatsApp(args: WhatsAppSendArgs) {
   const { data, error } = await supabase.functions.invoke("whatsapp-send", { body: args });
-  if (error) throw error;
-  if (!(data as any)?.success) throw new Error((data as any)?.error || "Falha ao enviar WhatsApp");
+  // Surface meaningful error from function body even on non-2xx
+  let payload: any = data ?? null;
+  if (!payload && (error as any)?.context) {
+    try { payload = await (error as any).context.json(); } catch {}
+  }
+  if (payload && payload.success === false) {
+    throw new Error(payload.error || "Falha ao enviar WhatsApp");
+  }
+  if (error) throw new Error((error as any).message || "Falha ao enviar WhatsApp");
   return data as { success: boolean; wa_message_id: string | null; status: string; log_id: string };
 }
 
