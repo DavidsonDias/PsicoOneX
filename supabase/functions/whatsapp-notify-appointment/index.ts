@@ -70,7 +70,7 @@ serve(async (req) => {
     });
   }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  // supabase client already created above
 
   const { data: apt, error: aptErr } = await supabase
     .from("appointments")
