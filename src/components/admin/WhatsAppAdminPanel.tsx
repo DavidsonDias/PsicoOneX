@@ -389,7 +389,29 @@ export default function WhatsAppAdminPanel() {
                 {loadingAction === "list_templates" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}Atualizar
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Expected templates checklist */}
+              <div className="p-3 rounded-lg bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,20%)]">
+                <p className="text-xs uppercase tracking-wider text-[hsl(220,9%,55%)] mb-2">Checklist PsicoOne (pt_BR · 4 variáveis)</p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {EXPECTED_TEMPLATES.map((name) => {
+                    const tpl = templates.find((t: any) => t.name === name && t.language === "pt_BR");
+                    const ok = tpl?.status === "APPROVED";
+                    return (
+                      <div key={name} className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-[hsl(222,47%,10%)] border border-[hsl(222,47%,18%)]">
+                        <span className="font-mono text-xs">{name}</span>
+                        {ok ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 gap-1"><CheckCircle2 className="h-3 w-3" />OK</Badge>
+                        ) : tpl ? (
+                          <Badge variant="outline" className={TPL_STATUS_COLORS[tpl.status] || "bg-slate-500/10 text-slate-400 border-slate-500/30"}>{tpl.status}</Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30 gap-1"><AlertTriangle className="h-3 w-3" />Faltando</Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
               {templates.length === 0 ? (
                 <p className="text-sm text-[hsl(220,9%,55%)] text-center py-10">Clique em Atualizar para listar templates da Meta.</p>
               ) : (
@@ -503,6 +525,47 @@ export default function WhatsAppAdminPanel() {
                     </div>
                   ))}
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* LIVE LOGS */}
+        <TabsContent value="logs">
+          <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2"><Inbox className="h-5 w-5 text-emerald-400" />Logs ao vivo</CardTitle>
+                <CardDescription className="text-[hsl(220,9%,55%)]">Últimas 40 mensagens · atualiza em tempo real (Realtime).</CardDescription>
+              </div>
+              <Button onClick={load} variant="outline" className="border-[hsl(222,47%,22%)] bg-transparent text-white hover:bg-[hsl(222,47%,16%)]"><RefreshCw className="h-4 w-4 mr-2" />Recarregar</Button>
+            </CardHeader>
+            <CardContent>
+              {recentLogs.length === 0 ? (
+                <p className="text-sm text-[hsl(220,9%,55%)] text-center py-10">Nenhuma mensagem registrada ainda.</p>
+              ) : (
+                <ScrollArea className="h-[480px] pr-3">
+                  <div className="space-y-1.5">
+                    {recentLogs.map((l) => {
+                      const color = l.status === "delivered" ? "text-emerald-400"
+                        : l.status === "sent" ? "text-blue-400"
+                        : l.status === "failed" ? "text-red-400"
+                        : "text-slate-400";
+                      return (
+                        <div key={l.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,20%)] hover:bg-[hsl(222,47%,16%)] transition-colors">
+                          <Circle className={`h-2 w-2 fill-current ${color}`} />
+                          <div className="flex-1 min-w-0 grid grid-cols-12 gap-2 items-center">
+                            <span className="col-span-3 font-mono text-xs truncate">{l.phone}</span>
+                            <span className="col-span-4 text-xs text-[hsl(220,9%,70%)] truncate">{l.template || l.body_preview || "—"}</span>
+                            <span className={`col-span-2 text-xs uppercase font-semibold ${color}`}>{l.status}</span>
+                            <span className="col-span-3 text-[10px] text-[hsl(220,9%,50%)] text-right">{format(new Date(l.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}</span>
+                          </div>
+                          {l.error && <span className="text-[10px] text-red-400 truncate max-w-[200px]" title={l.error}>{l.error}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               )}
             </CardContent>
           </Card>
