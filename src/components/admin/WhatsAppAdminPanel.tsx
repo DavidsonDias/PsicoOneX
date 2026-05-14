@@ -271,6 +271,7 @@ export default function WhatsAppAdminPanel() {
           <TabsTrigger value="webhook" className="gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"><Webhook className="h-4 w-4" />Webhook</TabsTrigger>
           <TabsTrigger value="test" className="gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"><Send className="h-4 w-4" />Teste</TabsTrigger>
           <TabsTrigger value="profile" className="gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"><Sparkles className="h-4 w-4" />Perfil</TabsTrigger>
+          <TabsTrigger value="logs" className="gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"><Inbox className="h-4 w-4" />Logs ao vivo</TabsTrigger>
         </TabsList>
 
         {/* CREDENTIALS */}
