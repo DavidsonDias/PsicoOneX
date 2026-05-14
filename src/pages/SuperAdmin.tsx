@@ -17,6 +17,8 @@ import {
   Menu, X, Mail
 } from "lucide-react";
 import { EmailMonitoringDashboard } from "@/components/admin/EmailMonitoringDashboard";
+import WhatsAppAdminPanel from "@/components/admin/WhatsAppAdminPanel";
+import { MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
