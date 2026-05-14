@@ -39,9 +39,17 @@ serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
-  const ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
+  const { data: cfg } = await supabase.from("whatsapp_config").select("phone_number_id, access_token, is_active").maybeSingle();
+  const PHONE_NUMBER_ID = (cfg?.phone_number_id || Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || "").trim();
+  const ACCESS_TOKEN = (cfg?.access_token || Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "").trim();
+
+  if (cfg?.is_active === false) {
+    return new Response(JSON.stringify({ skipped: "disabled by admin" }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
     return new Response(JSON.stringify({ error: "WhatsApp credentials missing" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -62,7 +70,7 @@ serve(async (req) => {
     });
   }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  // supabase client already created above
 
   const { data: apt, error: aptErr } = await supabase
     .from("appointments")

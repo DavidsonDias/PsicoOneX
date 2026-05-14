@@ -17,6 +17,8 @@ import {
   Menu, X, Mail
 } from "lucide-react";
 import { EmailMonitoringDashboard } from "@/components/admin/EmailMonitoringDashboard";
+import WhatsAppAdminPanel from "@/components/admin/WhatsAppAdminPanel";
+import { MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
@@ -77,6 +79,7 @@ const SIDEBAR_ITEMS = [
   { id: "logs", label: "Auditoria", icon: ScrollText },
   { id: "monitoring", label: "Monitoramento", icon: Monitor },
   { id: "emails", label: "E-mails", icon: Mail },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "settings", label: "Configurações", icon: Settings },
 ];
 
@@ -1218,6 +1221,8 @@ const SuperAdmin = () => {
               <EmailMonitoringDashboard />
             </motion.div>
           )}
+
+          {activeTab === "whatsapp" && <WhatsAppAdminPanel />}
 
           {/* SETTINGS */}
           {activeTab === "settings" && (

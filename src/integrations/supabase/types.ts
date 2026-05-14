@@ -1135,6 +1135,63 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_config: {
+        Row: {
+          access_token: string | null
+          app_id: string | null
+          business_account_id: string | null
+          business_name: string | null
+          created_at: string
+          display_phone_number: string | null
+          id: string
+          is_active: boolean
+          last_test_error: string | null
+          last_test_status: string | null
+          last_tested_at: string | null
+          phone_number_id: string | null
+          updated_at: string
+          updated_by: string | null
+          verify_token: string | null
+          webhook_subscribed: boolean
+        }
+        Insert: {
+          access_token?: string | null
+          app_id?: string | null
+          business_account_id?: string | null
+          business_name?: string | null
+          created_at?: string
+          display_phone_number?: string | null
+          id?: string
+          is_active?: boolean
+          last_test_error?: string | null
+          last_test_status?: string | null
+          last_tested_at?: string | null
+          phone_number_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verify_token?: string | null
+          webhook_subscribed?: boolean
+        }
+        Update: {
+          access_token?: string | null
+          app_id?: string | null
+          business_account_id?: string | null
+          business_name?: string | null
+          created_at?: string
+          display_phone_number?: string | null
+          id?: string
+          is_active?: boolean
+          last_test_error?: string | null
+          last_test_status?: string | null
+          last_tested_at?: string | null
+          phone_number_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verify_token?: string | null
+          webhook_subscribed?: boolean
+        }
+        Relationships: []
+      }
       whatsapp_logs: {
         Row: {
           appointment_id: string | null

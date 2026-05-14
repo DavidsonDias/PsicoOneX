@@ -44,9 +44,19 @@ serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
-  const ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+  const adminClient = createClient(SUPABASE_URL, SERVICE_KEY);
 
+  // Prefer DB config (managed by Super Admin), fallback to env vars
+  const { data: cfg } = await adminClient.from("whatsapp_config").select("phone_number_id, access_token, is_active").maybeSingle();
+  const PHONE_NUMBER_ID = (cfg?.phone_number_id || Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || "").trim();
+  const ACCESS_TOKEN = (cfg?.access_token || Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "").trim();
+  const ENABLED = cfg?.is_active !== false;
+
+  if (!ENABLED) {
+    return new Response(JSON.stringify({ error: "WhatsApp integration disabled by admin" }), {
+      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
     return new Response(JSON.stringify({ error: "WhatsApp credentials not configured" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -56,7 +66,7 @@ serve(async (req) => {
   // Auth: extract caller (psychologist) from JWT
   const authHeader = req.headers.get("Authorization") || "";
   const token = authHeader.replace("Bearer ", "");
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  const supabase = adminClient;
   const { data: userData } = await supabase.auth.getUser(token);
   const psychologistId = userData?.user?.id;
   if (!psychologistId) {
