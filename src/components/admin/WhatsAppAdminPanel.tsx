@@ -15,7 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   Activity, AlertTriangle, CheckCircle2, Copy, Eye, EyeOff, Globe, KeyRound,
   Loader2, MessageCircle, Phone, RefreshCw, Save, Send, ShieldCheck, Sparkles,
-  Webhook, Zap, FileText, BarChart3, PowerOff, Power
+  Webhook, Zap, FileText, BarChart3, PowerOff, Power, Inbox, Circle
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
