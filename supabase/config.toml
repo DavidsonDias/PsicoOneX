@@ -43,3 +43,5 @@ project_id = "pnkhogpsadywdbgzqhfi"
     verify_jwt = true
   [functions.whatsapp-webhook]
     verify_jwt = false
+  [functions.whatsapp-admin]
+    verify_jwt = true
