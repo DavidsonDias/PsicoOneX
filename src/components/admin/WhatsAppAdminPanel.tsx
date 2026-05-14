@@ -74,6 +74,12 @@ export default function WhatsAppAdminPanel() {
 
   // Stats
   const [stats, setStats] = useState({ total: 0, sent: 0, delivered: 0, failed: 0, last24h: 0 });
+  const [recentLogs, setRecentLogs] = useState<any[]>([]);
+
+  const EXPECTED_TEMPLATES = [
+    "appointment_created", "appointment_reminder_24h", "appointment_reminder_1h",
+    "appointment_rescheduled", "appointment_cancelled", "session_started",
+  ];
 
   const load = async () => {
     setLoading(true);
