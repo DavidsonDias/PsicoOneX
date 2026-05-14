@@ -96,9 +96,20 @@ export default function WhatsAppAdminPanel() {
       supabase.from("whatsapp_logs").select("id", { count: "exact", head: true }).gte("created_at", since),
     ]);
     setStats({ total: total || 0, sent: sent || 0, delivered: delivered || 0, failed: failed || 0, last24h: last24h || 0 });
+
+    const { data: logs } = await supabase.from("whatsapp_logs")
+      .select("id, status, phone, template, created_at, error, body_preview")
+      .order("created_at", { ascending: false }).limit(40);
+    setRecentLogs(logs || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const ch = supabase.channel("wa_admin_logs")
+      .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_logs" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const updateField = (k: keyof WaConfig, v: any) => setCfg((c) => (c ? { ...c, [k]: v } : c));
 
