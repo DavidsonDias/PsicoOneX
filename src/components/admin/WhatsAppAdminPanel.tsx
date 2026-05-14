@@ -15,7 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   Activity, AlertTriangle, CheckCircle2, Copy, Eye, EyeOff, Globe, KeyRound,
   Loader2, MessageCircle, Phone, RefreshCw, Save, Send, ShieldCheck, Sparkles,
-  Webhook, Zap, FileText, BarChart3, PowerOff, Power
+  Webhook, Zap, FileText, BarChart3, PowerOff, Power, Inbox, Circle
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -74,6 +74,12 @@ export default function WhatsAppAdminPanel() {
 
   // Stats
   const [stats, setStats] = useState({ total: 0, sent: 0, delivered: 0, failed: 0, last24h: 0 });
+  const [recentLogs, setRecentLogs] = useState<any[]>([]);
+
+  const EXPECTED_TEMPLATES = [
+    "appointment_created", "appointment_reminder_24h", "appointment_reminder_1h",
+    "appointment_rescheduled", "appointment_cancelled", "session_started",
+  ];
 
   const load = async () => {
     setLoading(true);
@@ -90,9 +96,20 @@ export default function WhatsAppAdminPanel() {
       supabase.from("whatsapp_logs").select("id", { count: "exact", head: true }).gte("created_at", since),
     ]);
     setStats({ total: total || 0, sent: sent || 0, delivered: delivered || 0, failed: failed || 0, last24h: last24h || 0 });
+
+    const { data: logs } = await supabase.from("whatsapp_logs")
+      .select("id, status, phone, template, created_at, error, body_preview")
+      .order("created_at", { ascending: false }).limit(40);
+    setRecentLogs(logs || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const ch = supabase.channel("wa_admin_logs")
+      .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_logs" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const updateField = (k: keyof WaConfig, v: any) => setCfg((c) => (c ? { ...c, [k]: v } : c));
 
@@ -254,6 +271,7 @@ export default function WhatsAppAdminPanel() {
           <TabsTrigger value="webhook" className="gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"><Webhook className="h-4 w-4" />Webhook</TabsTrigger>
           <TabsTrigger value="test" className="gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"><Send className="h-4 w-4" />Teste</TabsTrigger>
           <TabsTrigger value="profile" className="gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"><Sparkles className="h-4 w-4" />Perfil</TabsTrigger>
+          <TabsTrigger value="logs" className="gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"><Inbox className="h-4 w-4" />Logs ao vivo</TabsTrigger>
         </TabsList>
 
         {/* CREDENTIALS */}
@@ -371,7 +389,29 @@ export default function WhatsAppAdminPanel() {
                 {loadingAction === "list_templates" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}Atualizar
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Expected templates checklist */}
+              <div className="p-3 rounded-lg bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,20%)]">
+                <p className="text-xs uppercase tracking-wider text-[hsl(220,9%,55%)] mb-2">Checklist PsicoOne (pt_BR · 4 variáveis)</p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {EXPECTED_TEMPLATES.map((name) => {
+                    const tpl = templates.find((t: any) => t.name === name && t.language === "pt_BR");
+                    const ok = tpl?.status === "APPROVED";
+                    return (
+                      <div key={name} className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-[hsl(222,47%,10%)] border border-[hsl(222,47%,18%)]">
+                        <span className="font-mono text-xs">{name}</span>
+                        {ok ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 gap-1"><CheckCircle2 className="h-3 w-3" />OK</Badge>
+                        ) : tpl ? (
+                          <Badge variant="outline" className={TPL_STATUS_COLORS[tpl.status] || "bg-slate-500/10 text-slate-400 border-slate-500/30"}>{tpl.status}</Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30 gap-1"><AlertTriangle className="h-3 w-3" />Faltando</Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
               {templates.length === 0 ? (
                 <p className="text-sm text-[hsl(220,9%,55%)] text-center py-10">Clique em Atualizar para listar templates da Meta.</p>
               ) : (
@@ -485,6 +525,47 @@ export default function WhatsAppAdminPanel() {
                     </div>
                   ))}
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* LIVE LOGS */}
+        <TabsContent value="logs">
+          <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2"><Inbox className="h-5 w-5 text-emerald-400" />Logs ao vivo</CardTitle>
+                <CardDescription className="text-[hsl(220,9%,55%)]">Últimas 40 mensagens · atualiza em tempo real (Realtime).</CardDescription>
+              </div>
+              <Button onClick={load} variant="outline" className="border-[hsl(222,47%,22%)] bg-transparent text-white hover:bg-[hsl(222,47%,16%)]"><RefreshCw className="h-4 w-4 mr-2" />Recarregar</Button>
+            </CardHeader>
+            <CardContent>
+              {recentLogs.length === 0 ? (
+                <p className="text-sm text-[hsl(220,9%,55%)] text-center py-10">Nenhuma mensagem registrada ainda.</p>
+              ) : (
+                <ScrollArea className="h-[480px] pr-3">
+                  <div className="space-y-1.5">
+                    {recentLogs.map((l) => {
+                      const color = l.status === "delivered" ? "text-emerald-400"
+                        : l.status === "sent" ? "text-blue-400"
+                        : l.status === "failed" ? "text-red-400"
+                        : "text-slate-400";
+                      return (
+                        <div key={l.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,20%)] hover:bg-[hsl(222,47%,16%)] transition-colors">
+                          <Circle className={`h-2 w-2 fill-current ${color}`} />
+                          <div className="flex-1 min-w-0 grid grid-cols-12 gap-2 items-center">
+                            <span className="col-span-3 font-mono text-xs truncate">{l.phone}</span>
+                            <span className="col-span-4 text-xs text-[hsl(220,9%,70%)] truncate">{l.template || l.body_preview || "—"}</span>
+                            <span className={`col-span-2 text-xs uppercase font-semibold ${color}`}>{l.status}</span>
+                            <span className="col-span-3 text-[10px] text-[hsl(220,9%,50%)] text-right">{format(new Date(l.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}</span>
+                          </div>
+                          {l.error && <span className="text-[10px] text-red-400 truncate max-w-[200px]" title={l.error}>{l.error}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               )}
             </CardContent>
           </Card>
