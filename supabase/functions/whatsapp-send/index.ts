@@ -66,7 +66,7 @@ serve(async (req) => {
   // Auth: extract caller (psychologist) from JWT
   const authHeader = req.headers.get("Authorization") || "";
   const token = authHeader.replace("Bearer ", "");
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  const supabase = adminClient;
   const { data: userData } = await supabase.auth.getUser(token);
   const psychologistId = userData?.user?.id;
   if (!psychologistId) {
