@@ -79,6 +79,7 @@ const SIDEBAR_ITEMS = [
   { id: "logs", label: "Auditoria", icon: ScrollText },
   { id: "monitoring", label: "Monitoramento", icon: Monitor },
   { id: "emails", label: "E-mails", icon: Mail },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "settings", label: "Configurações", icon: Settings },
 ];
 
