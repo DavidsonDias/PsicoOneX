@@ -103,7 +103,7 @@ export default function IntegrationsHub() {
     {
       id: "google_calendar", name: "Google Calendar", vendor: "Google Workspace",
       description: "Sincronização bidirecional de agendamentos com OAuth 2.0 e refresh automático.",
-      category: "calendar", icon: Calendar, status: gcalCount > 0 ? "active" : "configured",
+      category: "calendar", icon: Calendar, status: "active",
       accent: "from-blue-500 to-indigo-700", metric: { label: "Conectados", value: gcalCount },
       panel: GoogleCalendarAdminPanel, docsUrl: "https://developers.google.com/calendar",
     },
@@ -125,13 +125,48 @@ export default function IntegrationsHub() {
       category: "communication", icon: Mail, status: "active", accent: "from-rose-500 to-orange-600",
       metric: { label: "Domínio", value: "notify.sevendevx.com" },
     },
-    // —— Roadmap / coming soon ——
-    { id: "apple_calendar", name: "Apple Calendar (iCloud)", vendor: "Apple", description: "Sincronização via CalDAV com tokens app-specific.", category: "calendar", icon: Apple, status: "coming_soon", accent: "from-slate-400 to-slate-700" },
-    { id: "outlook", name: "Outlook & Microsoft 365", vendor: "Microsoft Graph", description: "Agenda corporativa via Graph API com OAuth.", category: "calendar", icon: Cloud, status: "coming_soon", accent: "from-sky-500 to-blue-800" },
-    { id: "telegram", name: "Telegram Bot", vendor: "Telegram", description: "Notificações alternativas via bot oficial.", category: "communication", icon: Hash, status: "coming_soon", accent: "from-cyan-500 to-blue-700" },
-    { id: "twilio_sms", name: "Twilio SMS", vendor: "Twilio", description: "SMS para pacientes sem WhatsApp.", category: "communication", icon: Phone, status: "coming_soon", accent: "from-red-500 to-pink-700" },
-    { id: "zapier", name: "Zapier / Make", vendor: "iPaaS", description: "Conecte 6.000+ apps via webhooks de saída.", category: "marketing", icon: Zap, status: "coming_soon", accent: "from-amber-500 to-orange-700" },
-  ], [waStatus, waMetric, gcalCount]);
+    // —— Configuráveis (schema-driven) ——
+    {
+      id: "telegram", name: "Telegram Bot", vendor: "Telegram Bot API",
+      description: "Notificações alternativas via bot oficial com mensagens HTML e broadcasts.",
+      category: "communication", icon: Hash, status: statusOf("telegram"),
+      accent: "from-cyan-500 to-blue-700",
+      panel: () => <GenericIntegrationPanel integrationId="telegram" />,
+      docsUrl: "https://core.telegram.org/bots/api",
+    },
+    {
+      id: "twilio_sms", name: "Twilio SMS", vendor: "Twilio",
+      description: "SMS para pacientes sem WhatsApp. Cobertura global em segundos.",
+      category: "communication", icon: Phone, status: statusOf("twilio_sms"),
+      accent: "from-red-500 to-pink-700",
+      panel: () => <GenericIntegrationPanel integrationId="twilio_sms" />,
+      docsUrl: "https://www.twilio.com/docs/sms",
+    },
+    {
+      id: "zapier", name: "Zapier / Make", vendor: "iPaaS — Webhooks",
+      description: "Conecte 6.000+ apps via webhooks de saída a partir de eventos do PsicoOne.",
+      category: "marketing", icon: Zap, status: statusOf("zapier"),
+      accent: "from-amber-500 to-orange-700",
+      panel: () => <GenericIntegrationPanel integrationId="zapier" />,
+      docsUrl: "https://zapier.com/apps/webhook",
+    },
+    {
+      id: "apple_calendar", name: "Apple Calendar (iCloud)", vendor: "Apple CalDAV",
+      description: "Sincronização via CalDAV com senha específica de app.",
+      category: "calendar", icon: Apple, status: statusOf("apple_calendar"),
+      accent: "from-slate-400 to-slate-700",
+      panel: () => <GenericIntegrationPanel integrationId="apple_calendar" />,
+      docsUrl: "https://support.apple.com/pt-br/102654",
+    },
+    {
+      id: "outlook", name: "Outlook & Microsoft 365", vendor: "Microsoft Graph",
+      description: "Agenda corporativa via Graph API com OAuth client credentials.",
+      category: "calendar", icon: Cloud, status: statusOf("outlook"),
+      accent: "from-sky-500 to-blue-800",
+      panel: () => <GenericIntegrationPanel integrationId="outlook" />,
+      docsUrl: "https://learn.microsoft.com/graph/auth-v2-service",
+    },
+  ], [waStatus, waMetric, gcalCount, extraConfigs]);
 
   const filtered = integrations.filter(i =>
     (category === "all" || i.category === category) &&
