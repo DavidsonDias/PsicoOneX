@@ -60,22 +60,37 @@ export default function IntegrationsHub() {
   const [waStatus, setWaStatus] = useState<Status>("inactive");
   const [waMetric, setWaMetric] = useState<number>(0);
   const [gcalCount, setGcalCount] = useState<number>(0);
+  const [extraConfigs, setExtraConfigs] = useState<Record<string, { is_active: boolean; last_test_status: string | null }>>({});
 
-  useEffect(() => {
-    (async () => {
-      const [{ data: wa }, { count: waLogs }, { count: gcal }] = await Promise.all([
-        supabase.from("whatsapp_config").select("phone_number_id, access_token, is_active, last_test_status").maybeSingle(),
-        supabase.from("whatsapp_logs").select("id", { count: "exact", head: true }),
-        supabase.from("google_calendar_tokens").select("id", { count: "exact", head: true }),
-      ]);
-      setWaMetric(waLogs || 0);
-      setGcalCount(gcal || 0);
-      if (!wa?.phone_number_id || !wa?.access_token) setWaStatus("inactive");
-      else if (wa.last_test_status === "failed") setWaStatus("error");
-      else if (wa.is_active && wa.last_test_status === "ok") setWaStatus("active");
-      else setWaStatus("configured");
-    })();
-  }, []);
+  const refreshAll = async () => {
+    const [{ data: wa }, { count: waLogs }, { count: gcal }, { data: ic }] = await Promise.all([
+      supabase.from("whatsapp_config").select("phone_number_id, access_token, is_active, last_test_status").maybeSingle(),
+      supabase.from("whatsapp_logs").select("id", { count: "exact", head: true }),
+      supabase.from("google_calendar_tokens").select("id", { count: "exact", head: true }),
+      supabase.from("integration_configs").select("integration_id, is_active, last_test_status"),
+    ]);
+    setWaMetric(waLogs || 0);
+    setGcalCount(gcal || 0);
+    if (!wa?.phone_number_id || !wa?.access_token) setWaStatus("inactive");
+    else if (wa.last_test_status === "failed") setWaStatus("error");
+    else if (wa.is_active && wa.last_test_status === "ok") setWaStatus("active");
+    else setWaStatus("configured");
+
+    const map: Record<string, { is_active: boolean; last_test_status: string | null }> = {};
+    (ic || []).forEach((r: any) => { map[r.integration_id] = { is_active: r.is_active, last_test_status: r.last_test_status }; });
+    setExtraConfigs(map);
+  };
+
+  useEffect(() => { void refreshAll(); }, []);
+
+  const statusOf = (id: string, fallback: Status = "inactive"): Status => {
+    const c = extraConfigs[id];
+    if (!c) return fallback;
+    if (!c.is_active) return "inactive";
+    if (c.last_test_status === "failed") return "error";
+    if (c.last_test_status === "ok") return "active";
+    return "configured";
+  };
 
   const integrations: Integration[] = useMemo(() => [
     {
