@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import WhatsAppAdminPanel from "./WhatsAppAdminPanel";
 import GoogleCalendarAdminPanel from "./GoogleCalendarAdminPanel";
+import GenericIntegrationPanel from "./GenericIntegrationPanel";
 
 type Status = "active" | "configured" | "inactive" | "coming_soon" | "error";
 type Category = "communication" | "calendar" | "payments" | "ai" | "marketing" | "all";
