@@ -520,6 +520,48 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_configs: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          integration_id: string
+          is_active: boolean
+          last_test_error: string | null
+          last_test_status: string | null
+          last_tested_at: string | null
+          name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          integration_id: string
+          is_active?: boolean
+          last_test_error?: string | null
+          last_test_status?: string | null
+          last_tested_at?: string | null
+          name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          integration_id?: string
+          is_active?: boolean
+          last_test_error?: string | null
+          last_test_status?: string | null
+          last_tested_at?: string | null
+          name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       medical_record_attachments: {
         Row: {
           created_at: string
