@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import {
   Save, Bell, Palette, FileText, Database, Download, Lock, Loader2,
   Shield, Plug, HelpCircle, User, Package, CheckCircle2, FileJson, FileSpreadsheet, FileArchive,
-  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw, Puzzle
+  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw, Puzzle, Sun, Moon, Sparkles, Monitor
 } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
@@ -23,11 +23,13 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PluginManager as PluginManagerComponent } from "@/components/settings/PluginManager";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 type ExportFormat = "xlsx" | "json" | "csv";
 
@@ -64,6 +66,7 @@ export default function Configuracoes() {
 
   const { isAdmin } = useUserRole();
   const { resetOnboarding } = useOnboarding();
+  const { prefs, save: savePrefs } = useUserPreferences();
 
   const [settings, setSettings] = useState({
     clinic_name: "",
@@ -77,6 +80,21 @@ export default function Configuracoes() {
     terms_of_service: "",
     privacy_policy: "",
   });
+
+  // Hydrate from saved prefs
+  useEffect(() => {
+    setSettings((prev) => ({
+      ...prev,
+      session_duration: prefs.settings.session_duration,
+      session_price: prefs.settings.session_price,
+      reminder_hours: prefs.settings.reminder_hours,
+      enable_whatsapp: prefs.settings.enable_whatsapp,
+      enable_email: prefs.settings.enable_email,
+      enable_sms: prefs.settings.enable_sms,
+      terms_of_service: prefs.settings.terms_of_service,
+      privacy_policy: prefs.settings.privacy_policy,
+    }));
+  }, [prefs.settings]);
 
   useEffect(() => { checkAuthAndLoadData(); }, []);
 
@@ -96,9 +114,27 @@ export default function Configuracoes() {
 
   const handleSaveSettings = async () => {
     setSaving(true);
-    toast.info("Configurações serão salvas após a atualização do banco de dados");
-    setSaving(false);
+    try {
+      await savePrefs({
+        settings: {
+          session_duration: settings.session_duration,
+          session_price: settings.session_price,
+          reminder_hours: settings.reminder_hours,
+          enable_whatsapp: settings.enable_whatsapp,
+          enable_email: settings.enable_email,
+          enable_sms: settings.enable_sms,
+          terms_of_service: settings.terms_of_service,
+          privacy_policy: settings.privacy_policy,
+        },
+      });
+      toast.success("Configurações salvas!");
+    } catch (e) {
+      toast.error("Erro ao salvar configurações");
+    } finally {
+      setSaving(false);
+    }
   };
+
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
