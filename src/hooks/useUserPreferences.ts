@@ -107,15 +107,8 @@ const subscribe = (cb: () => void) => {
 };
 
 export function useUserPreferences() {
-  // Trigger hydration once
   useEffect(() => { hydrate(); }, []);
-  const snapshot = useSyncExternalStore(
-    subscribe,
-    () => _state,
-    () => _state
-  );
-  const [, force] = useState(0);
-  useEffect(() => subscribe(() => force((n) => n + 1)), []);
+  const snapshot = useSyncExternalStore(subscribe, () => _state, () => _state);
   const save = useCallback((patch: Partial<UserPreferences>) => saveStore(patch), []);
   return { prefs: snapshot, loading: _loading, save };
 }
