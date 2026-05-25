@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { PatientProvider } from "@/contexts/PatientContext";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeApplier } from "@/components/ThemeApplier";
+
 import { HelmetProvider } from "react-helmet-async";
 import { useAuthRedirect } from "./hooks/useAuthRedirect";
 import { SyncProvider } from "./contexts/SyncContext";
@@ -65,14 +67,16 @@ function PageLoader() {
 
 const App = () => (
   <HelmetProvider>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem themes={["light","dark","midnight","system"]} disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <SidebarProvider>
             <SyncProvider>
             <PatientProvider>
+            <ThemeApplier />
             <Toaster />
             <Sonner />
+
             <BrowserRouter>
               <AuthRedirectHandler />
               <Suspense fallback={<PageLoader />}>

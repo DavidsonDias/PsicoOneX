@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import {
   Save, Bell, Palette, FileText, Database, Download, Lock, Loader2,
   Shield, Plug, HelpCircle, User, Package, CheckCircle2, FileJson, FileSpreadsheet, FileArchive,
-  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw, Puzzle
+  KeyRound, LogOut, Upload, AlertTriangle, RotateCcw, Puzzle, Sun, Moon, Sparkles, Monitor
 } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
@@ -23,11 +23,13 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PluginManager as PluginManagerComponent } from "@/components/settings/PluginManager";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 type ExportFormat = "xlsx" | "json" | "csv";
 
@@ -64,6 +66,7 @@ export default function Configuracoes() {
 
   const { isAdmin } = useUserRole();
   const { resetOnboarding } = useOnboarding();
+  const { prefs, save: savePrefs } = useUserPreferences();
 
   const [settings, setSettings] = useState({
     clinic_name: "",
@@ -77,6 +80,21 @@ export default function Configuracoes() {
     terms_of_service: "",
     privacy_policy: "",
   });
+
+  // Hydrate from saved prefs
+  useEffect(() => {
+    setSettings((prev) => ({
+      ...prev,
+      session_duration: prefs.settings.session_duration,
+      session_price: prefs.settings.session_price,
+      reminder_hours: prefs.settings.reminder_hours,
+      enable_whatsapp: prefs.settings.enable_whatsapp,
+      enable_email: prefs.settings.enable_email,
+      enable_sms: prefs.settings.enable_sms,
+      terms_of_service: prefs.settings.terms_of_service,
+      privacy_policy: prefs.settings.privacy_policy,
+    }));
+  }, [prefs.settings]);
 
   useEffect(() => { checkAuthAndLoadData(); }, []);
 
@@ -96,9 +114,27 @@ export default function Configuracoes() {
 
   const handleSaveSettings = async () => {
     setSaving(true);
-    toast.info("Configurações serão salvas após a atualização do banco de dados");
-    setSaving(false);
+    try {
+      await savePrefs({
+        settings: {
+          session_duration: settings.session_duration,
+          session_price: settings.session_price,
+          reminder_hours: settings.reminder_hours,
+          enable_whatsapp: settings.enable_whatsapp,
+          enable_email: settings.enable_email,
+          enable_sms: settings.enable_sms,
+          terms_of_service: settings.terms_of_service,
+          privacy_policy: settings.privacy_policy,
+        },
+      });
+      toast.success("Configurações salvas!");
+    } catch (e) {
+      toast.error("Erro ao salvar configurações");
+    } finally {
+      setSaving(false);
+    }
   };
+
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -624,22 +660,91 @@ export default function Configuracoes() {
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5 text-primary" /> Personalização Visual
               </CardTitle>
-              <CardDescription>Customize a aparência do sistema</CardDescription>
+              <CardDescription>Escolha o tema e a cor primária — aplicado em tempo real e em todos os dispositivos</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="primary_color">Cor Principal</Label>
-                <div className="flex gap-4 mt-2">
-                  <Input id="primary_color" type="color" value={settings.primary_color} onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })} className="w-20 h-10" />
-                  <Input value={settings.primary_color} onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })} />
+            <CardContent className="space-y-8">
+              {/* Theme picker */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Tema do sistema</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {([
+                    { value: "light", label: "Claro", icon: Sun, swatch: "bg-white border-2", inner: "bg-blue-500" },
+                    { value: "dark", label: "Escuro", icon: Moon, swatch: "bg-slate-900", inner: "bg-blue-500" },
+                    { value: "midnight", label: "Midnight Command", icon: Sparkles, swatch: "bg-gradient-to-br from-[#0a0a1a] to-[#141432]", inner: "bg-gradient-to-r from-indigo-500 to-cyan-400" },
+                    { value: "system", label: "Sistema", icon: Monitor, swatch: "bg-gradient-to-br from-white via-slate-300 to-slate-900", inner: "bg-blue-500" },
+                  ] as const).map(({ value, label, icon: Icon, swatch, inner }) => {
+                    const active = prefs.theme === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => savePrefs({ theme: value })}
+                        className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                          active ? "border-primary shadow-lg shadow-primary/20 scale-[1.02]" : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        <div className={`w-full h-16 rounded-lg ${swatch} flex items-center justify-center`}>
+                          <div className={`w-8 h-8 rounded-full ${inner}`} />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Icon className="h-3.5 w-3.5" />
+                          <span className="text-xs font-medium">{label}</span>
+                        </div>
+                        {active && (
+                          <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                            <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <Button onClick={handleSaveSettings} disabled={saving} className="gap-2 w-full sm:w-auto">
-                <Save className="h-4 w-4" />{saving ? "Salvando..." : "Salvar Aparência"}
-              </Button>
+
+              {/* Primary hue picker */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Cor primária</Label>
+                  <span className="text-xs text-muted-foreground">Hue {prefs.primary_hue}°</span>
+                </div>
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                  {[0, 25, 45, 90, 142, 180, 200, 217, 250, 280, 320].map((hue) => {
+                    const active = prefs.primary_hue === hue;
+                    return (
+                      <button
+                        key={hue}
+                        type="button"
+                        onClick={() => savePrefs({ primary_hue: hue })}
+                        className={`relative h-10 rounded-lg transition-all hover:scale-110 ${
+                          active ? "ring-2 ring-offset-2 ring-offset-background ring-foreground scale-110" : ""
+                        }`}
+                        style={{ background: `hsl(${hue} 91% 60%)` }}
+                        aria-label={`Hue ${hue}`}
+                      >
+                        {active && <CheckCircle2 className="h-4 w-4 text-white absolute inset-0 m-auto" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={359}
+                  value={prefs.primary_hue}
+                  onChange={(e) => savePrefs({ primary_hue: Number(e.target.value) })}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                  style={{
+                    background: "linear-gradient(to right, hsl(0 91% 60%), hsl(60 91% 60%), hsl(120 91% 60%), hsl(180 91% 60%), hsl(240 91% 60%), hsl(300 91% 60%), hsl(360 91% 60%))",
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  As mudanças são aplicadas imediatamente e sincronizadas em todos os dispositivos.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
+
 
         {/* ── SECURITY ── */}
         <TabsContent value="security">
