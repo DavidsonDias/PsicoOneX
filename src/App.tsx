@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { PatientProvider } from "@/contexts/PatientContext";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeApplier } from "@/components/ThemeApplier";
+
 import { HelmetProvider } from "react-helmet-async";
 import { useAuthRedirect } from "./hooks/useAuthRedirect";
 import { SyncProvider } from "./contexts/SyncContext";
