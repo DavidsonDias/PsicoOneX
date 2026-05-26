@@ -47,23 +47,34 @@
       (function () {
         try {
           var raw = localStorage.getItem('psicoone_local_preferences');
-          var prefs = raw ? JSON.parse(raw) : {};
-          var theme = prefs.theme || 'system';
-          var resolved = theme === 'system'
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-            : theme;
+          var p = raw ? JSON.parse(raw) : {};
+          var theme = p.theme || 'system';
+          var custom = ['midnight', 'arctic', 'obsidian', 'emerald', 'crimson', 'neopurple'];
+          var isCustom = custom.indexOf(theme) !== -1;
+          var resolved = isCustom
+            ? theme
+            : (theme === 'system'
+                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                : theme);
           var root = document.documentElement;
-          root.classList.remove('light', 'dark', 'midnight');
+          var all = ['light', 'dark'].concat(custom);
+          for (var i = 0; i < all.length; i++) root.classList.remove(all[i]);
           root.classList.add(resolved);
-          root.style.colorScheme = resolved === 'light' ? 'light' : 'dark';
-          var hue = typeof prefs.primary_hue === 'number' ? prefs.primary_hue : 217;
+          var lightThemes = ['light', 'arctic', 'emerald'];
+          root.style.colorScheme = lightThemes.indexOf(resolved) !== -1 ? 'light' : 'dark';
+          var hue = typeof p.primary_hue === 'number' ? p.primary_hue : 217;
           root.style.setProperty('--primary', hue + ' 91% 60%');
           root.style.setProperty('--primary-light', hue + ' 91% 70%');
           root.style.setProperty('--primary-dark', hue + ' 91% 50%');
           root.style.setProperty('--ring', hue + ' 91% 60%');
+          root.dataset.density = p.density || 'comfortable';
+          root.dataset.radius = p.radius || 'rounded';
+          root.dataset.glow = p.glow || 'soft';
+          root.dataset.sidebarStyle = p.sidebar_style || 'solid';
         } catch (e) {}
       })();
     </script>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
