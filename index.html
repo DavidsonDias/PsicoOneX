@@ -42,6 +42,28 @@
 </head>
 
   <body>
+    <script>
+      // Anti-flash: apply local appearance synchronously before React boots
+      (function () {
+        try {
+          var raw = localStorage.getItem('psicoone_local_preferences');
+          var prefs = raw ? JSON.parse(raw) : {};
+          var theme = prefs.theme || 'system';
+          var resolved = theme === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : theme;
+          var root = document.documentElement;
+          root.classList.remove('light', 'dark', 'midnight');
+          root.classList.add(resolved);
+          root.style.colorScheme = resolved === 'light' ? 'light' : 'dark';
+          var hue = typeof prefs.primary_hue === 'number' ? prefs.primary_hue : 217;
+          root.style.setProperty('--primary', hue + ' 91% 60%');
+          root.style.setProperty('--primary-light', hue + ' 91% 70%');
+          root.style.setProperty('--primary-dark', hue + ' 91% 50%');
+          root.style.setProperty('--ring', hue + ' 91% 60%');
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
