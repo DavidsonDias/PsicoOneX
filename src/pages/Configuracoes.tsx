@@ -660,38 +660,47 @@ export default function Configuracoes() {
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5 text-primary" /> Personalização Visual
               </CardTitle>
-              <CardDescription>Escolha o tema e a cor primária — aplicado em tempo real e em todos os dispositivos</CardDescription>
+              <CardDescription>
+                Temas, densidade, raio, glow e estilo da sidebar — aplicado em tempo real, salvo neste dispositivo
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-8">
-              {/* Theme picker */}
+            <CardContent className="space-y-10">
+              {/* THEME GALLERY */}
               <div className="space-y-3">
                 <Label className="text-base font-semibold">Tema do sistema</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {([
-                    { value: "light", label: "Claro", icon: Sun, swatch: "bg-white border-2", inner: "bg-blue-500" },
-                    { value: "dark", label: "Escuro", icon: Moon, swatch: "bg-slate-900", inner: "bg-blue-500" },
-                    { value: "midnight", label: "Midnight Command", icon: Sparkles, swatch: "bg-gradient-to-br from-[#0a0a1a] to-[#141432]", inner: "bg-gradient-to-r from-indigo-500 to-cyan-400" },
-                    { value: "system", label: "Sistema", icon: Monitor, swatch: "bg-gradient-to-br from-white via-slate-300 to-slate-900", inner: "bg-blue-500" },
-                  ] as const).map(({ value, label, icon: Icon, swatch, inner }) => {
+                    { value: "system",    label: "Sistema",          desc: "Segue o SO",                grad: "linear-gradient(135deg,#fff 0%,#0f172a 100%)",                 accent: "linear-gradient(90deg,#3b82f6,#6366f1)" },
+                    { value: "light",     label: "Claro",            desc: "Limpo e clássico",          grad: "linear-gradient(135deg,#fafbfc,#e8ecf1)",                       accent: "linear-gradient(90deg,#3b82f6,#8b5cf6)" },
+                    { value: "dark",      label: "Escuro",           desc: "Profissional padrão",       grad: "linear-gradient(135deg,#0f172a,#1e293b)",                       accent: "linear-gradient(90deg,#3b82f6,#a855f7)" },
+                    { value: "midnight",  label: "Midnight Command", desc: "Indigo + ciano enterprise", grad: "linear-gradient(135deg,#0a0a1a,#141432)",                       accent: "linear-gradient(90deg,#6366f1,#06b6d4)" },
+                    { value: "arctic",    label: "Arctic Glass",     desc: "Glassmorphism gelado",      grad: "linear-gradient(135deg,#f0f9ff,#bae6fd)",                       accent: "linear-gradient(90deg,#0ea5e9,#22d3ee)" },
+                    { value: "obsidian",  label: "Obsidian Pro",     desc: "Preto absoluto + ouro",     grad: "linear-gradient(135deg,#000,#1a1a1a)",                          accent: "linear-gradient(90deg,#fbbf24,#f59e0b)" },
+                    { value: "emerald",   label: "Emerald Zen",      desc: "Verde clínico relaxante",   grad: "linear-gradient(135deg,#ecfdf5,#a7f3d0)",                       accent: "linear-gradient(90deg,#10b981,#14b8a6)" },
+                    { value: "crimson",   label: "Crimson Focus",    desc: "Vermelho executivo",        grad: "linear-gradient(135deg,#0a0a0a,#1a0606)",                       accent: "linear-gradient(90deg,#ef4444,#f97316)" },
+                    { value: "neopurple", label: "Neo Purple",       desc: "Neon futurista",            grad: "linear-gradient(135deg,#0f0418,#1e0a2e)",                       accent: "linear-gradient(90deg,#c084fc,#ec4899)" },
+                  ] as const).map(({ value, label, desc, grad, accent }) => {
                     const active = prefs.theme === value;
                     return (
                       <button
                         key={value}
                         type="button"
                         onClick={() => savePrefs({ theme: value })}
-                        className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                          active ? "border-primary shadow-lg shadow-primary/20 scale-[1.02]" : "border-border hover:border-primary/40"
+                        className={`group relative text-left rounded-xl border-2 overflow-hidden transition-all ${
+                          active ? "border-primary shadow-lg shadow-primary/30 scale-[1.02]" : "border-border hover:border-primary/40"
                         }`}
                       >
-                        <div className={`w-full h-16 rounded-lg ${swatch} flex items-center justify-center`}>
-                          <div className={`w-8 h-8 rounded-full ${inner}`} />
+                        <div className="h-20 w-full relative" style={{ background: grad }}>
+                          <div className="absolute bottom-2 left-2 right-2 h-2 rounded-full" style={{ background: accent }} />
+                          <div className="absolute top-2 left-2 w-8 h-2 rounded-full bg-white/30" />
+                          <div className="absolute top-2 left-12 w-12 h-2 rounded-full bg-white/15" />
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <Icon className="h-3.5 w-3.5" />
-                          <span className="text-xs font-medium">{label}</span>
+                        <div className="p-2.5">
+                          <p className="text-xs font-semibold leading-tight">{label}</p>
+                          <p className="text-[10px] text-muted-foreground leading-tight truncate">{desc}</p>
                         </div>
                         {active && (
-                          <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow">
                             <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
                           </div>
                         )}
@@ -701,13 +710,13 @@ export default function Configuracoes() {
                 </div>
               </div>
 
-              {/* Primary hue picker */}
+              {/* PRIMARY HUE */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Cor primária</Label>
+                  <Label className="text-base font-semibold">Cor de destaque</Label>
                   <span className="text-xs text-muted-foreground">Hue {prefs.primary_hue}°</span>
                 </div>
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                <div className="grid grid-cols-6 sm:grid-cols-11 gap-2">
                   {[0, 25, 45, 90, 142, 180, 200, 217, 250, 280, 320].map((hue) => {
                     const active = prefs.primary_hue === hue;
                     return (
@@ -734,16 +743,95 @@ export default function Configuracoes() {
                   onChange={(e) => savePrefs({ primary_hue: Number(e.target.value) })}
                   className="w-full h-2 rounded-full appearance-none cursor-pointer"
                   style={{
-                    background: "linear-gradient(to right, hsl(0 91% 60%), hsl(60 91% 60%), hsl(120 91% 60%), hsl(180 91% 60%), hsl(240 91% 60%), hsl(300 91% 60%), hsl(360 91% 60%))",
+                    background:
+                      "linear-gradient(to right, hsl(0 91% 60%), hsl(60 91% 60%), hsl(120 91% 60%), hsl(180 91% 60%), hsl(240 91% 60%), hsl(300 91% 60%), hsl(360 91% 60%))",
                   }}
                 />
-                <p className="text-xs text-muted-foreground">
-                  As mudanças são aplicadas imediatamente e sincronizadas em todos os dispositivos.
-                </p>
               </div>
+
+              {/* DENSITY / RADIUS / GLOW / SIDEBAR */}
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Densidade</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["compact","comfortable","spacious"] as const).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => savePrefs({ density: d })}
+                        className={`py-2 px-3 rounded-lg border-2 text-xs font-medium capitalize transition-all ${
+                          prefs.density === d ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        {d === "compact" ? "Compacta" : d === "comfortable" ? "Confortável" : "Espaçada"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Bordas</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(["sharp","medium","rounded","ultra"] as const).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => savePrefs({ radius: r })}
+                        className={`py-2 px-2 border-2 text-xs font-medium capitalize transition-all ${
+                          prefs.radius === r ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                        } ${r === "sharp" ? "rounded-sm" : r === "medium" ? "rounded-md" : r === "rounded" ? "rounded-lg" : "rounded-2xl"}`}
+                      >
+                        {r === "sharp" ? "Reto" : r === "medium" ? "Médio" : r === "rounded" ? "Suave" : "Ultra"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Brilho (glow)</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(["off","soft","medium","strong"] as const).map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => savePrefs({ glow: g })}
+                        className={`py-2 px-2 rounded-lg border-2 text-xs font-medium capitalize transition-all ${
+                          prefs.glow === g ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        {g === "off" ? "Off" : g === "soft" ? "Sutil" : g === "medium" ? "Médio" : "Forte"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Estilo da Sidebar</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["solid","glass","floating","minimal"] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => savePrefs({ sidebar_style: s })}
+                        className={`py-2 px-3 rounded-lg border-2 text-xs font-medium capitalize transition-all ${
+                          prefs.sidebar_style === s ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        {s === "solid" ? "Sólida" : s === "glass" ? "Vidro" : s === "floating" ? "Flutuante" : "Minimal"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground border-t pt-4">
+                💡 As preferências visuais são salvas localmente neste dispositivo — cada navegador/dispositivo mantém seu próprio estilo, como Slack, Notion e Linear.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
+
+
 
 
         {/* ── SECURITY ── */}

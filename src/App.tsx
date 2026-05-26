@@ -67,7 +67,7 @@ function PageLoader() {
 
 const App = () => (
   <HelmetProvider>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem themes={["light","dark","midnight","system"]} disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem themes={["light","dark","system","midnight","arctic","obsidian","emerald","crimson","neopurple"]} disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <SidebarProvider>
