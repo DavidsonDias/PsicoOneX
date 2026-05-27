@@ -1,0 +1,8 @@
+# PsicoOne
+
+> Plataforma completa de gestão para psicólogos com IA: prontuário eletrônico, agenda online, teleatendimento e gestão financeira.
+
+## Pages
+
+- [Home](/): Visão geral do produto, recursos, depoimentos, planos e FAQ.
+- [Entrar / Criar conta](/auth): Acesso e cadastro de psicólogos no PsicoOne.
