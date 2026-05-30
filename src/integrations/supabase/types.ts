@@ -811,6 +811,39 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_onboarding_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          patient_id: string
+          psychologist_id: string
+          status: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          patient_id: string
+          psychologist_id: string
+          status?: string
+          token?: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          patient_id?: string
+          psychologist_id?: string
+          status?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       patient_portal_audit: {
         Row: {
           action: string
@@ -844,82 +877,148 @@ export type Database = {
       patients: {
         Row: {
           address: string | null
+          address_number: string | null
           birth_date: string | null
+          cep: string | null
+          city: string | null
+          company: string | null
+          complement: string | null
           cpf: string | null
           created_at: string | null
           default_session_value: number | null
           deleted_at: string | null
           deleted_by: string | null
           deleted_reason: string | null
+          education: string | null
           email: string | null
           emergency_contact: string | null
           emergency_phone: string | null
+          emergency_relationship: string | null
           full_name: string
+          gender: string | null
+          health_plan: string | null
+          health_plan_expiry: string | null
+          health_plan_id: string | null
           id: string
+          lgpd_signature_data: string | null
+          lgpd_signed_at: string | null
+          marital_status: string | null
           monthly_plan_value: number | null
+          neighborhood: string | null
           notes: string | null
+          onboarding_completed_at: string | null
+          onboarding_status: string
           payment_day: number | null
           phone: string | null
           portal_activated_at: string | null
           preferred_notification_channel: string
+          profession: string | null
           psychologist_id: string
+          rg: string | null
+          state: string | null
           status: string | null
+          street: string | null
           treatment_start_date: string | null
           updated_at: string | null
+          uploaded_documents: Json | null
           user_id: string | null
           whatsapp_phone: string | null
         }
         Insert: {
           address?: string | null
+          address_number?: string | null
           birth_date?: string | null
+          cep?: string | null
+          city?: string | null
+          company?: string | null
+          complement?: string | null
           cpf?: string | null
           created_at?: string | null
           default_session_value?: number | null
           deleted_at?: string | null
           deleted_by?: string | null
           deleted_reason?: string | null
+          education?: string | null
           email?: string | null
           emergency_contact?: string | null
           emergency_phone?: string | null
+          emergency_relationship?: string | null
           full_name: string
+          gender?: string | null
+          health_plan?: string | null
+          health_plan_expiry?: string | null
+          health_plan_id?: string | null
           id?: string
+          lgpd_signature_data?: string | null
+          lgpd_signed_at?: string | null
+          marital_status?: string | null
           monthly_plan_value?: number | null
+          neighborhood?: string | null
           notes?: string | null
+          onboarding_completed_at?: string | null
+          onboarding_status?: string
           payment_day?: number | null
           phone?: string | null
           portal_activated_at?: string | null
           preferred_notification_channel?: string
+          profession?: string | null
           psychologist_id: string
+          rg?: string | null
+          state?: string | null
           status?: string | null
+          street?: string | null
           treatment_start_date?: string | null
           updated_at?: string | null
+          uploaded_documents?: Json | null
           user_id?: string | null
           whatsapp_phone?: string | null
         }
         Update: {
           address?: string | null
+          address_number?: string | null
           birth_date?: string | null
+          cep?: string | null
+          city?: string | null
+          company?: string | null
+          complement?: string | null
           cpf?: string | null
           created_at?: string | null
           default_session_value?: number | null
           deleted_at?: string | null
           deleted_by?: string | null
           deleted_reason?: string | null
+          education?: string | null
           email?: string | null
           emergency_contact?: string | null
           emergency_phone?: string | null
+          emergency_relationship?: string | null
           full_name?: string
+          gender?: string | null
+          health_plan?: string | null
+          health_plan_expiry?: string | null
+          health_plan_id?: string | null
           id?: string
+          lgpd_signature_data?: string | null
+          lgpd_signed_at?: string | null
+          marital_status?: string | null
           monthly_plan_value?: number | null
+          neighborhood?: string | null
           notes?: string | null
+          onboarding_completed_at?: string | null
+          onboarding_status?: string
           payment_day?: number | null
           phone?: string | null
           portal_activated_at?: string | null
           preferred_notification_channel?: string
+          profession?: string | null
           psychologist_id?: string
+          rg?: string | null
+          state?: string | null
           status?: string | null
+          street?: string | null
           treatment_start_date?: string | null
           updated_at?: string | null
+          uploaded_documents?: Json | null
           user_id?: string | null
           whatsapp_phone?: string | null
         }
