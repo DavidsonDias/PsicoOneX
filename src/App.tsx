@@ -41,6 +41,7 @@ const PatientProfile = lazy(() => import("./pages/PatientProfile"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const PortalPacienteExterno = lazy(() => import("./pages/PortalPacienteExterno"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const PatientOnboarding = lazy(() => import("./pages/PatientOnboarding"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
 const PortalAcceptInvite = lazy(() => import("./pages/portal/PortalAcceptInvite"));
@@ -112,6 +113,7 @@ const App = () => (
                     <Route path="mensagens" element={<PortalMensagens />} />
                   </Route>
                   <Route path="/portal/:token" element={<PortalPacienteExterno />} />
+                  <Route path="/onboarding/:token" element={<PatientOnboarding />} />
                   <Route path="/unsubscribe" element={<Unsubscribe />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
