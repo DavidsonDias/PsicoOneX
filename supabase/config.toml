@@ -45,3 +45,5 @@ project_id = "pnkhogpsadywdbgzqhfi"
     verify_jwt = false
   [functions.whatsapp-admin]
     verify_jwt = true
+  [functions.patient-onboarding]
+    verify_jwt = false
