@@ -70,6 +70,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // View
   const [expandedId, setExpandedId] = useState<string | null>(null);
