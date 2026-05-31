@@ -276,13 +276,25 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
       />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Filtrar por texto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-auto" />
         <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-auto" />
+        <Button
+          variant={showFavoritesOnly ? "default" : "outline"}
+          size="default"
+          className="gap-2"
+          onClick={() => setShowFavoritesOnly(v => !v)}
+          title="Mostrar apenas favoritos"
+        >
+          <Star className={`h-4 w-4 ${showFavoritesOnly ? "fill-current" : ""}`} />
+          <span className="hidden sm:inline">Favoritos</span>
+          {favoritesCount > 0 && <Badge variant="secondary" className="ml-1">{favoritesCount}</Badge>}
+        </Button>
+        <PeriodAISummary patientId={patientId} patientName={patientName} />
         <Button className="gap-2" onClick={openCreate}>
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Novo Prontuário</span>
