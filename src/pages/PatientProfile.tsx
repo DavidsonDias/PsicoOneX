@@ -162,8 +162,10 @@ export default function PatientProfile() {
 
   const tabItems = [
     { value: "overview", label: "Visão Geral", icon: User },
+    { value: "timeline", label: "Timeline", icon: Activity },
     { value: "clinical", label: "Perfil IA", icon: Brain },
     { value: "records", label: "Prontuários", icon: FileText },
+    { value: "attachments", label: "Anexos", icon: Paperclip },
     { value: "financial", label: "Financeiro", icon: DollarSign },
     { value: "agenda", label: "Agenda", icon: Calendar },
     { value: "documents", label: "Documentos", icon: File },
