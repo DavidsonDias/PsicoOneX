@@ -93,7 +93,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
   const loadRecords = async () => {
     const { data, error } = await supabase
       .from("medical_records")
-      .select("id, session_date, session_number, complaints, observations, evolution, techniques_used, next_steps")
+      .select("id, session_date, session_number, complaints, observations, evolution, techniques_used, next_steps, is_favorite")
       .eq("patient_id", patientId)
       .is("deleted_at", null)
       .order("session_date", { ascending: false });
