@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { FileText, Search, Plus, Calendar, Eye, Hash, Edit2, Trash2 } from "lucide-react";
+import { FileText, Search, Plus, Calendar, Eye, Hash, Edit2, Trash2, Star } from "lucide-react";
 import { SmartSearch } from "@/components/medical-records/SmartSearch";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ProntuarioEditor, type ProntuarioFormData } from "@/components/medical-records/ProntuarioEditor";
 import { ActionMenu } from "@/components/ui/action-menu";
+import { PeriodAISummary } from "./PeriodAISummary";
 
 interface Record {
   id: string;
