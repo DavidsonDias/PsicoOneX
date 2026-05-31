@@ -613,6 +613,7 @@ export type Database = {
           deleted_reason: string | null
           evolution: string | null
           id: string
+          is_favorite: boolean
           next_steps: string | null
           observations: string | null
           patient_id: string
@@ -631,6 +632,7 @@ export type Database = {
           deleted_reason?: string | null
           evolution?: string | null
           id?: string
+          is_favorite?: boolean
           next_steps?: string | null
           observations?: string | null
           patient_id: string
@@ -649,6 +651,7 @@ export type Database = {
           deleted_reason?: string | null
           evolution?: string | null
           id?: string
+          is_favorite?: boolean
           next_steps?: string | null
           observations?: string | null
           patient_id?: string
