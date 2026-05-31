@@ -244,6 +244,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
 
   // ── Filters ──
   const filtered = records.filter(r => {
+    if (showFavoritesOnly && !r.is_favorite) return false;
     if (search) {
       const term = search.toLowerCase();
       const matchesText = [r.complaints, r.observations, r.evolution, r.techniques_used, r.next_steps]
@@ -254,6 +255,8 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
     if (dateTo && r.session_date > dateTo) return false;
     return true;
   });
+
+  const favoritesCount = records.filter(r => r.is_favorite).length;
 
   if (loading) {
     return (
