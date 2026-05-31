@@ -193,6 +193,21 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
     loadRecords();
   };
 
+  // ── Toggle favorite ──
+  const toggleFavorite = async (record: Record) => {
+    const newVal = !record.is_favorite;
+    // Optimistic update
+    setRecords(prev => prev.map(r => r.id === record.id ? { ...r, is_favorite: newVal } : r));
+    const { error } = await supabase
+      .from("medical_records")
+      .update({ is_favorite: newVal })
+      .eq("id", record.id);
+    if (error) {
+      setRecords(prev => prev.map(r => r.id === record.id ? { ...r, is_favorite: !newVal } : r));
+      toast.error("Erro ao favoritar");
+    }
+  };
+
   // ── AI generate ──
   const handleGenerateAI = useCallback(async () => {
     if (!patientId) return;
