@@ -234,7 +234,7 @@ export default function PatientProfile() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 h-auto gap-1">
+          <TabsList className="w-full grid grid-cols-4 sm:grid-cols-8 h-auto gap-1">
             {tabItems.map((tab) => (
               <TabsTrigger
                 key={tab.value}
@@ -257,11 +257,17 @@ export default function PatientProfile() {
             <TabsContent value="overview" className="mt-0">
               <PatientOverviewTab patient={patient} />
             </TabsContent>
+            <TabsContent value="timeline" className="mt-0">
+              <PatientUnifiedTimeline patientId={patient.id} patientName={patient.full_name} />
+            </TabsContent>
             <TabsContent value="clinical" className="mt-0">
               <PatientClinicalProfile patientId={patient.id} patientName={patient.full_name} />
             </TabsContent>
             <TabsContent value="records" className="mt-0">
               <PatientRecordsTab patientId={patient.id} patientName={patient.full_name} />
+            </TabsContent>
+            <TabsContent value="attachments" className="mt-0">
+              <PatientAttachmentsCenter patientId={patient.id} patientName={patient.full_name} />
             </TabsContent>
             <TabsContent value="financial" className="mt-0">
               <PatientFinancialTab patientId={patient.id} patientName={patient.full_name} defaultSessionValue={patient.default_session_value} />
