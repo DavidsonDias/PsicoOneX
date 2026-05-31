@@ -24,6 +24,7 @@ interface Record {
   evolution: string | null;
   techniques_used: string | null;
   next_steps: string | null;
+  is_favorite?: boolean;
 }
 
 interface PendingFile {
