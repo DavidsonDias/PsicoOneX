@@ -50,6 +50,26 @@ Analise os prontuários e retorne APENAS em JSON:
 Busque por temas, sintomas, técnicas e conteúdo semântico — não apenas texto literal.`;
 
       userContent = `Prontuários:\n${records.map((r: any) => `[${r.id}] Sessão ${r.session} (${r.date}): ${r.content}`).join('\n')}`;
+    } else if (type === 'period-summary') {
+      const { patientName, periodDays, records } = body;
+      systemPrompt = `Você é um assistente clínico para psicólogos. Gere um resumo executivo dos últimos ${periodDays} dias de atendimento do paciente.
+Responda APENAS em JSON válido:
+{
+  "headline": "Frase curta resumindo o período (1 linha)",
+  "summary": "Resumo clínico de 3-5 frases sobre o que ocorreu no período",
+  "progress": "positive|neutral|negative",
+  "keyThemes": ["tema1", "tema2", "tema3"],
+  "techniquesUsed": ["técnica1", "técnica2"],
+  "alerts": ["alerta clínico relevante, se houver"],
+  "suggestedFocus": ["sugestão de foco para próximas sessões"]
+}
+Seja objetivo, clínico e útil. Se não houver dados suficientes, indique isso em summary.`;
+
+      userContent = `Paciente: ${patientName}\nPeríodo: últimos ${periodDays} dias\n\nProntuários (${records.length}):\n${
+        records.map((r: any) =>
+          `Sessão ${r.session || '?'} (${r.date}): ${[r.complaints, r.observations, r.evolution, r.techniques, r.nextSteps].filter(Boolean).join(' | ')}`
+        ).join('\n')
+      }`;
     } else {
       throw new Error(`Unknown insight type: ${type}`);
     }

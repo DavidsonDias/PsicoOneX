@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { FileText, Search, Plus, Calendar, Eye, Hash, Edit2, Trash2 } from "lucide-react";
+import { FileText, Search, Plus, Calendar, Eye, Hash, Edit2, Trash2, Star } from "lucide-react";
 import { SmartSearch } from "@/components/medical-records/SmartSearch";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ProntuarioEditor, type ProntuarioFormData } from "@/components/medical-records/ProntuarioEditor";
 import { ActionMenu } from "@/components/ui/action-menu";
+import { PeriodAISummary } from "./PeriodAISummary";
 
 interface Record {
   id: string;
@@ -23,6 +24,7 @@ interface Record {
   evolution: string | null;
   techniques_used: string | null;
   next_steps: string | null;
+  is_favorite?: boolean;
 }
 
 interface PendingFile {
@@ -68,6 +70,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // View
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -90,7 +93,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
   const loadRecords = async () => {
     const { data, error } = await supabase
       .from("medical_records")
-      .select("id, session_date, session_number, complaints, observations, evolution, techniques_used, next_steps")
+      .select("id, session_date, session_number, complaints, observations, evolution, techniques_used, next_steps, is_favorite")
       .eq("patient_id", patientId)
       .is("deleted_at", null)
       .order("session_date", { ascending: false });
@@ -190,6 +193,21 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
     loadRecords();
   };
 
+  // ── Toggle favorite ──
+  const toggleFavorite = async (record: Record) => {
+    const newVal = !record.is_favorite;
+    // Optimistic update
+    setRecords(prev => prev.map(r => r.id === record.id ? { ...r, is_favorite: newVal } : r));
+    const { error } = await supabase
+      .from("medical_records")
+      .update({ is_favorite: newVal })
+      .eq("id", record.id);
+    if (error) {
+      setRecords(prev => prev.map(r => r.id === record.id ? { ...r, is_favorite: !newVal } : r));
+      toast.error("Erro ao favoritar");
+    }
+  };
+
   // ── AI generate ──
   const handleGenerateAI = useCallback(async () => {
     if (!patientId) return;
@@ -226,6 +244,7 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
 
   // ── Filters ──
   const filtered = records.filter(r => {
+    if (showFavoritesOnly && !r.is_favorite) return false;
     if (search) {
       const term = search.toLowerCase();
       const matchesText = [r.complaints, r.observations, r.evolution, r.techniques_used, r.next_steps]
@@ -236,6 +255,8 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
     if (dateTo && r.session_date > dateTo) return false;
     return true;
   });
+
+  const favoritesCount = records.filter(r => r.is_favorite).length;
 
   if (loading) {
     return (
@@ -255,13 +276,25 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
       />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Filtrar por texto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-auto" />
         <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-auto" />
+        <Button
+          variant={showFavoritesOnly ? "default" : "outline"}
+          size="default"
+          className="gap-2"
+          onClick={() => setShowFavoritesOnly(v => !v)}
+          title="Mostrar apenas favoritos"
+        >
+          <Star className={`h-4 w-4 ${showFavoritesOnly ? "fill-current" : ""}`} />
+          <span className="hidden sm:inline">Favoritos</span>
+          {favoritesCount > 0 && <Badge variant="secondary" className="ml-1">{favoritesCount}</Badge>}
+        </Button>
+        <PeriodAISummary patientId={patientId} patientName={patientName} />
         <Button className="gap-2" onClick={openCreate}>
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Novo Prontuário</span>
@@ -309,6 +342,15 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => toggleFavorite(record)}
+                      title={record.is_favorite ? "Desfavoritar" : "Favoritar"}
+                    >
+                      <Star className={`h-4 w-4 ${record.is_favorite ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+                    </Button>
                     <ActionMenu
                       onEdit={() => openEdit(record)}
                       onDelete={() => handleDelete(record.id)}
