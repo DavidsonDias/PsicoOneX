@@ -342,6 +342,15 @@ export function PatientRecordsTab({ patientId, patientName }: Props) {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => toggleFavorite(record)}
+                      title={record.is_favorite ? "Desfavoritar" : "Favoritar"}
+                    >
+                      <Star className={`h-4 w-4 ${record.is_favorite ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+                    </Button>
                     <ActionMenu
                       onEdit={() => openEdit(record)}
                       onDelete={() => handleDelete(record.id)}
