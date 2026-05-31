@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ArrowLeft, User, FileText, DollarSign, Calendar, File, Edit, Brain } from "lucide-react";
+import { ArrowLeft, User, FileText, DollarSign, Calendar, File, Edit, Brain, Activity, Paperclip } from "lucide-react";
 import { PatientForm, PatientFormData } from "@/components/patients/PatientForm";
 import { differenceInYears } from "date-fns";
 import { PatientOverviewTab } from "@/components/patient-profile/PatientOverviewTab";
@@ -19,6 +19,8 @@ import { PatientFinancialTab } from "@/components/patient-profile/PatientFinanci
 import { PatientAgendaTab } from "@/components/patient-profile/PatientAgendaTab";
 import { PatientDocumentsTab } from "@/components/patient-profile/PatientDocumentsTab";
 import { PatientClinicalProfile } from "@/components/patient-profile/PatientClinicalProfile";
+import { PatientUnifiedTimeline } from "@/components/patient-profile/PatientUnifiedTimeline";
+import { PatientAttachmentsCenter } from "@/components/patient-profile/PatientAttachmentsCenter";
 import { PatientInviteButton } from "@/components/patients/PatientInviteButton";
 
 export interface PatientFull {
