@@ -32,6 +32,8 @@ import { FinancialChart } from "@/components/financial/FinancialChart";
 import { FinancialProjections } from "@/components/financial/FinancialProjections";
 import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
 import { FinancialGrowth } from "@/components/financial/FinancialGrowth";
+import { RecurringBillingsPanel } from "@/components/financial/RecurringBillingsPanel";
+import { OverdueSemaforo } from "@/components/financial/OverdueSemaforo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
@@ -156,7 +158,7 @@ export default function Financeiro() {
   const loadTransactions = async (uid: string) => {
     const { data, error } = await supabase
       .from("financial_transactions")
-      .select(`*, patients (full_name)`)
+      .select(`*, patients (full_name, phone, email)`)
       .eq("psychologist_id", uid)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
@@ -165,13 +167,16 @@ export default function Financeiro() {
 
     const now = new Date();
     const formatted = (data || []).map((t: any) => {
-      // Auto-compute overdue: pending + past due date → overdue
       let computedStatus = t.status;
       if (t.status === "pending" && t.due_date && isAfter(now, new Date(t.due_date))) {
         computedStatus = "overdue";
       }
       return {
-        ...t, patient_name: t.patients?.full_name, payment_status: computedStatus,
+        ...t,
+        patient_name: t.patients?.full_name,
+        patient_phone: t.patients?.phone ?? null,
+        patient_email: t.patients?.email ?? null,
+        payment_status: computedStatus,
       };
     });
     setTransactions(formatted);
@@ -759,6 +764,7 @@ export default function Financeiro() {
       <Tabs defaultValue="pagamentos" className="mb-6">
         <TabsList className="bg-muted/50 mb-6">
           <TabsTrigger value="pagamentos" className="gap-2"><Receipt className="h-4 w-4" />Pagamentos</TabsTrigger>
+          <TabsTrigger value="stripe" className="gap-2"><CreditCard className="h-4 w-4" />Cobranças Stripe</TabsTrigger>
           <TabsTrigger value="resumo" className="gap-2"><TrendingUp className="h-4 w-4" />Resumo</TabsTrigger>
           <TabsTrigger value="notas" className="gap-2"><FileText className="h-4 w-4" />Notas Fiscais</TabsTrigger>
           <TabsTrigger value="relatorios" className="gap-2"><BarChart3 className="h-4 w-4" />Relatórios</TabsTrigger>
@@ -766,6 +772,21 @@ export default function Financeiro() {
 
         {/* ========== PAGAMENTOS TAB ========== */}
         <TabsContent value="pagamentos" className="space-y-6">
+          <OverdueSemaforo
+            transactions={transactions as any}
+            onSync={async () => {
+              const t = toast.loading("Sincronizando pagamentos Stripe...");
+              try {
+                const { data, error } = await supabase.functions.invoke("sync-patient-payments", { body: {} });
+                if (error) throw error;
+                toast.success(`${data?.updated || 0} pagamento(s) confirmado(s)`, { id: t });
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) loadTransactions(user.id);
+              } catch (e: any) {
+                toast.error(e.message || "Erro ao sincronizar", { id: t });
+              }
+            }}
+          />
           {/* Period Controls */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
             <MonthYearPicker />
@@ -1027,6 +1048,26 @@ export default function Financeiro() {
               )}
             </div>
           </div>
+        </TabsContent>
+
+        {/* ========== STRIPE TAB ========== */}
+        <TabsContent value="stripe" className="space-y-6">
+          <OverdueSemaforo
+            transactions={transactions as any}
+            onSync={async () => {
+              const t = toast.loading("Sincronizando pagamentos Stripe...");
+              try {
+                const { data, error } = await supabase.functions.invoke("sync-patient-payments", { body: {} });
+                if (error) throw error;
+                toast.success(`${data?.updated || 0} pagamento(s) confirmado(s)`, { id: t });
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) loadTransactions(user.id);
+              } catch (e: any) {
+                toast.error(e.message || "Erro ao sincronizar", { id: t });
+              }
+            }}
+          />
+          <RecurringBillingsPanel />
         </TabsContent>
 
         {/* ========== RESUMO TAB ========== */}

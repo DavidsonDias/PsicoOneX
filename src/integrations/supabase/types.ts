@@ -385,12 +385,21 @@ export type Database = {
           id: string
           invoice_number: string | null
           invoice_status: string | null
+          is_recurring: boolean
           paid_date: string | null
           patient_id: string
+          payment_link_sent_at: string | null
           payment_method: string | null
           psychologist_id: string
           receipt_url: string | null
+          recurrence_parent_id: string | null
+          reminder_count: number
+          reminder_sent_at: string | null
           status: string | null
+          stripe_paid_at: string | null
+          stripe_payment_intent_id: string | null
+          stripe_payment_link: string | null
+          stripe_payment_link_id: string | null
           tax_amount: number | null
           tax_rate: number | null
           type: string
@@ -411,12 +420,21 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           invoice_status?: string | null
+          is_recurring?: boolean
           paid_date?: string | null
           patient_id: string
+          payment_link_sent_at?: string | null
           payment_method?: string | null
           psychologist_id: string
           receipt_url?: string | null
+          recurrence_parent_id?: string | null
+          reminder_count?: number
+          reminder_sent_at?: string | null
           status?: string | null
+          stripe_paid_at?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_payment_link?: string | null
+          stripe_payment_link_id?: string | null
           tax_amount?: number | null
           tax_rate?: number | null
           type: string
@@ -437,12 +455,21 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           invoice_status?: string | null
+          is_recurring?: boolean
           paid_date?: string | null
           patient_id?: string
+          payment_link_sent_at?: string | null
           payment_method?: string | null
           psychologist_id?: string
           receipt_url?: string | null
+          recurrence_parent_id?: string | null
+          reminder_count?: number
+          reminder_sent_at?: string | null
           status?: string | null
+          stripe_paid_at?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_payment_link?: string | null
+          stripe_payment_link_id?: string | null
           tax_amount?: number | null
           tax_rate?: number | null
           type?: string
@@ -1077,6 +1104,54 @@ export type Database = {
           preferred_clinical_style?: string | null
           specialty?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      recurring_billings: {
+        Row: {
+          amount: number
+          auto_send_link: boolean
+          billing_day: number
+          channel: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          last_run_date: string | null
+          next_run_date: string
+          patient_id: string
+          psychologist_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          auto_send_link?: boolean
+          billing_day: number
+          channel?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_run_date?: string | null
+          next_run_date: string
+          patient_id: string
+          psychologist_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          auto_send_link?: boolean
+          billing_day?: number
+          channel?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_run_date?: string | null
+          next_run_date?: string
+          patient_id?: string
+          psychologist_id?: string
+          updated_at?: string
         }
         Relationships: []
       }

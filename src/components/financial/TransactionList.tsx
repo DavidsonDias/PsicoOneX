@@ -1,31 +1,34 @@
- import { motion, AnimatePresence } from "framer-motion";
- import { Badge } from "@/components/ui/badge";
- import { Button } from "@/components/ui/button";
- import { ActionMenu } from "@/components/ui/action-menu";
- import { TrendingUp, TrendingDown, Calendar, CreditCard, Banknote, Smartphone, Building } from "lucide-react";
- import { format } from "date-fns";
- import { cn } from "@/lib/utils";
- 
- interface Transaction {
-   id: string;
-   type: "income" | "expense";
-   amount: number;
-   description: string;
-   category: string;
-   payment_method: string;
-   payment_status: string;
-   due_date: string;
-   paid_date: string | null;
-   patient_id: string | null;
-   patient_name?: string;
- }
- 
- interface TransactionListProps {
-   transactions: Transaction[];
-   onEdit: (t: Transaction) => void;
-   onDelete: (id: string) => void;
-   onStatusChange?: (id: string, status: string) => void;
- }
+import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { TrendingUp, TrendingDown, Calendar, CreditCard, Banknote, Smartphone, Building } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { PaymentLinkActions } from "./PaymentLinkActions";
+
+interface Transaction {
+  id: string;
+  type: "income" | "expense";
+  amount: number;
+  description: string;
+  category: string;
+  payment_method: string;
+  payment_status: string;
+  due_date: string;
+  paid_date: string | null;
+  patient_id: string | null;
+  patient_name?: string;
+  patient_phone?: string | null;
+  patient_email?: string | null;
+  stripe_payment_link?: string | null;
+}
+
+interface TransactionListProps {
+  transactions: Transaction[];
+  onEdit: (t: Transaction) => void;
+  onDelete: (id: string) => void;
+  onStatusChange?: (id: string, status: string) => void;
+}
  
  export function TransactionList({ transactions, onEdit, onDelete }: TransactionListProps) {
    const getPaymentIcon = (method: string) => {
@@ -114,13 +117,23 @@
                      {statusConfig.label}
                    </Badge>
                  </div>
-                 <ActionMenu
-                   onEdit={() => onEdit(transaction)}
-                   onDelete={() => onDelete(transaction.id)}
-                   deleteTitle="Excluir Transação"
-                   deleteDescription="Deseja excluir esta transação?"
-                 />
-               </div>
+                  {transaction.type === "income" && transaction.payment_status !== "paid" && transaction.payment_status !== "cancelled" && (
+                    <PaymentLinkActions
+                      transactionId={transaction.id}
+                      existingUrl={transaction.stripe_payment_link}
+                      patientName={transaction.patient_name}
+                      patientPhone={transaction.patient_phone}
+                      patientEmail={transaction.patient_email}
+                      amount={transaction.amount}
+                    />
+                  )}
+                  <ActionMenu
+                    onEdit={() => onEdit(transaction)}
+                    onDelete={() => onDelete(transaction.id)}
+                    deleteTitle="Excluir Transação"
+                    deleteDescription="Deseja excluir esta transação?"
+                  />
+                </div>
              </motion.div>
            );
          })}
