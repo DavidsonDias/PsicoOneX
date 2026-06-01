@@ -117,13 +117,23 @@ interface TransactionListProps {
                      {statusConfig.label}
                    </Badge>
                  </div>
-                 <ActionMenu
-                   onEdit={() => onEdit(transaction)}
-                   onDelete={() => onDelete(transaction.id)}
-                   deleteTitle="Excluir Transação"
-                   deleteDescription="Deseja excluir esta transação?"
-                 />
-               </div>
+                  {transaction.type === "income" && transaction.payment_status !== "paid" && transaction.payment_status !== "cancelled" && (
+                    <PaymentLinkActions
+                      transactionId={transaction.id}
+                      existingUrl={transaction.stripe_payment_link}
+                      patientName={transaction.patient_name}
+                      patientPhone={transaction.patient_phone}
+                      patientEmail={transaction.patient_email}
+                      amount={transaction.amount}
+                    />
+                  )}
+                  <ActionMenu
+                    onEdit={() => onEdit(transaction)}
+                    onDelete={() => onDelete(transaction.id)}
+                    deleteTitle="Excluir Transação"
+                    deleteDescription="Deseja excluir esta transação?"
+                  />
+                </div>
              </motion.div>
            );
          })}
