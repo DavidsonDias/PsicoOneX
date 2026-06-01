@@ -203,6 +203,12 @@ export default function PatientProfile() {
             </div>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <SendOnboardingButton
+              patientId={patient.id}
+              patientName={patient.full_name}
+              patientPhone={patient.phone || undefined}
+              patientEmail={patient.email || undefined}
+            />
             <PatientInviteButton
               patientId={patient.id}
               patientEmail={patient.email}
