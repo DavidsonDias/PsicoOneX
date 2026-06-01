@@ -1050,6 +1050,26 @@ export default function Financeiro() {
           </div>
         </TabsContent>
 
+        {/* ========== STRIPE TAB ========== */}
+        <TabsContent value="stripe" className="space-y-6">
+          <OverdueSemaforo
+            transactions={transactions as any}
+            onSync={async () => {
+              const t = toast.loading("Sincronizando pagamentos Stripe...");
+              try {
+                const { data, error } = await supabase.functions.invoke("sync-patient-payments", { body: {} });
+                if (error) throw error;
+                toast.success(`${data?.updated || 0} pagamento(s) confirmado(s)`, { id: t });
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) loadTransactions(user.id);
+              } catch (e: any) {
+                toast.error(e.message || "Erro ao sincronizar", { id: t });
+              }
+            }}
+          />
+          <RecurringBillingsPanel />
+        </TabsContent>
+
         {/* ========== RESUMO TAB ========== */}
         <TabsContent value="resumo" className="space-y-6">
           <FinancialGrowth transactions={transactions} />
