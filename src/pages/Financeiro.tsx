@@ -156,7 +156,7 @@ export default function Financeiro() {
   const loadTransactions = async (uid: string) => {
     const { data, error } = await supabase
       .from("financial_transactions")
-      .select(`*, patients (full_name)`)
+      .select(`*, patients (full_name, phone, email)`)
       .eq("psychologist_id", uid)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
@@ -165,13 +165,16 @@ export default function Financeiro() {
 
     const now = new Date();
     const formatted = (data || []).map((t: any) => {
-      // Auto-compute overdue: pending + past due date → overdue
       let computedStatus = t.status;
       if (t.status === "pending" && t.due_date && isAfter(now, new Date(t.due_date))) {
         computedStatus = "overdue";
       }
       return {
-        ...t, patient_name: t.patients?.full_name, payment_status: computedStatus,
+        ...t,
+        patient_name: t.patients?.full_name,
+        patient_phone: t.patients?.phone ?? null,
+        patient_email: t.patients?.email ?? null,
+        payment_status: computedStatus,
       };
     });
     setTransactions(formatted);
