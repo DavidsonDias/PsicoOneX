@@ -32,6 +32,8 @@ import { FinancialChart } from "@/components/financial/FinancialChart";
 import { FinancialProjections } from "@/components/financial/FinancialProjections";
 import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
 import { FinancialGrowth } from "@/components/financial/FinancialGrowth";
+import { RecurringBillingsPanel } from "@/components/financial/RecurringBillingsPanel";
+import { OverdueSemaforo } from "@/components/financial/OverdueSemaforo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
