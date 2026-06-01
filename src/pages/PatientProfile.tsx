@@ -22,6 +22,7 @@ import { PatientClinicalProfile } from "@/components/patient-profile/PatientClin
 import { PatientUnifiedTimeline } from "@/components/patient-profile/PatientUnifiedTimeline";
 import { PatientAttachmentsCenter } from "@/components/patient-profile/PatientAttachmentsCenter";
 import { PatientInviteButton } from "@/components/patients/PatientInviteButton";
+import { SendOnboardingButton } from "@/components/patients/SendOnboardingButton";
 
 export interface PatientFull {
   id: string;
