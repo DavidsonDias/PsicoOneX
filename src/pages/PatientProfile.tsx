@@ -246,10 +246,10 @@ export default function PatientProfile() {
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="gap-1.5 text-xs sm:text-sm py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="flex-col sm:flex-row gap-1 sm:gap-1.5 text-[10px] sm:text-sm py-2 px-1 sm:px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
                 <tab.icon className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="leading-tight">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
