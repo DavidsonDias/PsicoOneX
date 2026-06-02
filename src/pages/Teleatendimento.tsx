@@ -143,6 +143,8 @@ const Teleatendimento = () => {
   const loadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
+    setPsychologistId(session.user.id);
+
     const [patientsRes, sessionsRes] = await Promise.all([
       supabase.from("patients").select("id, full_name").eq("status", "active").order("full_name"),
       supabase.from("telehealth_sessions").select("*").eq("psychologist_id", session.user.id).order("created_at", { ascending: false }).limit(20),
