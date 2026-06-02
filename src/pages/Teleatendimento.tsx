@@ -362,6 +362,15 @@ const Teleatendimento = () => {
                   {transcription.isListening ? "Parar" : "Transcrever"}
                 </Button>
               )}
+              <Button
+                variant={notesOpen ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setNotesOpen((v) => !v)}
+                className="gap-1.5 text-xs"
+              >
+                <NotebookPen className="h-3.5 w-3.5" />
+                Anotações
+              </Button>
               <Button variant="outline" size="sm" onClick={copyLink} className="gap-1.5">
                 <Copy className="h-3.5 w-3.5" />
                 Link
@@ -369,6 +378,7 @@ const Teleatendimento = () => {
               <DebugOverlay debug={webrtc.debugInfo} />
             </div>
           </div>
+
 
           {/* Media error */}
           {webrtc.mediaError && (
