@@ -939,6 +939,7 @@ export type Database = {
           onboarding_completed_at: string | null
           onboarding_status: string
           payment_day: number | null
+          permanent_room_token: string | null
           phone: string | null
           portal_activated_at: string | null
           preferred_notification_channel: string
@@ -988,6 +989,7 @@ export type Database = {
           onboarding_completed_at?: string | null
           onboarding_status?: string
           payment_day?: number | null
+          permanent_room_token?: string | null
           phone?: string | null
           portal_activated_at?: string | null
           preferred_notification_channel?: string
@@ -1037,6 +1039,7 @@ export type Database = {
           onboarding_completed_at?: string | null
           onboarding_status?: string
           payment_day?: number | null
+          permanent_room_token?: string | null
           phone?: string | null
           portal_activated_at?: string | null
           preferred_notification_channel?: string
@@ -1268,9 +1271,12 @@ export type Database = {
           created_at: string
           duration_seconds: number | null
           ended_at: string | null
+          host_notified_at: string | null
           id: string
+          live_notes: string | null
           medical_record_id: string | null
           patient_id: string | null
+          patient_joined_at: string | null
           psychologist_id: string
           room_token: string
           started_at: string | null
@@ -1284,9 +1290,12 @@ export type Database = {
           created_at?: string
           duration_seconds?: number | null
           ended_at?: string | null
+          host_notified_at?: string | null
           id?: string
+          live_notes?: string | null
           medical_record_id?: string | null
           patient_id?: string | null
+          patient_joined_at?: string | null
           psychologist_id: string
           room_token?: string
           started_at?: string | null
@@ -1300,9 +1309,12 @@ export type Database = {
           created_at?: string
           duration_seconds?: number | null
           ended_at?: string | null
+          host_notified_at?: string | null
           id?: string
+          live_notes?: string | null
           medical_record_id?: string | null
           patient_id?: string | null
+          patient_joined_at?: string | null
           psychologist_id?: string
           room_token?: string
           started_at?: string | null
