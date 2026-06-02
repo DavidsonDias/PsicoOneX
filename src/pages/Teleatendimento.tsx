@@ -64,6 +64,13 @@ const Teleatendimento = () => {
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(true);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
+  // Live notes panel
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [psychologistId, setPsychologistId] = useState<string | null>(null);
+
+  useWaitingRoomNotifier({ psychologistId });
+
+
   const selectedPatientName = patients.find((p) => p.id === selectedPatient)?.full_name || "";
 
   const chat = useTelehealthChat(currentSession?.room_token || "", "Profissional");
