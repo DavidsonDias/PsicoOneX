@@ -81,20 +81,28 @@ const SalaTeleatendimento = () => {
     try {
       await webrtc.connect();
       setRoomState("in-call");
+      // Signal patient arrival so the psychologist hears the waiting-room chime
+      supabase.functions
+        .invoke("telehealth-room-signal", { body: { roomToken: token, event: "joined" } })
+        .catch((e) => console.warn("[sala] signal failed", e));
       toast.success("Conectado à sessão!");
     } catch (e) {
       console.error(e);
       toast.error("Erro ao conectar. Verifique permissões de câmera/microfone.");
       setRoomState("name-entry");
     }
-  }, [webrtc]);
+  }, [webrtc, token]);
 
   const leaveRoom = useCallback(() => {
     webrtc.disconnect();
     setRoomState("name-entry");
     setRemoteStream(null);
+    supabase.functions
+      .invoke("telehealth-room-signal", { body: { roomToken: token, event: "left" } })
+      .catch(() => {});
     toast.info("Você saiu da sessão");
-  }, [webrtc]);
+  }, [webrtc, token]);
+
 
   if (roomState === "loading") {
     return (

@@ -8,21 +8,24 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Video, Clock, Users, Copy, ExternalLink, Mic, MicOff, AlertTriangle, ScrollText } from "lucide-react";
+import { Video, Clock, Users, Copy, ExternalLink, Mic, MicOff, AlertTriangle, ScrollText, NotebookPen } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DebugOverlay } from "@/components/telehealth/DebugOverlay";
 import { SessionActions } from "@/components/telehealth/SessionActions";
 import { useTelehealthWebRTC } from "@/hooks/useTelehealthWebRTC";
 import { useTelehealthChat } from "@/hooks/useTelehealthChat";
 import { useSessionTranscription } from "@/hooks/useSessionTranscription";
+import { useWaitingRoomNotifier } from "@/hooks/useWaitingRoomNotifier";
 import { VideoPanel } from "@/components/telehealth/VideoPanel";
 import { CallControls, type VideoLayout } from "@/components/telehealth/CallControls";
 import { ChatPanel } from "@/components/telehealth/ChatPanel";
 import { ConnectionIndicator } from "@/components/telehealth/ConnectionIndicator";
 import { PostSessionSummary } from "@/components/telehealth/PostSessionSummary";
 import { PreCallCheck } from "@/components/telehealth/PreCallCheck";
+import { LiveSessionNotes } from "@/components/telehealth/LiveSessionNotes";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
 
 interface Patient {
   id: string;
@@ -60,6 +63,13 @@ const Teleatendimento = () => {
   // Transcription & privacy
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(true);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+
+  // Live notes panel
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [psychologistId, setPsychologistId] = useState<string | null>(null);
+
+  useWaitingRoomNotifier({ psychologistId });
+
 
   const selectedPatientName = patients.find((p) => p.id === selectedPatient)?.full_name || "";
 
@@ -133,6 +143,8 @@ const Teleatendimento = () => {
   const loadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
+    setPsychologistId(session.user.id);
+
     const [patientsRes, sessionsRes] = await Promise.all([
       supabase.from("patients").select("id, full_name").eq("status", "active").order("full_name"),
       supabase.from("telehealth_sessions").select("*").eq("psychologist_id", session.user.id).order("created_at", { ascending: false }).limit(20),
@@ -350,6 +362,15 @@ const Teleatendimento = () => {
                   {transcription.isListening ? "Parar" : "Transcrever"}
                 </Button>
               )}
+              <Button
+                variant={notesOpen ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setNotesOpen((v) => !v)}
+                className="gap-1.5 text-xs"
+              >
+                <NotebookPen className="h-3.5 w-3.5" />
+                Anotações
+              </Button>
               <Button variant="outline" size="sm" onClick={copyLink} className="gap-1.5">
                 <Copy className="h-3.5 w-3.5" />
                 Link
@@ -357,6 +378,7 @@ const Teleatendimento = () => {
               <DebugOverlay debug={webrtc.debugInfo} />
             </div>
           </div>
+
 
           {/* Media error */}
           {webrtc.mediaError && (
@@ -416,7 +438,18 @@ const Teleatendimento = () => {
                 <ChatPanel messages={chat.messages} onSend={chat.sendMessage} onClose={chat.closeChat} />
               </div>
             )}
+
+            {notesOpen && currentSession && (
+              <div className="w-80 hidden lg:flex flex-col h-[calc(100vh-16rem)]">
+                <LiveSessionNotes
+                  sessionId={currentSession.id}
+                  initialValue={(currentSession as any).live_notes}
+                  onClose={() => setNotesOpen(false)}
+                />
+              </div>
+            )}
           </div>
+
 
           {currentSession && (
             <Card className="p-3 bg-primary/5 border-primary/20">

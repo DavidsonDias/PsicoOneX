@@ -37,11 +37,12 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey);
 
   const now = new Date();
-  const stats = { checked: 0, sent24h: 0, sent1h: 0, skipped: 0, failed: 0 };
+  const stats = { checked: 0, sent24h: 0, sent1h: 0, sent15m: 0, skipped: 0, failed: 0 };
 
-  async function processWindow(hoursAhead: 24 | 1, fromMin: number, toMin: number) {
+  async function processWindow(hoursAhead: 24 | 1 | 0.25, fromMin: number, toMin: number) {
     const from = new Date(now.getTime() + fromMin * 60_000).toISOString();
     const to = new Date(now.getTime() + toMin * 60_000).toISOString();
+
 
     const { data: apts, error } = await supabase
       .from("appointments")
@@ -153,7 +154,9 @@ Deno.serve(async (req) => {
       });
 
       if (sendRes.ok) {
-        if (hoursAhead === 24) stats.sent24h++; else stats.sent1h++;
+        if (hoursAhead === 24) stats.sent24h++;
+        else if (hoursAhead === 1) stats.sent1h++;
+        else stats.sent15m++;
       } else {
         stats.failed++;
         console.error(`[reminders] Failed for apt ${apt.id}:`, await sendRes.text());
@@ -163,6 +166,9 @@ Deno.serve(async (req) => {
 
   await processWindow(24, 23 * 60 + 45, 24 * 60 + 15);
   await processWindow(1, 45, 75);
+  // 15-minute heads-up — narrow window so it lands once per appointment
+  await processWindow(0.25, 10, 20);
+
 
   console.log("[reminders] Done", stats);
 
