@@ -438,7 +438,18 @@ const Teleatendimento = () => {
                 <ChatPanel messages={chat.messages} onSend={chat.sendMessage} onClose={chat.closeChat} />
               </div>
             )}
+
+            {notesOpen && currentSession && (
+              <div className="w-80 hidden lg:flex flex-col h-[calc(100vh-16rem)]">
+                <LiveSessionNotes
+                  sessionId={currentSession.id}
+                  initialValue={(currentSession as any).live_notes}
+                  onClose={() => setNotesOpen(false)}
+                />
+              </div>
+            )}
           </div>
+
 
           {currentSession && (
             <Card className="p-3 bg-primary/5 border-primary/20">
