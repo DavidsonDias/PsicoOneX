@@ -8,21 +8,24 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Video, Clock, Users, Copy, ExternalLink, Mic, MicOff, AlertTriangle, ScrollText } from "lucide-react";
+import { Video, Clock, Users, Copy, ExternalLink, Mic, MicOff, AlertTriangle, ScrollText, NotebookPen } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DebugOverlay } from "@/components/telehealth/DebugOverlay";
 import { SessionActions } from "@/components/telehealth/SessionActions";
 import { useTelehealthWebRTC } from "@/hooks/useTelehealthWebRTC";
 import { useTelehealthChat } from "@/hooks/useTelehealthChat";
 import { useSessionTranscription } from "@/hooks/useSessionTranscription";
+import { useWaitingRoomNotifier } from "@/hooks/useWaitingRoomNotifier";
 import { VideoPanel } from "@/components/telehealth/VideoPanel";
 import { CallControls, type VideoLayout } from "@/components/telehealth/CallControls";
 import { ChatPanel } from "@/components/telehealth/ChatPanel";
 import { ConnectionIndicator } from "@/components/telehealth/ConnectionIndicator";
 import { PostSessionSummary } from "@/components/telehealth/PostSessionSummary";
 import { PreCallCheck } from "@/components/telehealth/PreCallCheck";
+import { LiveSessionNotes } from "@/components/telehealth/LiveSessionNotes";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
 
 interface Patient {
   id: string;
