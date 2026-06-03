@@ -909,8 +909,11 @@ export type Database = {
           address: string | null
           address_number: string | null
           birth_date: string | null
+          birth_place: string | null
           cep: string | null
+          children: Json
           city: string | null
+          cnh: string | null
           company: string | null
           complement: string | null
           cpf: string | null
@@ -920,20 +923,31 @@ export type Database = {
           deleted_by: string | null
           deleted_reason: string | null
           education: string | null
+          education_level: string | null
           email: string | null
           emergency_contact: string | null
           emergency_phone: string | null
           emergency_relationship: string | null
+          emergency_whatsapp: string | null
+          father_name: string | null
+          father_profession: string | null
           full_name: string
           gender: string | null
           health_plan: string | null
           health_plan_expiry: string | null
           health_plan_id: string | null
           id: string
+          initial_demand: string | null
+          lgpd_data_consent: boolean
+          lgpd_privacy_consent: boolean
           lgpd_signature_data: string | null
           lgpd_signed_at: string | null
+          lgpd_truth_declaration: boolean
           marital_status: string | null
+          medications: Json
           monthly_plan_value: number | null
+          mother_name: string | null
+          mother_profession: string | null
           neighborhood: string | null
           notes: string | null
           onboarding_completed_at: string | null
@@ -941,11 +955,28 @@ export type Database = {
           payment_day: number | null
           permanent_room_token: string | null
           phone: string | null
+          phone_residential: string | null
           portal_activated_at: string | null
           preferred_notification_channel: string
+          prior_therapy: boolean | null
+          prior_therapy_duration: string | null
+          prior_therapy_reason: string | null
+          prior_therapy_when: string | null
           profession: string | null
+          profession_role: string | null
           psychologist_id: string
+          recording_authorization: string | null
+          religion: string | null
           rg: string | null
+          rg_issuer: string | null
+          siblings_brothers: number | null
+          siblings_sisters: number | null
+          signature_device: string | null
+          signature_ip: string | null
+          signature_timestamp: string | null
+          social_name: string | null
+          spouse_name: string | null
+          spouse_relationship_time: string | null
           state: string | null
           status: string | null
           street: string | null
@@ -953,14 +984,18 @@ export type Database = {
           updated_at: string | null
           uploaded_documents: Json | null
           user_id: string | null
+          uses_medication: boolean | null
           whatsapp_phone: string | null
         }
         Insert: {
           address?: string | null
           address_number?: string | null
           birth_date?: string | null
+          birth_place?: string | null
           cep?: string | null
+          children?: Json
           city?: string | null
+          cnh?: string | null
           company?: string | null
           complement?: string | null
           cpf?: string | null
@@ -970,20 +1005,31 @@ export type Database = {
           deleted_by?: string | null
           deleted_reason?: string | null
           education?: string | null
+          education_level?: string | null
           email?: string | null
           emergency_contact?: string | null
           emergency_phone?: string | null
           emergency_relationship?: string | null
+          emergency_whatsapp?: string | null
+          father_name?: string | null
+          father_profession?: string | null
           full_name: string
           gender?: string | null
           health_plan?: string | null
           health_plan_expiry?: string | null
           health_plan_id?: string | null
           id?: string
+          initial_demand?: string | null
+          lgpd_data_consent?: boolean
+          lgpd_privacy_consent?: boolean
           lgpd_signature_data?: string | null
           lgpd_signed_at?: string | null
+          lgpd_truth_declaration?: boolean
           marital_status?: string | null
+          medications?: Json
           monthly_plan_value?: number | null
+          mother_name?: string | null
+          mother_profession?: string | null
           neighborhood?: string | null
           notes?: string | null
           onboarding_completed_at?: string | null
@@ -991,11 +1037,28 @@ export type Database = {
           payment_day?: number | null
           permanent_room_token?: string | null
           phone?: string | null
+          phone_residential?: string | null
           portal_activated_at?: string | null
           preferred_notification_channel?: string
+          prior_therapy?: boolean | null
+          prior_therapy_duration?: string | null
+          prior_therapy_reason?: string | null
+          prior_therapy_when?: string | null
           profession?: string | null
+          profession_role?: string | null
           psychologist_id: string
+          recording_authorization?: string | null
+          religion?: string | null
           rg?: string | null
+          rg_issuer?: string | null
+          siblings_brothers?: number | null
+          siblings_sisters?: number | null
+          signature_device?: string | null
+          signature_ip?: string | null
+          signature_timestamp?: string | null
+          social_name?: string | null
+          spouse_name?: string | null
+          spouse_relationship_time?: string | null
           state?: string | null
           status?: string | null
           street?: string | null
@@ -1003,14 +1066,18 @@ export type Database = {
           updated_at?: string | null
           uploaded_documents?: Json | null
           user_id?: string | null
+          uses_medication?: boolean | null
           whatsapp_phone?: string | null
         }
         Update: {
           address?: string | null
           address_number?: string | null
           birth_date?: string | null
+          birth_place?: string | null
           cep?: string | null
+          children?: Json
           city?: string | null
+          cnh?: string | null
           company?: string | null
           complement?: string | null
           cpf?: string | null
@@ -1020,20 +1087,31 @@ export type Database = {
           deleted_by?: string | null
           deleted_reason?: string | null
           education?: string | null
+          education_level?: string | null
           email?: string | null
           emergency_contact?: string | null
           emergency_phone?: string | null
           emergency_relationship?: string | null
+          emergency_whatsapp?: string | null
+          father_name?: string | null
+          father_profession?: string | null
           full_name?: string
           gender?: string | null
           health_plan?: string | null
           health_plan_expiry?: string | null
           health_plan_id?: string | null
           id?: string
+          initial_demand?: string | null
+          lgpd_data_consent?: boolean
+          lgpd_privacy_consent?: boolean
           lgpd_signature_data?: string | null
           lgpd_signed_at?: string | null
+          lgpd_truth_declaration?: boolean
           marital_status?: string | null
+          medications?: Json
           monthly_plan_value?: number | null
+          mother_name?: string | null
+          mother_profession?: string | null
           neighborhood?: string | null
           notes?: string | null
           onboarding_completed_at?: string | null
@@ -1041,11 +1119,28 @@ export type Database = {
           payment_day?: number | null
           permanent_room_token?: string | null
           phone?: string | null
+          phone_residential?: string | null
           portal_activated_at?: string | null
           preferred_notification_channel?: string
+          prior_therapy?: boolean | null
+          prior_therapy_duration?: string | null
+          prior_therapy_reason?: string | null
+          prior_therapy_when?: string | null
           profession?: string | null
+          profession_role?: string | null
           psychologist_id?: string
+          recording_authorization?: string | null
+          religion?: string | null
           rg?: string | null
+          rg_issuer?: string | null
+          siblings_brothers?: number | null
+          siblings_sisters?: number | null
+          signature_device?: string | null
+          signature_ip?: string | null
+          signature_timestamp?: string | null
+          social_name?: string | null
+          spouse_name?: string | null
+          spouse_relationship_time?: string | null
           state?: string | null
           status?: string | null
           street?: string | null
@@ -1053,6 +1148,7 @@ export type Database = {
           updated_at?: string | null
           uploaded_documents?: Json | null
           user_id?: string | null
+          uses_medication?: boolean | null
           whatsapp_phone?: string | null
         }
         Relationships: [
