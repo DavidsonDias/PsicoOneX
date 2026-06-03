@@ -51,12 +51,17 @@ Deno.serve(async (req) => {
     if (req.method === "POST") {
       const body = await req.json();
       const { documents, ...patientData } = body;
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim()
+        || req.headers.get("cf-connecting-ip")
+        || req.headers.get("x-real-ip")
+        || null;
 
       // Update patient
       const { error: upErr } = await supabase
         .from("patients")
         .update({
           ...patientData,
+          signature_ip: ip,
           uploaded_documents: documents || [],
           onboarding_status: "review",
           onboarding_completed_at: new Date().toISOString(),
