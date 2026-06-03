@@ -158,6 +158,10 @@ export function PatientForm({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const optional = (k: string) => {
+      const v = fd.get(k);
+      return v ? String(v) : undefined;
+    };
     onSubmit({
       full_name: fd.get("full_name") as string,
       email: (fd.get("email") as string) || "",
@@ -172,6 +176,15 @@ export function PatientForm({
       payment_day: (fd.get("payment_day") as string) || "",
       monthly_plan_value: monthlyPlan,
       frequency,
+      social_name: optional("social_name"),
+      birth_place: optional("birth_place"),
+      gender: optional("gender"),
+      marital_status: optional("marital_status"),
+      rg: optional("rg"),
+      rg_issuer: optional("rg_issuer"),
+      profession: optional("profession"),
+      education_level: optional("education_level"),
+      initial_demand: optional("initial_demand"),
     });
   };
 
