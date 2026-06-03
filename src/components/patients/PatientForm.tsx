@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DollarSign, CheckCircle2, Info, Repeat } from "lucide-react";
+import { DollarSign, CheckCircle2, Info, Repeat, ChevronDown, FileHeart } from "lucide-react";
 
 export type SessionFrequency = "semanal" | "quinzenal" | "mensal" | "avulso";
 
