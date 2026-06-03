@@ -25,6 +25,15 @@ export interface PatientFormData {
   payment_day: string;
   monthly_plan_value: string;
   frequency: SessionFrequency;
+  social_name?: string;
+  birth_place?: string;
+  gender?: string;
+  marital_status?: string;
+  rg?: string;
+  rg_issuer?: string;
+  profession?: string;
+  education_level?: string;
+  initial_demand?: string;
 }
 
 interface PatientFormProps {
