@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DollarSign, CheckCircle2, Info, Repeat } from "lucide-react";
+import { DollarSign, CheckCircle2, Info, Repeat, ChevronDown, FileHeart } from "lucide-react";
 
 export type SessionFrequency = "semanal" | "quinzenal" | "mensal" | "avulso";
 
@@ -24,6 +25,15 @@ export interface PatientFormData {
   payment_day: string;
   monthly_plan_value: string;
   frequency: SessionFrequency;
+  social_name?: string;
+  birth_place?: string;
+  gender?: string;
+  marital_status?: string;
+  rg?: string;
+  rg_issuer?: string;
+  profession?: string;
+  education_level?: string;
+  initial_demand?: string;
 }
 
 interface PatientFormProps {
@@ -148,6 +158,10 @@ export function PatientForm({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const optional = (k: string) => {
+      const v = fd.get(k);
+      return v ? String(v) : undefined;
+    };
     onSubmit({
       full_name: fd.get("full_name") as string,
       email: (fd.get("email") as string) || "",
@@ -162,6 +176,15 @@ export function PatientForm({
       payment_day: (fd.get("payment_day") as string) || "",
       monthly_plan_value: monthlyPlan,
       frequency,
+      social_name: optional("social_name"),
+      birth_place: optional("birth_place"),
+      gender: optional("gender"),
+      marital_status: optional("marital_status"),
+      rg: optional("rg"),
+      rg_issuer: optional("rg_issuer"),
+      profession: optional("profession"),
+      education_level: optional("education_level"),
+      initial_demand: optional("initial_demand"),
     });
   };
 
@@ -304,6 +327,70 @@ export function PatientForm({
         <Label htmlFor="notes">Observações</Label>
         <Textarea id="notes" name="notes" rows={3} placeholder="Observações sobre o paciente..." defaultValue={initialData?.notes} />
       </div>
+
+      {!compact && (
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="outline" className="w-full justify-between">
+              <span className="flex items-center gap-2"><FileHeart className="h-4 w-4" /> Ficha Clínica Completa (opcional)</span>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 pt-4">
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Nome social</Label><Input name="social_name" defaultValue={(initialData as any)?.social_name} /></div>
+              <div className="space-y-2"><Label>Naturalidade</Label><Input name="birth_place" defaultValue={(initialData as any)?.birth_place} placeholder="Cidade de nascimento" /></div>
+              <div className="space-y-2"><Label>Gênero</Label>
+                <Select name="gender" defaultValue={(initialData as any)?.gender || ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="feminino">Feminino</SelectItem>
+                    <SelectItem value="masculino">Masculino</SelectItem>
+                    <SelectItem value="nao_binario">Não-binário</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                    <SelectItem value="prefiro_nao_dizer">Prefiro não dizer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Estado civil</Label>
+                <Select name="marital_status" defaultValue={(initialData as any)?.marital_status || ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                    <SelectItem value="casado">Casado(a)</SelectItem>
+                    <SelectItem value="uniao_estavel">União estável</SelectItem>
+                    <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                    <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>RG</Label><Input name="rg" defaultValue={(initialData as any)?.rg} /></div>
+              <div className="space-y-2"><Label>Órgão expedidor</Label><Input name="rg_issuer" defaultValue={(initialData as any)?.rg_issuer} placeholder="SSP/SP" /></div>
+              <div className="space-y-2"><Label>Profissão</Label><Input name="profession" defaultValue={(initialData as any)?.profession} /></div>
+              <div className="space-y-2"><Label>Escolaridade</Label>
+                <Select name="education_level" defaultValue={(initialData as any)?.education_level || ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fund_inc">Fundamental Incompleto</SelectItem>
+                    <SelectItem value="fund_comp">Fundamental Completo</SelectItem>
+                    <SelectItem value="medio_inc">Médio Incompleto</SelectItem>
+                    <SelectItem value="medio_comp">Médio Completo</SelectItem>
+                    <SelectItem value="sup_inc">Superior Incompleto</SelectItem>
+                    <SelectItem value="sup_comp">Superior Completo</SelectItem>
+                    <SelectItem value="pos">Pós-graduação</SelectItem>
+                    <SelectItem value="mestrado">Mestrado</SelectItem>
+                    <SelectItem value="doutorado">Doutorado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Demanda inicial</Label>
+              <Textarea name="initial_demand" rows={3} placeholder="Motivo da procura por atendimento psicológico..." defaultValue={(initialData as any)?.initial_demand} />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
 
       {extraContent}
 

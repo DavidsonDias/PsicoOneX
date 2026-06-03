@@ -245,6 +245,15 @@ export default function Patients() {
         default_session_value: formValues.default_session_value ? parseFloat(formValues.default_session_value) : null,
         payment_day: formValues.payment_day ? parseInt(formValues.payment_day) : null,
         monthly_plan_value: formValues.monthly_plan_value ? parseFloat(formValues.monthly_plan_value) : null,
+        social_name: formValues.social_name || null,
+        birth_place: formValues.birth_place || null,
+        gender: formValues.gender || null,
+        marital_status: formValues.marital_status || null,
+        rg: formValues.rg || null,
+        rg_issuer: formValues.rg_issuer || null,
+        profession: formValues.profession || null,
+        education_level: formValues.education_level || null,
+        initial_demand: formValues.initial_demand || null,
       } as any).select().single();
 
       if (error) throw error;
@@ -343,6 +352,15 @@ export default function Patients() {
         default_session_value: formValues.default_session_value ? parseFloat(formValues.default_session_value) : null,
         payment_day: formValues.payment_day ? parseInt(formValues.payment_day) : null,
         monthly_plan_value: formValues.monthly_plan_value ? parseFloat(formValues.monthly_plan_value) : null,
+        social_name: formValues.social_name || null,
+        birth_place: formValues.birth_place || null,
+        gender: formValues.gender || null,
+        marital_status: formValues.marital_status || null,
+        rg: formValues.rg || null,
+        rg_issuer: formValues.rg_issuer || null,
+        profession: formValues.profession || null,
+        education_level: formValues.education_level || null,
+        initial_demand: formValues.initial_demand || null,
       } as any).eq("id", editingPatient.id);
       if (error) throw error;
       toast.success("Paciente atualizado com sucesso!");
@@ -790,6 +808,15 @@ export default function Patients() {
                   default_session_value: editingPatient.default_session_value != null ? String(editingPatient.default_session_value) : "",
                   payment_day: editingPatient.payment_day != null ? String(editingPatient.payment_day) : "",
                   monthly_plan_value: editingPatient.monthly_plan_value != null ? String(editingPatient.monthly_plan_value) : "",
+                  social_name: (editingPatient as any).social_name || "",
+                  birth_place: (editingPatient as any).birth_place || "",
+                  gender: (editingPatient as any).gender || "",
+                  marital_status: (editingPatient as any).marital_status || "",
+                  rg: (editingPatient as any).rg || "",
+                  rg_issuer: (editingPatient as any).rg_issuer || "",
+                  profession: (editingPatient as any).profession || "",
+                  education_level: (editingPatient as any).education_level || "",
+                  initial_demand: (editingPatient as any).initial_demand || "",
                 }}
                 onSubmit={handleEditPatientFromForm}
                 submitLabel="Salvar"
