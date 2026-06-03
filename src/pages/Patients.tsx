@@ -808,6 +808,15 @@ export default function Patients() {
                   default_session_value: editingPatient.default_session_value != null ? String(editingPatient.default_session_value) : "",
                   payment_day: editingPatient.payment_day != null ? String(editingPatient.payment_day) : "",
                   monthly_plan_value: editingPatient.monthly_plan_value != null ? String(editingPatient.monthly_plan_value) : "",
+                  social_name: (editingPatient as any).social_name || "",
+                  birth_place: (editingPatient as any).birth_place || "",
+                  gender: (editingPatient as any).gender || "",
+                  marital_status: (editingPatient as any).marital_status || "",
+                  rg: (editingPatient as any).rg || "",
+                  rg_issuer: (editingPatient as any).rg_issuer || "",
+                  profession: (editingPatient as any).profession || "",
+                  education_level: (editingPatient as any).education_level || "",
+                  initial_demand: (editingPatient as any).initial_demand || "",
                 }}
                 onSubmit={handleEditPatientFromForm}
                 submitLabel="Salvar"
