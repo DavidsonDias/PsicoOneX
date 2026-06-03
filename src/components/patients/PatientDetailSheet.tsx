@@ -169,6 +169,33 @@ interface PatientDetailSheetProps {
            </TabsList>
  
            <TabsContent value="info" className="space-y-4 mt-4">
+             {patient.onboarding_status === "review" && (
+               <Card className="border-amber-500/40 bg-amber-500/5">
+                 <CardHeader className="pb-2">
+                   <CardTitle className="text-sm font-medium text-amber-700 flex items-center gap-2">
+                     <AlertCircle className="h-4 w-4" /> Cadastro aguardando revisão
+                   </CardTitle>
+                 </CardHeader>
+                 <CardContent className="space-y-3">
+                   <p className="text-xs text-muted-foreground">O paciente concluiu o preenchimento da ficha. Revise as informações e aprove para continuar.</p>
+                   <div className="flex gap-2">
+                     <Button size="sm" onClick={async () => {
+                       const { error } = await supabase.from("patients").update({ onboarding_status: "approved" } as any).eq("id", patient.id);
+                       if (error) return toast.error("Erro ao aprovar");
+                       toast.success("Cadastro aprovado");
+                       onClose();
+                     }}>Aprovar</Button>
+                     <Button size="sm" variant="outline" onClick={onEdit}>Revisar dados</Button>
+                     <Button size="sm" variant="ghost" onClick={async () => {
+                       const { error } = await supabase.from("patients").update({ onboarding_status: "pending" } as any).eq("id", patient.id);
+                       if (error) return toast.error("Erro ao solicitar correção");
+                       toast.success("Solicitação de correção registrada");
+                       onClose();
+                     }}>Solicitar correção</Button>
+                   </div>
+                 </CardContent>
+               </Card>
+             )}
              <Card>
                <CardHeader className="pb-3">
                  <CardTitle className="text-sm font-medium text-muted-foreground">Contato</CardTitle>
