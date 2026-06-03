@@ -28,6 +28,8 @@ interface Patient {
   user_id?: string | null;
   portal_activated_at?: string | null;
   created_at?: string;
+  onboarding_status?: string | null;
+  onboarding_completed_at?: string | null;
 }
 
 interface PatientDetailSheetProps {
