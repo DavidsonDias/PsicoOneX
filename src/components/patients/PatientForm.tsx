@@ -306,6 +306,70 @@ export function PatientForm({
         <Textarea id="notes" name="notes" rows={3} placeholder="Observações sobre o paciente..." defaultValue={initialData?.notes} />
       </div>
 
+      {!compact && (
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="outline" className="w-full justify-between">
+              <span className="flex items-center gap-2"><FileHeart className="h-4 w-4" /> Ficha Clínica Completa (opcional)</span>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 pt-4">
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Nome social</Label><Input name="social_name" defaultValue={(initialData as any)?.social_name} /></div>
+              <div className="space-y-2"><Label>Naturalidade</Label><Input name="birth_place" defaultValue={(initialData as any)?.birth_place} placeholder="Cidade de nascimento" /></div>
+              <div className="space-y-2"><Label>Gênero</Label>
+                <Select name="gender" defaultValue={(initialData as any)?.gender || ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="feminino">Feminino</SelectItem>
+                    <SelectItem value="masculino">Masculino</SelectItem>
+                    <SelectItem value="nao_binario">Não-binário</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                    <SelectItem value="prefiro_nao_dizer">Prefiro não dizer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Estado civil</Label>
+                <Select name="marital_status" defaultValue={(initialData as any)?.marital_status || ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                    <SelectItem value="casado">Casado(a)</SelectItem>
+                    <SelectItem value="uniao_estavel">União estável</SelectItem>
+                    <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                    <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>RG</Label><Input name="rg" defaultValue={(initialData as any)?.rg} /></div>
+              <div className="space-y-2"><Label>Órgão expedidor</Label><Input name="rg_issuer" defaultValue={(initialData as any)?.rg_issuer} placeholder="SSP/SP" /></div>
+              <div className="space-y-2"><Label>Profissão</Label><Input name="profession" defaultValue={(initialData as any)?.profession} /></div>
+              <div className="space-y-2"><Label>Escolaridade</Label>
+                <Select name="education_level" defaultValue={(initialData as any)?.education_level || ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fund_inc">Fundamental Incompleto</SelectItem>
+                    <SelectItem value="fund_comp">Fundamental Completo</SelectItem>
+                    <SelectItem value="medio_inc">Médio Incompleto</SelectItem>
+                    <SelectItem value="medio_comp">Médio Completo</SelectItem>
+                    <SelectItem value="sup_inc">Superior Incompleto</SelectItem>
+                    <SelectItem value="sup_comp">Superior Completo</SelectItem>
+                    <SelectItem value="pos">Pós-graduação</SelectItem>
+                    <SelectItem value="mestrado">Mestrado</SelectItem>
+                    <SelectItem value="doutorado">Doutorado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Demanda inicial</Label>
+              <Textarea name="initial_demand" rows={3} placeholder="Motivo da procura por atendimento psicológico..." defaultValue={(initialData as any)?.initial_demand} />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {extraContent}
 
       <div className="flex justify-end gap-2 pt-4">
