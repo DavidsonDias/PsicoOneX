@@ -21,8 +21,10 @@ import { PatientDocumentsTab } from "@/components/patient-profile/PatientDocumen
 import { PatientClinicalProfile } from "@/components/patient-profile/PatientClinicalProfile";
 import { PatientUnifiedTimeline } from "@/components/patient-profile/PatientUnifiedTimeline";
 import { PatientAttachmentsCenter } from "@/components/patient-profile/PatientAttachmentsCenter";
+import { PatientFullRecord } from "@/components/patient-profile/PatientFullRecord";
 import { PatientInviteButton } from "@/components/patients/PatientInviteButton";
 import { SendOnboardingButton } from "@/components/patients/SendOnboardingButton";
+import { ClipboardList } from "lucide-react";
 
 export interface PatientFull {
   id: string;
