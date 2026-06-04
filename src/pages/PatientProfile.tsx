@@ -267,6 +267,9 @@ export default function PatientProfile() {
             <TabsContent value="overview" className="mt-0">
               <PatientOverviewTab patient={patient} />
             </TabsContent>
+            <TabsContent value="fullrecord" className="mt-0">
+              <PatientFullRecord patientId={patient.id} onEdit={() => setEditOpen(true)} />
+            </TabsContent>
             <TabsContent value="timeline" className="mt-0">
               <PatientUnifiedTimeline patientId={patient.id} patientName={patient.full_name} />
             </TabsContent>
