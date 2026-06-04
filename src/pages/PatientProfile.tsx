@@ -21,8 +21,10 @@ import { PatientDocumentsTab } from "@/components/patient-profile/PatientDocumen
 import { PatientClinicalProfile } from "@/components/patient-profile/PatientClinicalProfile";
 import { PatientUnifiedTimeline } from "@/components/patient-profile/PatientUnifiedTimeline";
 import { PatientAttachmentsCenter } from "@/components/patient-profile/PatientAttachmentsCenter";
+import { PatientFullRecord } from "@/components/patient-profile/PatientFullRecord";
 import { PatientInviteButton } from "@/components/patients/PatientInviteButton";
 import { SendOnboardingButton } from "@/components/patients/SendOnboardingButton";
+import { ClipboardList } from "lucide-react";
 
 export interface PatientFull {
   id: string;
@@ -163,6 +165,7 @@ export default function PatientProfile() {
 
   const tabItems = [
     { value: "overview", label: "Visão Geral", icon: User },
+    { value: "fullrecord", label: "Cadastro", icon: ClipboardList },
     { value: "timeline", label: "Timeline", icon: Activity },
     { value: "clinical", label: "Perfil IA", icon: Brain },
     { value: "records", label: "Prontuários", icon: FileText },
@@ -241,7 +244,7 @@ export default function PatientProfile() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-4 sm:grid-cols-8 h-auto gap-1">
+          <TabsList className="w-full grid grid-cols-3 sm:grid-cols-9 h-auto gap-1">
             {tabItems.map((tab) => (
               <TabsTrigger
                 key={tab.value}
@@ -263,6 +266,9 @@ export default function PatientProfile() {
           >
             <TabsContent value="overview" className="mt-0">
               <PatientOverviewTab patient={patient} />
+            </TabsContent>
+            <TabsContent value="fullrecord" className="mt-0">
+              <PatientFullRecord patientId={patient.id} onEdit={() => setEditOpen(true)} />
             </TabsContent>
             <TabsContent value="timeline" className="mt-0">
               <PatientUnifiedTimeline patientId={patient.id} patientName={patient.full_name} />
