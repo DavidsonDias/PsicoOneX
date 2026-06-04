@@ -113,6 +113,7 @@ interface PatientFullData {
   onboarding_completed_at: string | null;
   health_plan: string | null;
   health_plan_id: string | null;
+  user_id: string | null;
 }
 
 interface Props {
