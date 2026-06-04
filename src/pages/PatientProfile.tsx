@@ -244,7 +244,7 @@ export default function PatientProfile() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-4 sm:grid-cols-8 h-auto gap-1">
+          <TabsList className="w-full grid grid-cols-3 sm:grid-cols-9 h-auto gap-1">
             {tabItems.map((tab) => (
               <TabsTrigger
                 key={tab.value}
