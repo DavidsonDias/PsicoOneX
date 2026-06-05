@@ -415,13 +415,16 @@ export default function Agenda() {
         duration_minutes: parseInt(formData.duration),
         status: formData.status,
         session_value: parseFloat(formData.session_value) || 200,
+        recurrence_type: formData.recurrence_enabled ? formData.recurrence_type : null,
       } as any)
       .eq("id", editingAppointment.id);
 
     if (error) {
-      toast.error("Erro ao atualizar agendamento");
+      console.error("[Agenda] update error:", error);
+      toast.error((error as any)?.message ? `Erro: ${(error as any).message}` : "Erro ao atualizar agendamento");
       return;
     }
+
 
     await supabase.from("audit_logs").insert({
       user_id: userId,
