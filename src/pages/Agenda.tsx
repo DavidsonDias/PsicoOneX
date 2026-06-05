@@ -612,7 +612,7 @@ export default function Agenda() {
         duration: String(appointment.duration_minutes || 50),
         status: appointment.status || "scheduled",
         session_value: String(appointment.session_value || 200),
-        recurrence_enabled: false,
+        recurrence_enabled: !!(appointment.recurrence_type || (appointment as any).recurrence_parent_id),
         recurrence_type: appointment.recurrence_type || "weekly",
         recurrence_count: "4",
       });
