@@ -278,8 +278,23 @@ export default function Agenda() {
       .single();
 
     if (error) {
-      toast.error("Erro ao criar agendamento");
-      console.error(error);
+      console.error("[Agenda] insert error:", error);
+      const msg = (error as any)?.message || "";
+      let friendly = "Erro ao criar agendamento";
+      if (/duplicate key/i.test(msg) && /room_token/i.test(msg)) {
+        friendly = "Conflito na sala de teleatendimento do paciente. Recarregue a página e tente novamente.";
+      } else if (/violates row-level security/i.test(msg)) {
+        friendly = "Sem permissão para criar este agendamento.";
+      } else if (/violates foreign key/i.test(msg) && /patient/i.test(msg)) {
+        friendly = "Paciente inválido ou removido.";
+      } else if (/null value in column/i.test(msg)) {
+        friendly = "Preencha todos os campos obrigatórios.";
+      } else if (/check constraint/i.test(msg)) {
+        friendly = "Dados inválidos no agendamento.";
+      } else if (msg) {
+        friendly = `Erro: ${msg}`;
+      }
+      toast.error(friendly);
       setCreating(false);
       return;
     }
