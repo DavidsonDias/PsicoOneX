@@ -278,8 +278,23 @@ export default function Agenda() {
       .single();
 
     if (error) {
-      toast.error("Erro ao criar agendamento");
-      console.error(error);
+      console.error("[Agenda] insert error:", error);
+      const msg = (error as any)?.message || "";
+      let friendly = "Erro ao criar agendamento";
+      if (/duplicate key/i.test(msg) && /room_token/i.test(msg)) {
+        friendly = "Conflito na sala de teleatendimento do paciente. Recarregue a página e tente novamente.";
+      } else if (/violates row-level security/i.test(msg)) {
+        friendly = "Sem permissão para criar este agendamento.";
+      } else if (/violates foreign key/i.test(msg) && /patient/i.test(msg)) {
+        friendly = "Paciente inválido ou removido.";
+      } else if (/null value in column/i.test(msg)) {
+        friendly = "Preencha todos os campos obrigatórios.";
+      } else if (/check constraint/i.test(msg)) {
+        friendly = "Dados inválidos no agendamento.";
+      } else if (msg) {
+        friendly = `Erro: ${msg}`;
+      }
+      toast.error(friendly);
       setCreating(false);
       return;
     }
@@ -400,13 +415,16 @@ export default function Agenda() {
         duration_minutes: parseInt(formData.duration),
         status: formData.status,
         session_value: parseFloat(formData.session_value) || 200,
+        recurrence_type: formData.recurrence_enabled ? formData.recurrence_type : null,
       } as any)
       .eq("id", editingAppointment.id);
 
     if (error) {
-      toast.error("Erro ao atualizar agendamento");
+      console.error("[Agenda] update error:", error);
+      toast.error((error as any)?.message ? `Erro: ${(error as any).message}` : "Erro ao atualizar agendamento");
       return;
     }
+
 
     await supabase.from("audit_logs").insert({
       user_id: userId,
@@ -597,7 +615,7 @@ export default function Agenda() {
         duration: String(appointment.duration_minutes || 50),
         status: appointment.status || "scheduled",
         session_value: String(appointment.session_value || 200),
-        recurrence_enabled: false,
+        recurrence_enabled: !!(appointment.recurrence_type || (appointment as any).recurrence_parent_id),
         recurrence_type: appointment.recurrence_type || "weekly",
         recurrence_count: "4",
       });
