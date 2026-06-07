@@ -112,6 +112,8 @@ export type Database = {
           patient_id: string
           psychologist_id: string
           recurrence_end_date: string | null
+          recurrence_extended_until: string | null
+          recurrence_open_ended: boolean
           recurrence_parent_id: string | null
           recurrence_type: string | null
           reminder_sent: boolean | null
@@ -137,6 +139,8 @@ export type Database = {
           patient_id: string
           psychologist_id: string
           recurrence_end_date?: string | null
+          recurrence_extended_until?: string | null
+          recurrence_open_ended?: boolean
           recurrence_parent_id?: string | null
           recurrence_type?: string | null
           reminder_sent?: boolean | null
@@ -162,6 +166,8 @@ export type Database = {
           patient_id?: string
           psychologist_id?: string
           recurrence_end_date?: string | null
+          recurrence_extended_until?: string | null
+          recurrence_open_ended?: boolean
           recurrence_parent_id?: string | null
           recurrence_type?: string | null
           reminder_sent?: boolean | null
@@ -795,6 +801,71 @@ export type Database = {
           },
           {
             foreignKeyName: "patient_access_links_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_billing_plans: {
+        Row: {
+          active: boolean
+          amount: number
+          billing_type: string
+          created_at: string
+          day_of_month: number | null
+          deleted_at: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          last_generated_at: string | null
+          patient_id: string
+          payment_method: string | null
+          psychologist_id: string
+          sessions_per_cycle: number | null
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          billing_type: string
+          created_at?: string
+          day_of_month?: number | null
+          deleted_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          last_generated_at?: string | null
+          patient_id: string
+          payment_method?: string | null
+          psychologist_id: string
+          sessions_per_cycle?: number | null
+          start_date?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          billing_type?: string
+          created_at?: string
+          day_of_month?: number | null
+          deleted_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          last_generated_at?: string | null
+          patient_id?: string
+          payment_method?: string | null
+          psychologist_id?: string
+          sessions_per_cycle?: number | null
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_billing_plans_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"

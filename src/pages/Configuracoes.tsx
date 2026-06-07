@@ -21,6 +21,7 @@ import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSett
 import WhatsAppLogsPanel from "@/components/settings/WhatsAppLogsPanel";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PluginManager as PluginManagerComponent } from "@/components/settings/PluginManager";
+import { AccessibilitySettings } from "@/components/settings/AccessibilitySettings";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -1221,7 +1222,8 @@ export default function Configuracoes() {
         </TabsContent>
 
         {/* ── PLUGINS ── */}
-        <TabsContent value="plugins">
+        <TabsContent value="plugins" className="space-y-4">
+          <AccessibilitySettings />
           <PluginManagerComponent />
         </TabsContent>
       </Tabs>

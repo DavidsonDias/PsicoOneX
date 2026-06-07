@@ -334,8 +334,19 @@ export default function Agenda() {
     });
 
     if (formData.recurrence_enabled && mainAppointment) {
-      const count = parseInt(formData.recurrence_count) || 4;
+      const isOpenEnded = formData.recurrence_count === "open";
+      // Janela inicial: 90 dias para indeterminada, caso contrário N sessões
+      const count = isOpenEnded
+        ? Math.ceil(90 / (formData.recurrence_type === "weekly" ? 7 : formData.recurrence_type === "biweekly" ? 14 : 30))
+        : parseInt(formData.recurrence_count) || 4;
       const recurrenceDates = generateRecurrenceDates(formData.date, formData.time, formData.recurrence_type, count);
+
+      if (isOpenEnded) {
+        await supabase.from("appointments").update({
+          recurrence_open_ended: true,
+          recurrence_extended_until: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
+        } as any).eq("id", mainAppointment.id);
+      }
 
       for (const date of recurrenceDates) {
         const childConflicts = checkConflicts(
@@ -359,7 +370,6 @@ export default function Agenda() {
             session_value: sessionValue,
             appointment_id: childApt.id,
           });
-          // Sync recurring appointment to Google Calendar
           const patient = patients.find(p => p.id === formData.patient_id);
           syncAppointmentToGoogle("create", {
             id: childApt.id,
@@ -371,7 +381,9 @@ export default function Agenda() {
           });
         }
       }
-      toast.success(`Série de ${count} agendamentos criada!`);
+      toast.success(isOpenEnded
+        ? `Série indeterminada criada (${recurrenceDates.length} sessões iniciais — extensão automática)`
+        : `Série de ${count} agendamentos criada!`);
     } else {
       toast.success("Agendamento criado!");
     }
@@ -982,8 +994,14 @@ export default function Agenda() {
                       {[2, 4, 8, 12, 16, 24].map(n => (
                         <SelectItem key={n} value={String(n)}>{n} sessões</SelectItem>
                       ))}
+                      <SelectItem value="open">Sem prazo (indeterminada)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {formData.recurrence_count === "open" && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Sessões geradas automaticamente em janela de 90 dias.
+                    </p>
+                  )}
                 </div>
               </motion.div>
             )}
