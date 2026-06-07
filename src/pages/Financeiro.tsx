@@ -33,6 +33,7 @@ import { FinancialProjections } from "@/components/financial/FinancialProjection
 import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
 import { FinancialGrowth } from "@/components/financial/FinancialGrowth";
 import { RecurringBillingsPanel } from "@/components/financial/RecurringBillingsPanel";
+import { BillingPlansPanel } from "@/components/financial/BillingPlansPanel";
 import { OverdueSemaforo } from "@/components/financial/OverdueSemaforo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1067,6 +1068,7 @@ export default function Financeiro() {
               }
             }}
           />
+          <BillingPlansPanel patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))} />
           <RecurringBillingsPanel />
         </TabsContent>
 
