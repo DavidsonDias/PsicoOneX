@@ -982,8 +982,14 @@ export default function Agenda() {
                       {[2, 4, 8, 12, 16, 24].map(n => (
                         <SelectItem key={n} value={String(n)}>{n} sessões</SelectItem>
                       ))}
+                      <SelectItem value="open">Sem prazo (indeterminada)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {formData.recurrence_count === "open" && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Sessões geradas automaticamente em janela de 90 dias.
+                    </p>
+                  )}
                 </div>
               </motion.div>
             )}
