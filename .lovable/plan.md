@@ -1,83 +1,70 @@
+# Auditoria Enterprise PsicoOne — Plano de Execução
 
-# 🗺️ Roadmap PsicoOne Enterprise — 8 fases
-
-Cada fase é independente, entregável e testável. Eu só inicio a próxima depois do seu OK.
-
----
-
-## FASE 1 — Self-Onboarding do Paciente 🧑‍⚕️
-**Entrega:** psicólogo cria cadastro mínimo (nome/email/telefone) → gera link seguro → paciente preenche tudo sozinho.
-
-**Backend**
-- Nova tabela `patient_onboarding_tokens` (token único, expiração configurável 24h/48h/72h/7d, status `pending|used|expired|revoked`, RLS).
-- Colunas extras em `patients`: `rg`, `gender`, `marital_status`, `whatsapp`, `cep`, `street`, `number`, `complement`, `neighborhood`, `city`, `state`, `profession`, `company`, `education`, `emergency_relationship`, `health_plan`, `health_plan_id`, `health_plan_expiry`, `onboarding_status` (`not_sent|pending|review|completed`), `onboarding_completed_at`, `lgpd_signature_data`, `lgpd_signed_at`.
-- Bucket storage `patient-documents` (RG/CPF/CNH/convênio) com RLS por paciente.
-- Edge function `patient-onboarding` (público via token): GET retorna paciente, POST salva dados + arquivos + assinatura.
-
-**Frontend**
-- Botão **"Enviar formulário para completar cadastro"** no `PatientForm` + `PatientDetailSheet`.
-- Modal de geração de link (escolher validade + copiar/enviar por WhatsApp/email).
-- Página pública `/onboarding/:token` — wizard de 6 passos (Pessoal → Contato → Endereço com auto-CEP → Profissional → Emergência → Convênio → Docs → Assinatura LGPD canvas).
-- Badge "🟡 Aguardando revisão" no card do paciente + notificação para psicólogo + botão "Revisar informações".
+Escopo amplo. Vou entregar em **6 ondas** (waves), cada uma testável. Você pode aprovar tudo ou pedir para começar por uma onda específica.
 
 ---
 
-## FASE 2 — Prontuário Enterprise 📄
-- **Timeline clínica unificada** (consultas + evoluções + anexos + pagamentos em ordem cronológica) no `PatientProfile`.
-- **Busca global** com debounce em todos os campos do prontuário (já existe `SmartSearch`, estendo).
-- **Favoritos** — flag `is_favorite` em `medical_records`, estrela no `RecordCard`.
-- **Central de anexos** — nova aba agrupando todos os arquivos do paciente com filtros (PDF/imagem/exame).
-- **IA clínica** — botão "Resumo dos últimos 30 dias" usando `clinical-ai` edge function já existente.
+## Wave 1 — Separação Agenda × Financeiro + Recorrência Indeterminada
+
+**Problema:** hoje recorrência da agenda e do financeiro se misturam no mesmo formulário.
+
+- **Agenda** (`AppointmentForm`) passa a controlar APENAS: data, hora, duração, tipo, frequência da sessão, recorrência (única, semanal, quinzenal, mensal, personalizada, **indeterminada**).
+- Novo modo `indeterminada` → gera sessões em janela rolante de 90 dias via job diário (`extend-recurring-appointments` edge function + pg_cron).
+- **Financeiro** (`TransactionForm`) ganha módulo próprio "Plano de Cobrança" por paciente: por sessão / semanal / quinzenal / mensal, com valor base e regra de geração independente.
+- Tabela nova `patient_billing_plans` (patient_id, billing_type, amount, day_of_month, active, …).
+- Edge function `generate-billing-cycle` roda diariamente e cria `financial_transactions` conforme o plano.
+
+## Wave 2 — Motor de Validação Inteligente (IA)
+
+- Novo hook `useConsistencyCheck` chamado antes de salvar paciente/agendamento/cobrança.
+- Edge function `validate-consistency` (Lovable AI gemini-2.5-flash) recebe payload e retorna inconsistências + correção sugerida.
+- Diálogo `ConsistencyDialog` mostra: "4 sessões/mês × R$100 = R$400. Valor informado R$200. Corrigir?".
+- Casos cobertos: valor financeiro vs frequência da agenda, CPF/telefone/CEP inválidos, horário incomum (<7h ou >22h), conflito de agenda, duração incoerente.
+
+## Wave 3 — Assistente IA Operacional
+
+- **Cadastro de paciente:** badge "IA detectou X campos importantes faltando" + botão "Solicitar atualização" (dispara onboarding parcial via email).
+- **Agendamento:** aviso inline de conflito / horário incomum / sobreposição via mesma função.
+- **Financeiro:** card "Risco de inadimplência" no perfil do paciente (calcula atrasos últimos 60 dias, sugere lembrete automático). Reaproveita `proactive-insights`.
+
+## Wave 4 — Responsividade Enterprise + Acessibilidade
+
+- Auditoria de todas as telas listadas usando breakpoints 320 / 360 / 375 / 412 / 768 / 1024 / 1440.
+- Substituir `text-*` fixos críticos por `clamp()` via classe utilitária `text-fluid-*` no `tailwind.config.ts`.
+- Adicionar guard `overflow-x-hidden` em layouts raiz.
+- Novo `AccessibilitySettings` em Configurações: Fonte normal / grande / extra grande (multiplica `--font-scale` no `:root`).
+- Garantir tap-targets ≥44px nos botões `size="icon"` críticos.
+
+## Wave 5 — Datas, Timezone e Logs Enterprise
+
+- Helper único `src/lib/datetime.ts` forçando `America/Sao_Paulo` em todas formatações (date-fns-tz).
+- Auditoria de todos `format()` e `new Date()` para uso do helper.
+- Tabela `audit_logs` já existe — adicionar triggers em `patients`, `medical_records`, `appointments`, `financial_transactions` para registrar INSERT/UPDATE/DELETE com diff JSON.
+- Nova aba "Histórico" no perfil do paciente exibindo Quem / Quando / O que alterou.
+
+## Wave 6 — Dashboard Inteligente + Redução de Cliques
+
+- Novos widgets no `CustomizableDashboard`: Próxima sessão, Receita prevista vs recebida, Inadimplência, Pacientes sem sessão há +30d.
+- Insights IA reaproveitando `proactive-insights` com novos prompts.
+- Atalhos de teclado globais (`n` paciente, `a` agendamento, `f` cobrança) já parcialmente em `CommandPalette` — expandir.
+- Remover etapas duplicadas detectadas em PatientForm/AppointmentForm (campos repetidos entre wizards).
 
 ---
 
-## FASE 3 — Financeiro Enterprise + Stripe 💰
-- Habilito Stripe (test mode) via `enable_stripe_payments`.
-- Edge functions: `create-payment-link` (PIX/cartão para cobrança avulsa) e `create-recurring-charge`.
-- Coluna `payment_link_url`, `stripe_invoice_id` em `financial_transactions`.
-- UI: botão "Gerar link de cobrança" no `TransactionList`, semáforo de inadimplência (🟢🟡🔴).
-- Dashboard financeiro: faturamento mensal, ticket médio, receita prevista vs recebida, % inadimplência.
+## Detalhes técnicos
+
+- Migrations: `patient_billing_plans`, triggers de auditoria, índice em `appointments(scheduled_at, psychologist_id)` para validação rápida de conflito.
+- Edge functions novas: `extend-recurring-appointments`, `generate-billing-cycle`, `validate-consistency`.
+- pg_cron: agendar as duas primeiras (diário 03:00 BRT).
+- Sem mudanças em telehealth/onboarding já entregues.
+- Modelos IA: `google/gemini-2.5-flash` (validação) e `google/gemini-2.5-flash-lite` (insights leves).
 
 ---
 
-## FASE 4 — Teleatendimento Enterprise 🎥
-- **Sala permanente por paciente** (reusar `room_token` em todas as sessões do mesmo paciente).
-- **Sala de espera** já existe — adiciono polling + som de notificação para psicólogo.
-- **Lembrete 15min antes** via edge function agendada (`send-appointment-reminders` já existe — adiciono janela de 15min).
-- **Anotações privadas em tempo real** durante a sessão (salva no `medical_records` rascunho).
-- **Resumo pós-sessão** automático (já existe `summarize-session` — adiciono CTA ao final).
+## Como prefere prosseguir?
 
----
+1. **"Executar tudo"** — entrego as 6 waves em sequência (várias mensagens, ~migrations grandes).
+2. **"Começar pela Wave N"** — foco só nela primeiro.
+3. **"Ajustar plano"** — me diga o que mudar antes de implementar.
 
-## FASE 5 — Portal do Paciente 3.0 📲
-- Aba **Meu Financeiro** (lista de pagamentos, recibos PDF, links de cobrança pendentes).
-- Aba **Documentos** (contratos assinados, recibos).
-- Aba **Solicitações** (reagendamento/cancelamento usa `appointment_requests` já existente — UI nova).
-- Edição de perfil (endereço, telefone, contato de emergência).
-
----
-
-## FASE 6 — Central de Notificações Unificada 🔔
-- Refator do `notifications` para suportar 5 categorias: lembrete, reagendamento, confirmação, pagamento, documento.
-- Preferências por canal (email/WhatsApp/push) por categoria.
-- Push web via Service Worker (PWA já existe).
-
----
-
-## FASE 7 — Dashboard Executivo 📈
-- Novos widgets na `CustomizableDashboard`: Hoje (sessões/cancelamentos/no-show), Financeiro (recebido/previsto/atrasado), Pacientes (ativos/novos/aniversariantes), Teleatendimento (online/tempo médio/presença), IA (resumos pendentes/insights).
-
----
-
-## FASE 8 — Roadmap Avançado 🧠
-A combinar conforme prioridade:
-- Prescrição digital
-- Recibos NFS-e (Focus NFe — integração já mapeada)
-- Relatórios PDF profissionais
-- App mobile (Capacitor)
-
----
-
-## Como prosseguir
-
-Me diga **qual fase iniciar agora**. Recomendo começar pela **Fase 1 (Self-Onboarding)** porque desbloqueia dados de qualidade para todas as outras fases. Quando você aprovar, eu executo a fase inteira (migração + edge functions + UI) e te mostro o resultado antes de avançar.
+Recomendo começar pelas Waves **1 + 2** porque resolvem os conflitos de regra de negócio que você apontou primeiro; o resto vira incremento.
