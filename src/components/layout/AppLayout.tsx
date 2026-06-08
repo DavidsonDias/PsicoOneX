@@ -67,18 +67,29 @@ function AppLayoutInner({ children, title, description }: AppLayoutProps) {
     validateSignature();
   }, []);
 
-  // Keyboard shortcut for command palette
+  // Keyboard shortcuts
   useEffect(() => {
+    const isTyping = (el: EventTarget | null) => {
+      if (!(el instanceof HTMLElement)) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+    };
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setCommandOpen((open) => !open);
+        return;
       }
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (isTyping(e.target)) return;
+      if (e.key === "n") { e.preventDefault(); navigate("/pacientes?action=new"); }
+      else if (e.key === "a") { e.preventDefault(); navigate("/agenda?action=new"); }
+      else if (e.key === "f") { e.preventDefault(); navigate("/financeiro?action=new"); }
     };
 
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
-  }, []);
+  }, [navigate]);
 
   const checkAuth = async () => {
     try {
