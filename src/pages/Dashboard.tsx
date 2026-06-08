@@ -20,6 +20,7 @@ import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { CustomizableDashboard, type DashboardWidgetDef } from "@/components/dashboard/CustomizableDashboard";
+import { NextSessionWidget, RevenueForecastWidget, OverdueWidget, InactivePatientsWidget } from "@/components/dashboard/SmartWidgets";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
@@ -248,6 +249,26 @@ export default function Dashboard() {
         <WeeklyCalendar appointments={allAppointments} selectedDate={selectedDate}
           onDateChange={setSelectedDate} onAppointmentClick={() => navigate("/agenda")} />
       ),
+    },
+    {
+      id: "next_session", label: "Próxima Sessão",
+      description: "Mostra a próxima sessão agendada",
+      render: () => <NextSessionWidget />,
+    },
+    {
+      id: "revenue_forecast", label: "Receita Prevista vs Recebida",
+      description: "Acompanha o faturamento do mês corrente",
+      render: () => <RevenueForecastWidget />,
+    },
+    {
+      id: "overdue", label: "Inadimplência",
+      description: "Cobranças em atraso e total devido",
+      render: () => <OverdueWidget />,
+    },
+    {
+      id: "inactive_patients", label: "Pacientes Inativos",
+      description: "Pacientes sem sessão há mais de 30 dias",
+      render: () => <InactivePatientsWidget />,
     },
   ];
 
