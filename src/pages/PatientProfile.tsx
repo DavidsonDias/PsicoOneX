@@ -24,6 +24,7 @@ import { PatientAttachmentsCenter } from "@/components/patient-profile/PatientAt
 import { PatientFullRecord } from "@/components/patient-profile/PatientFullRecord";
 import { PatientInviteButton } from "@/components/patients/PatientInviteButton";
 import { SendOnboardingButton } from "@/components/patients/SendOnboardingButton";
+import { PatientCompletenessHint } from "@/components/patients/PatientCompletenessHint";
 import { ClipboardList } from "lucide-react";
 
 export interface PatientFull {
@@ -225,6 +226,9 @@ export default function PatientProfile() {
             </Button>
           </div>
         </motion.div>
+
+        <PatientCompletenessHint patient={patient} />
+
 
         {/* Edit Modal */}
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
