@@ -107,38 +107,123 @@ export default function PatientProfile() {
 
   if (!patient) return null;
 
-  const patientToFormData = (): Partial<PatientFormData> => ({
-    full_name: patient.full_name,
-    email: patient.email || "",
-    phone: patient.phone || "",
-    cpf: patient.cpf || "",
-    birth_date: patient.birth_date || "",
-    address: patient.address || "",
-    emergency_contact: patient.emergency_contact || "",
-    emergency_phone: patient.emergency_phone || "",
-    notes: patient.notes || "",
-    default_session_value: patient.default_session_value?.toString() || "",
-    payment_day: patient.payment_day?.toString() || "",
-  });
+  const patientToFormData = (): Partial<PatientFormData> => {
+    const p: any = patient;
+    return {
+      full_name: p.full_name,
+      email: p.email || "",
+      phone: p.phone || "",
+      cpf: p.cpf || "",
+      birth_date: p.birth_date || "",
+      address: p.address || "",
+      emergency_contact: p.emergency_contact || "",
+      emergency_phone: p.emergency_phone || "",
+      notes: p.notes || "",
+      default_session_value: p.default_session_value?.toString() || "",
+      payment_day: p.payment_day?.toString() || "",
+      monthly_plan_value: p.monthly_plan_value?.toString() || "",
+      social_name: p.social_name || "",
+      birth_place: p.birth_place || "",
+      gender: p.gender || "",
+      marital_status: p.marital_status || "",
+      rg: p.rg || "",
+      rg_issuer: p.rg_issuer || "",
+      cnh: p.cnh || "",
+      religion: p.religion || "",
+      profession: p.profession || "",
+      profession_role: p.profession_role || "",
+      company: p.company || "",
+      education_level: p.education_level || "",
+      cep: p.cep || "",
+      street: p.street || "",
+      address_number: p.address_number || "",
+      complement: p.complement || "",
+      neighborhood: p.neighborhood || "",
+      city: p.city || "",
+      state: p.state || "",
+      whatsapp_phone: p.whatsapp_phone || "",
+      phone_residential: p.phone_residential || "",
+      emergency_relationship: p.emergency_relationship || "",
+      emergency_whatsapp: p.emergency_whatsapp || "",
+      father_name: p.father_name || "",
+      father_profession: p.father_profession || "",
+      mother_name: p.mother_name || "",
+      mother_profession: p.mother_profession || "",
+      siblings_brothers: p.siblings_brothers?.toString() || "",
+      siblings_sisters: p.siblings_sisters?.toString() || "",
+      spouse_name: p.spouse_name || "",
+      spouse_relationship_time: p.spouse_relationship_time || "",
+      initial_demand: p.initial_demand || "",
+      prior_therapy: !!p.prior_therapy,
+      prior_therapy_when: p.prior_therapy_when || "",
+      prior_therapy_duration: p.prior_therapy_duration || "",
+      prior_therapy_reason: p.prior_therapy_reason || "",
+      uses_medication: !!p.uses_medication,
+      health_plan: p.health_plan || "",
+      health_plan_id: p.health_plan_id || "",
+    };
+  };
 
   const handleEditSubmit = async (data: PatientFormData) => {
     setSaving(true);
     try {
+      const n = (v?: string) => (v && v.trim() ? v : null);
+      const i = (v?: string) => (v && v.trim() ? parseInt(v) : null);
+      const f = (v?: string) => (v && v.trim() ? parseFloat(v) : null);
       const { error } = await supabase
         .from("patients")
         .update({
           full_name: data.full_name,
-          email: data.email || null,
-          phone: data.phone || null,
-          cpf: data.cpf || null,
-          birth_date: data.birth_date || null,
-          address: data.address || null,
-          emergency_contact: data.emergency_contact || null,
-          emergency_phone: data.emergency_phone || null,
-          notes: data.notes || null,
-          default_session_value: data.default_session_value ? parseFloat(data.default_session_value) : null,
-          payment_day: data.payment_day ? parseInt(data.payment_day) : null,
-          monthly_plan_value: data.monthly_plan_value ? parseFloat(data.monthly_plan_value) : null,
+          email: n(data.email),
+          phone: n(data.phone),
+          cpf: n(data.cpf),
+          birth_date: n(data.birth_date),
+          address: n(data.address),
+          emergency_contact: n(data.emergency_contact),
+          emergency_phone: n(data.emergency_phone),
+          notes: n(data.notes),
+          default_session_value: f(data.default_session_value),
+          payment_day: i(data.payment_day),
+          monthly_plan_value: f(data.monthly_plan_value),
+          social_name: n(data.social_name),
+          birth_place: n(data.birth_place),
+          gender: n(data.gender),
+          marital_status: n(data.marital_status),
+          rg: n(data.rg),
+          rg_issuer: n(data.rg_issuer),
+          cnh: n(data.cnh),
+          religion: n(data.religion),
+          profession: n(data.profession),
+          profession_role: n(data.profession_role),
+          company: n(data.company),
+          education_level: n(data.education_level),
+          cep: n(data.cep),
+          street: n(data.street),
+          address_number: n(data.address_number),
+          complement: n(data.complement),
+          neighborhood: n(data.neighborhood),
+          city: n(data.city),
+          state: n(data.state),
+          whatsapp_phone: n(data.whatsapp_phone),
+          phone_residential: n(data.phone_residential),
+          emergency_relationship: n(data.emergency_relationship),
+          emergency_whatsapp: n(data.emergency_whatsapp),
+          father_name: n(data.father_name),
+          father_profession: n(data.father_profession),
+          mother_name: n(data.mother_name),
+          mother_profession: n(data.mother_profession),
+          siblings_brothers: i(data.siblings_brothers),
+          siblings_sisters: i(data.siblings_sisters),
+          spouse_name: n(data.spouse_name),
+          spouse_relationship_time: n(data.spouse_relationship_time),
+          initial_demand: n(data.initial_demand),
+          prior_therapy: data.prior_therapy ?? false,
+          prior_therapy_when: n(data.prior_therapy_when),
+          prior_therapy_duration: n(data.prior_therapy_duration),
+          prior_therapy_reason: n(data.prior_therapy_reason),
+          uses_medication: data.uses_medication ?? false,
+          health_plan: n(data.health_plan),
+          health_plan_id: n(data.health_plan_id),
         })
         .eq("id", patient.id);
 
@@ -146,7 +231,8 @@ export default function PatientProfile() {
       toast.success("Cadastro atualizado com sucesso!");
       setEditOpen(false);
       if (id) loadPatient(id);
-    } catch {
+    } catch (e: any) {
+      console.error(e);
       toast.error("Erro ao atualizar cadastro");
     } finally {
       setSaving(false);
