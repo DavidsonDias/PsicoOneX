@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export interface AppNotification {
   id: string;
@@ -48,6 +49,15 @@ export function useNotifications() {
           const newNotif = payload.new as AppNotification;
           setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
           setUnreadCount((prev) => prev + 1);
+          // Realtime toast — destaque para conclusão de cadastro
+          const isOnboarding = newNotif.type === "patient_onboarding";
+          toast(newNotif.title, {
+            description: newNotif.message,
+            duration: isOnboarding ? 8000 : 5000,
+            action: newNotif.action_path
+              ? { label: newNotif.action_label || "Abrir", onClick: () => { window.location.href = newNotif.action_path!; } }
+              : undefined,
+          });
         }
       )
       .subscribe();
