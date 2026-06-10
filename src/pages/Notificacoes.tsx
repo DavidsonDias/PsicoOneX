@@ -106,18 +106,50 @@ export default function Notificacoes() {
           )}
         </div>
 
+        {/* Category filter chips */}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: "all", label: "Todas" },
+            { id: "agenda", label: "Agenda" },
+            { id: "appointment", label: "Consultas" },
+            { id: "payment", label: "Financeiro" },
+            { id: "patient", label: "Pacientes" },
+            { id: "patient_onboarding", label: "Onboarding" },
+            { id: "system", label: "Sistema" },
+            { id: "alert", label: "Alertas" },
+          ].map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCategoryFilter(c.id)}
+              className={cn(
+                "text-xs px-3 py-1 rounded-full border transition",
+                categoryFilter === c.id
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:border-primary/40"
+              )}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
         <TabsContent value="all" className="mt-0">
           <Card>
             <ScrollArea className="h-[600px]">
               <CardContent className="p-4 space-y-3">
-                {notifications.length === 0 ? (
+                {visible.length === 0 ? (
                   <div className="text-center py-16">
                     <Bell className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
                     <h3 className="font-semibold text-lg mb-2">Nenhuma notificação</h3>
                     <p className="text-muted-foreground">Você está em dia!</p>
                   </div>
                 ) : (
-                  notifications.map((notification, index) => {
+                  visible.map((notification, index) => {
+                    const IconComponent = typeIcons[notification.type] || Bell;
+                    const colorClass = typeColors[notification.type] || typeColors.system;
+                    return (
+                      <motion.div
+                        key={notification.id}
                     const IconComponent = typeIcons[notification.type] || Bell;
                     const colorClass = typeColors[notification.type] || typeColors.system;
                     return (
