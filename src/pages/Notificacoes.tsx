@@ -273,11 +273,23 @@ export default function Notificacoes() {
                       <p className="text-xs text-muted-foreground">{item.desc}</p>
                     </div>
                     <Switch
-                      checked={(settings as any)[item.key]}
-                      onCheckedChange={(checked) => setSettings({ ...settings, [item.key]: checked })}
+                      checked={item.key === "pushNotifications" ? push.subscribed : (settings as any)[item.key]}
+                      disabled={item.key === "pushNotifications" && (!push.supported || push.loading)}
+                      onCheckedChange={(checked) => {
+                        if (item.key === "pushNotifications") {
+                          checked ? push.subscribe() : push.unsubscribe();
+                          return;
+                        }
+                        setSettings({ ...settings, [item.key]: checked });
+                      }}
                     />
                   </div>
                 ))}
+                {!push.supported && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Push disponível apenas no app instalado (PWA) com chave VAPID configurada.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
