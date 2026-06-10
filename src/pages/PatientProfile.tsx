@@ -36,6 +36,8 @@ export interface PatientFull {
   birth_date: string | null;
   notes: string | null;
   status: string;
+  lifecycle_status?: string | null;
+  psychologist_id?: string;
   cpf: string | null;
   address: string | null;
   emergency_contact: string | null;
