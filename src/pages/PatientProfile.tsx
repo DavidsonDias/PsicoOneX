@@ -286,9 +286,12 @@ export default function PatientProfile() {
             <div>
               <h1 className="text-xl sm:text-2xl font-bold">{patient.full_name}</h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <Badge variant={patient.status === "active" ? "default" : "secondary"}>
-                  {patient.status === "active" ? "Ativo" : "Inativo"}
-                </Badge>
+                <PatientLifecycleManager
+                  patientId={patient.id}
+                  psychologistId={(patient as any).psychologist_id}
+                  currentStatus={patient.lifecycle_status ?? patient.status}
+                  onChanged={(s) => setPatient((p) => (p ? { ...p, lifecycle_status: s } : p))}
+                />
                 {age !== null && (
                   <span className="text-sm text-muted-foreground">{age} anos</span>
                 )}
