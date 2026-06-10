@@ -66,7 +66,7 @@ export function usePushSubscription() {
         (await navigator.serviceWorker.register("/push-sw.js"));
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapid),
+        applicationServerKey: urlBase64ToUint8Array(vapid).buffer as ArrayBuffer,
       });
       const json: any = sub.toJSON();
       const { data: { session } } = await supabase.auth.getSession();
