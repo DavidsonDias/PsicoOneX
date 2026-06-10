@@ -25,6 +25,7 @@ import { PatientFullRecord } from "@/components/patient-profile/PatientFullRecor
 import { PatientInviteButton } from "@/components/patients/PatientInviteButton";
 import { SendOnboardingButton } from "@/components/patients/SendOnboardingButton";
 import { PatientCompletenessHint } from "@/components/patients/PatientCompletenessHint";
+import { PatientLifecycleManager } from "@/components/patients/PatientLifecycleManager";
 import { ClipboardList } from "lucide-react";
 
 export interface PatientFull {
