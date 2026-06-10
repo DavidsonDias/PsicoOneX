@@ -722,6 +722,7 @@ export type Database = {
         Row: {
           action_label: string | null
           action_path: string | null
+          category: string
           created_at: string
           id: string
           message: string
@@ -734,6 +735,7 @@ export type Database = {
         Insert: {
           action_label?: string | null
           action_path?: string | null
+          category?: string
           created_at?: string
           id?: string
           message: string
@@ -746,6 +748,7 @@ export type Database = {
         Update: {
           action_label?: string | null
           action_path?: string | null
+          category?: string
           created_at?: string
           id?: string
           message?: string
@@ -975,6 +978,50 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_status_history: {
+        Row: {
+          changed_by: string
+          created_at: string
+          id: string
+          new_status: string
+          notes: string | null
+          patient_id: string
+          previous_status: string | null
+          psychologist_id: string
+          reason: string | null
+        }
+        Insert: {
+          changed_by: string
+          created_at?: string
+          id?: string
+          new_status: string
+          notes?: string | null
+          patient_id: string
+          previous_status?: string | null
+          psychologist_id: string
+          reason?: string | null
+        }
+        Update: {
+          changed_by?: string
+          created_at?: string
+          id?: string
+          new_status?: string
+          notes?: string | null
+          patient_id?: string
+          previous_status?: string | null
+          psychologist_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_status_history_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patients: {
         Row: {
           address: string | null
@@ -1014,6 +1061,9 @@ export type Database = {
           lgpd_signature_data: string | null
           lgpd_signed_at: string | null
           lgpd_truth_declaration: boolean
+          lifecycle_reason: string | null
+          lifecycle_status: string
+          lifecycle_updated_at: string | null
           marital_status: string | null
           medications: Json
           monthly_plan_value: number | null
@@ -1096,6 +1146,9 @@ export type Database = {
           lgpd_signature_data?: string | null
           lgpd_signed_at?: string | null
           lgpd_truth_declaration?: boolean
+          lifecycle_reason?: string | null
+          lifecycle_status?: string
+          lifecycle_updated_at?: string | null
           marital_status?: string | null
           medications?: Json
           monthly_plan_value?: number | null
@@ -1178,6 +1231,9 @@ export type Database = {
           lgpd_signature_data?: string | null
           lgpd_signed_at?: string | null
           lgpd_truth_declaration?: boolean
+          lifecycle_reason?: string | null
+          lifecycle_status?: string
+          lifecycle_updated_at?: string | null
           marital_status?: string | null
           medications?: Json
           monthly_plan_value?: number | null
@@ -1246,6 +1302,7 @@ export type Database = {
           preferred_clinical_style: string | null
           specialty: string | null
           updated_at: string | null
+          username: string | null
         }
         Insert: {
           auth_provider?: string | null
@@ -1260,6 +1317,7 @@ export type Database = {
           preferred_clinical_style?: string | null
           specialty?: string | null
           updated_at?: string | null
+          username?: string | null
         }
         Update: {
           auth_provider?: string | null
@@ -1274,6 +1332,40 @@ export type Database = {
           preferred_clinical_style?: string | null
           specialty?: string | null
           updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_used_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_used_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_used_at?: string | null
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }
