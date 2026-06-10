@@ -150,11 +150,6 @@ export default function Notificacoes() {
                     return (
                       <motion.div
                         key={notification.id}
-                    const IconComponent = typeIcons[notification.type] || Bell;
-                    const colorClass = typeColors[notification.type] || typeColors.system;
-                    return (
-                      <motion.div
-                        key={notification.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.03 }}
