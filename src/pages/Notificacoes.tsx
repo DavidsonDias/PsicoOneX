@@ -42,6 +42,11 @@ export default function Notificacoes() {
     notifications, unreadCount, markAsRead, markAllAsRead,
     deleteNotification, clearAll, createNotification,
   } = useNotifications();
+  const push = usePushSubscription();
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const visible = categoryFilter === "all"
+    ? notifications
+    : notifications.filter((n: any) => (n.category || n.type) === categoryFilter);
 
   const [settings, setSettings] = useState({
     emailNotifications: true,
