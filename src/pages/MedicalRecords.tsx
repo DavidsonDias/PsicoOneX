@@ -28,6 +28,7 @@ import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal"
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
 import { useAutosave } from "@/hooks/useAutosave";
 import { AutosaveIndicator } from "@/components/medical-records/AutosaveIndicator";
+import { VersionHistory } from "@/components/medical-records/VersionHistory";
 
 interface MedicalRecord {
   id: string;
@@ -627,23 +628,49 @@ const MedicalRecords = () => {
       ? (formData.observations ? `${formData.observations}\n\n--- Anotações Livres ---\n${freeFormNotes}` : freeFormNotes)
       : formData.observations;
 
+    const updatePayload = {
+      patient_id: formData.patient_id,
+      session_date: formData.session_date,
+      session_number: formData.session_number,
+      complaints: formData.complaints || null,
+      observations: combinedObservations || null,
+      techniques_used: formData.techniques_used || null,
+      evolution: formData.evolution || null,
+      next_steps: formData.next_steps || null,
+    };
+
     const { error } = await supabase
       .from("medical_records")
-      .update({
-        patient_id: formData.patient_id,
-        session_date: formData.session_date,
-        session_number: formData.session_number,
-        complaints: formData.complaints || null,
-        observations: combinedObservations || null,
-        techniques_used: formData.techniques_used || null,
-        evolution: formData.evolution || null,
-        next_steps: formData.next_steps || null
-      })
+      .update(updatePayload)
       .eq("id", editingRecord.id);
 
     if (error) {
       toast.error("Erro ao atualizar prontuário");
       return;
+    }
+
+    // Snapshot version after successful save
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      if (sess?.session) {
+        const { data: last } = await supabase
+          .from("medical_record_versions" as any)
+          .select("version_number")
+          .eq("record_id", editingRecord.id)
+          .order("version_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const next = ((last as any)?.version_number ?? 0) + 1;
+        await supabase.from("medical_record_versions" as any).insert({
+          record_id: editingRecord.id,
+          version_number: next,
+          content: updatePayload,
+          created_by: sess.session.user.id,
+          change_reason: "Edição manual",
+        });
+      }
+    } catch (e) {
+      console.warn("[version snapshot]", e);
     }
 
     if (pendingFiles.length > 0) {
@@ -1211,7 +1238,15 @@ const MedicalRecords = () => {
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes do Prontuário</DialogTitle>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle>Detalhes do Prontuário</DialogTitle>
+              {selectedRecord && (
+                <VersionHistory
+                  recordId={selectedRecord.id}
+                  onRestored={() => { loadRecords(userId); setViewDialogOpen(false); }}
+                />
+              )}
+            </div>
           </DialogHeader>
           {selectedRecord && (
             <div className="space-y-4">
