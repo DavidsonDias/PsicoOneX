@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DollarSign, CheckCircle2, Info, Repeat, ChevronDown, FileHeart, MapPin, Users, Stethoscope } from "lucide-react";
+import { useConsistencyCheck } from "@/hooks/useConsistencyCheck";
+import { ConsistencyDialog } from "@/components/shared/ConsistencyDialog";
 
 export type SessionFrequency = "semanal" | "quinzenal" | "mensal" | "avulso";
 
@@ -213,14 +215,17 @@ export function PatientForm({
     } catch {}
   }
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+  const { issues, check, clear, loading: checking } = useConsistencyCheck();
+  const [pendingData, setPendingData] = useState<PatientFormData | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const buildPayload = (form: HTMLFormElement): PatientFormData => {
+    const fd = new FormData(form);
     const opt = (k: string) => {
       const v = fd.get(k);
       return v ? String(v) : undefined;
     };
-    onSubmit({
+    return {
       full_name: fd.get("full_name") as string,
       email: (fd.get("email") as string) || "",
       phone,
@@ -273,7 +278,27 @@ export function PatientForm({
       uses_medication: usesMedication,
       health_plan: opt("health_plan"),
       health_plan_id: opt("health_plan_id"),
-    });
+    };
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = buildPayload(e.currentTarget);
+    // Validação inteligente (IA + local) antes de salvar
+    const found = await check("patient", { ...data, zip_code: cep }, true);
+    if (found.length === 0) {
+      onSubmit(data);
+      return;
+    }
+    setPendingData(data);
+    setConfirmOpen(true);
+  };
+
+  const confirmSave = () => {
+    if (pendingData) onSubmit(pendingData);
+    setConfirmOpen(false);
+    setPendingData(null);
+    clear();
   };
 
   const init: any = initialData || {};
