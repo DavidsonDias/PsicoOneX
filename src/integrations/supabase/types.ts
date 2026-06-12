@@ -636,6 +636,47 @@ export type Database = {
           },
         ]
       }
+      medical_record_versions: {
+        Row: {
+          change_reason: string | null
+          content: Json
+          created_at: string
+          created_by: string
+          id: string
+          record_id: string
+          title: string | null
+          version_number: number
+        }
+        Insert: {
+          change_reason?: string | null
+          content: Json
+          created_at?: string
+          created_by: string
+          id?: string
+          record_id: string
+          title?: string | null
+          version_number: number
+        }
+        Update: {
+          change_reason?: string | null
+          content?: Json
+          created_at?: string
+          created_by?: string
+          id?: string
+          record_id?: string
+          title?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_record_versions_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "medical_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medical_records: {
         Row: {
           appointment_id: string | null
