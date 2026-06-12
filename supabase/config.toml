@@ -47,3 +47,5 @@ project_id = "pnkhogpsadywdbgzqhfi"
     verify_jwt = true
   [functions.patient-onboarding]
     verify_jwt = false
+  [functions.send-push]
+    verify_jwt = false
