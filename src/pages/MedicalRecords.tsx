@@ -1237,7 +1237,15 @@ const MedicalRecords = () => {
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes do Prontuário</DialogTitle>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle>Detalhes do Prontuário</DialogTitle>
+              {selectedRecord && (
+                <VersionHistory
+                  recordId={selectedRecord.id}
+                  onRestored={() => { loadRecords(userId); setViewDialogOpen(false); }}
+                />
+              )}
+            </div>
           </DialogHeader>
           {selectedRecord && (
             <div className="space-y-4">
