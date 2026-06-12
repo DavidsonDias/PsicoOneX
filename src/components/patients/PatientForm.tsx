@@ -577,10 +577,17 @@ export function PatientForm({
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
         )}
-        <Button type="submit" disabled={loading} className="gap-2">
-          {loading ? <span className="animate-pulse">Processando...</span> : <><CheckCircle2 className="h-4 w-4" />{submitLabel}</>}
+        <Button type="submit" disabled={loading || checking} className="gap-2">
+          {loading || checking ? <span className="animate-pulse">{checking ? "Validando..." : "Processando..."}</span> : <><CheckCircle2 className="h-4 w-4" />{submitLabel}</>}
         </Button>
       </div>
+      <ConsistencyDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        issues={issues}
+        onConfirm={confirmSave}
+        confirmLabel="Salvar mesmo assim"
+      />
     </form>
   );
 }
