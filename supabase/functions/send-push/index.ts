@@ -15,7 +15,7 @@ interface PushPayload {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const VAPID_PUBLIC_KEY =
-  "BOK7dDqYeMx4C5O7PtjfZDwK96q-8PbyCns9c_c8f7MfiXXTPQ4Im0l7oWKGkZwAn_ui1B4gRS3j82pT1xC-Mio";
+  "BD81p4xbVEUVW5DFDoySC8ub-yZ0vwJbnYy2KfrbEQqruQViRfRR6SrBzpt5qiiboImi-9jL6WvFZqcyWvB-jvE";
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:contato@sevendevx.com";
 
