@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { VAPID_PUBLIC_KEY } from "@/lib/push-config";
 
 /**
  * Web Push subscription hook (PWA).
@@ -31,7 +32,7 @@ export function usePushSubscription() {
   const [supported, setSupported] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const vapid = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+  const vapid = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || VAPID_PUBLIC_KEY;
 
   useEffect(() => {
     const ok =
