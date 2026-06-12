@@ -28,6 +28,7 @@ import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal"
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
 import { useAutosave } from "@/hooks/useAutosave";
 import { AutosaveIndicator } from "@/components/medical-records/AutosaveIndicator";
+import { VersionHistory } from "@/components/medical-records/VersionHistory";
 
 interface MedicalRecord {
   id: string;
