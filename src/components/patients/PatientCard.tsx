@@ -1,12 +1,14 @@
- import { motion } from "framer-motion";
- import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
- import { Badge } from "@/components/ui/badge";
- import { ActionMenu } from "@/components/ui/action-menu";
- import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { motion } from "framer-motion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Mail, Phone, Calendar, MapPin, AlertCircle, Clock, FileText } from "lucide-react";
 import { WhatsAppButton } from "./WhatsAppButton";
- import { format, differenceInYears } from "date-fns";
- import { ptBR } from "date-fns/locale";
+import { format, differenceInYears } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { getLifecycleMeta } from "@/lib/patient-lifecycle";
+import { cn } from "@/lib/utils";
  
  interface Patient {
    id: string;
