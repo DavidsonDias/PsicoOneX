@@ -53,6 +53,7 @@ interface Patient {
   default_session_value?: number | null;
   payment_day?: number | null;
   monthly_plan_value?: number | null;
+  lifecycle_status?: string | null;
 }
 
 const formatPhone = (value: string): string => {
