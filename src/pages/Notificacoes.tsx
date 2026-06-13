@@ -69,6 +69,46 @@ export default function Notificacoes() {
     soundEnabled: true,
   });
 
+  // Per-category push preferences (persisted in user_preferences.settings)
+  const [pushCategoryPrefs, setPushCategoryPrefs] = useState<PushCategoryPrefs>(
+    Object.fromEntries(PUSH_CATEGORIES.map((c) => [c.id, true])),
+  );
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase
+        .from("user_preferences")
+        .select("settings")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      const stored = (data?.settings as any)?.push_categories;
+      if (stored && typeof stored === "object") {
+        setPushCategoryPrefs((prev) => ({ ...prev, ...stored }));
+      }
+    })();
+  }, []);
+
+  const togglePushCategory = async (id: string, value: boolean) => {
+    const next = { ...pushCategoryPrefs, [id]: value };
+    setPushCategoryPrefs(next);
+    setSavingPrefs(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSavingPrefs(false); return; }
+    const { data: existing } = await supabase
+      .from("user_preferences")
+      .select("settings")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+    const merged = { ...((existing?.settings as any) ?? {}), push_categories: next };
+    await supabase
+      .from("user_preferences")
+      .upsert({ user_id: session.user.id, settings: merged }, { onConflict: "user_id" });
+    setSavingPrefs(false);
+  };
+
   // Seed a welcome notification if empty on first load
   useEffect(() => {
     if (notifications.length === 0) {
