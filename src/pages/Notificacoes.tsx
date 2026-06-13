@@ -346,34 +346,30 @@ export default function Notificacoes() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5" />Tipos de Alerta</CardTitle>
-                <CardDescription>Personalize quais alertas deseja receber</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5" />Push por categoria</CardTitle>
+                <CardDescription>
+                  Escolha quais categorias acionam push no seu dispositivo. Aplicado em tempo real para todos os eventos disparados pelo sistema.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {[
-                  { key: "appointmentReminders", label: "Lembretes de Consulta", desc: "Alertas de agendamentos", type: "appointment" },
-                  { key: "paymentAlerts", label: "Alertas Financeiros", desc: "Pagamentos e cobranças", type: "payment" },
-                  { key: "systemUpdates", label: "Atualizações do Sistema", desc: "Novidades e melhorias", type: "system" },
-                ].map(item => {
-                  const Icon = typeIcons[item.type] || Bell;
-                  return (
-                    <div key={item.key} className="flex items-center justify-between">
-                      <div className="space-y-0.5 flex items-center gap-3">
-                        <div className={cn("p-2 rounded-lg", typeColors[item.type])}>
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <Label>{item.label}</Label>
-                          <p className="text-xs text-muted-foreground">{item.desc}</p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={(settings as any)[item.key]}
-                        onCheckedChange={(checked) => setSettings({ ...settings, [item.key]: checked })}
-                      />
+                {PUSH_CATEGORIES.map((cat) => (
+                  <div key={cat.id} className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{cat.label}</Label>
+                      <p className="text-xs text-muted-foreground">{cat.desc}</p>
                     </div>
-                  );
-                })}
+                    <Switch
+                      checked={pushCategoryPrefs[cat.id] !== false}
+                      disabled={savingPrefs || !push.subscribed}
+                      onCheckedChange={(v) => togglePushCategory(cat.id, v)}
+                    />
+                  </div>
+                ))}
+                {!push.subscribed && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Ative o Push na coluna ao lado para personalizar por categoria.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
