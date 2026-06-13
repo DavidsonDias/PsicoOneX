@@ -19,6 +19,17 @@ import { ptBR } from "date-fns/locale";
 import { useNotifications } from "@/hooks/useNotifications";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+type PushCategoryPrefs = Record<string, boolean>;
+
+const PUSH_CATEGORIES: { id: string; label: string; desc: string }[] = [
+  { id: "agenda", label: "Agenda", desc: "Novos agendamentos, remarcações, cancelamentos" },
+  { id: "financeiro", label: "Financeiro", desc: "Pagamentos recebidos, vencidos e novos lançamentos" },
+  { id: "prontuario", label: "Prontuários", desc: "Criação e atualização de prontuários" },
+  { id: "paciente", label: "Pacientes", desc: "Onboarding concluído, atualização de cadastro" },
+  { id: "sistema", label: "Sistema", desc: "Avisos da plataforma" },
+];
 
 const typeIcons: Record<string, React.ElementType> = {
   appointment: Calendar,
@@ -57,6 +68,46 @@ export default function Notificacoes() {
     systemUpdates: true,
     soundEnabled: true,
   });
+
+  // Per-category push preferences (persisted in user_preferences.settings)
+  const [pushCategoryPrefs, setPushCategoryPrefs] = useState<PushCategoryPrefs>(
+    Object.fromEntries(PUSH_CATEGORIES.map((c) => [c.id, true])),
+  );
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase
+        .from("user_preferences")
+        .select("settings")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      const stored = (data?.settings as any)?.push_categories;
+      if (stored && typeof stored === "object") {
+        setPushCategoryPrefs((prev) => ({ ...prev, ...stored }));
+      }
+    })();
+  }, []);
+
+  const togglePushCategory = async (id: string, value: boolean) => {
+    const next = { ...pushCategoryPrefs, [id]: value };
+    setPushCategoryPrefs(next);
+    setSavingPrefs(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSavingPrefs(false); return; }
+    const { data: existing } = await supabase
+      .from("user_preferences")
+      .select("settings")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+    const merged = { ...((existing?.settings as any) ?? {}), push_categories: next };
+    await supabase
+      .from("user_preferences")
+      .upsert({ user_id: session.user.id, settings: merged }, { onConflict: "user_id" });
+    setSavingPrefs(false);
+  };
 
   // Seed a welcome notification if empty on first load
   useEffect(() => {
@@ -295,34 +346,30 @@ export default function Notificacoes() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5" />Tipos de Alerta</CardTitle>
-                <CardDescription>Personalize quais alertas deseja receber</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5" />Push por categoria</CardTitle>
+                <CardDescription>
+                  Escolha quais categorias acionam push no seu dispositivo. Aplicado em tempo real para todos os eventos disparados pelo sistema.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {[
-                  { key: "appointmentReminders", label: "Lembretes de Consulta", desc: "Alertas de agendamentos", type: "appointment" },
-                  { key: "paymentAlerts", label: "Alertas Financeiros", desc: "Pagamentos e cobranças", type: "payment" },
-                  { key: "systemUpdates", label: "Atualizações do Sistema", desc: "Novidades e melhorias", type: "system" },
-                ].map(item => {
-                  const Icon = typeIcons[item.type] || Bell;
-                  return (
-                    <div key={item.key} className="flex items-center justify-between">
-                      <div className="space-y-0.5 flex items-center gap-3">
-                        <div className={cn("p-2 rounded-lg", typeColors[item.type])}>
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <Label>{item.label}</Label>
-                          <p className="text-xs text-muted-foreground">{item.desc}</p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={(settings as any)[item.key]}
-                        onCheckedChange={(checked) => setSettings({ ...settings, [item.key]: checked })}
-                      />
+                {PUSH_CATEGORIES.map((cat) => (
+                  <div key={cat.id} className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{cat.label}</Label>
+                      <p className="text-xs text-muted-foreground">{cat.desc}</p>
                     </div>
-                  );
-                })}
+                    <Switch
+                      checked={pushCategoryPrefs[cat.id] !== false}
+                      disabled={savingPrefs || !push.subscribed}
+                      onCheckedChange={(v) => togglePushCategory(cat.id, v)}
+                    />
+                  </div>
+                ))}
+                {!push.subscribed && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Ative o Push na coluna ao lado para personalizar por categoria.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
