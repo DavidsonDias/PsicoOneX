@@ -10,24 +10,25 @@ import { ptBR } from "date-fns/locale";
 import { getLifecycleMeta } from "@/lib/patient-lifecycle";
 import { cn } from "@/lib/utils";
  
- interface Patient {
-   id: string;
-   full_name: string;
-   email: string | null;
-   phone: string | null;
-   birth_date: string | null;
-   notes: string | null;
-   status: string;
-   cpf: string | null;
-   address: string | null;
-   emergency_contact: string | null;
-   emergency_phone: string | null;
-   created_at?: string;
-   _count?: {
-     appointments: number;
-     records: number;
-   };
- }
+interface Patient {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  birth_date: string | null;
+  notes: string | null;
+  status: string;
+  cpf: string | null;
+  address: string | null;
+  emergency_contact: string | null;
+  emergency_phone: string | null;
+  created_at?: string;
+  lifecycle_status?: string | null;
+  _count?: {
+    appointments: number;
+    records: number;
+  };
+}
  
 interface PatientCardProps {
   patient: Patient;
