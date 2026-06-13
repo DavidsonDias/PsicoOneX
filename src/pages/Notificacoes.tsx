@@ -19,6 +19,17 @@ import { ptBR } from "date-fns/locale";
 import { useNotifications } from "@/hooks/useNotifications";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+type PushCategoryPrefs = Record<string, boolean>;
+
+const PUSH_CATEGORIES: { id: string; label: string; desc: string }[] = [
+  { id: "agenda", label: "Agenda", desc: "Novos agendamentos, remarcações, cancelamentos" },
+  { id: "financeiro", label: "Financeiro", desc: "Pagamentos recebidos, vencidos e novos lançamentos" },
+  { id: "prontuario", label: "Prontuários", desc: "Criação e atualização de prontuários" },
+  { id: "paciente", label: "Pacientes", desc: "Onboarding concluído, atualização de cadastro" },
+  { id: "sistema", label: "Sistema", desc: "Avisos da plataforma" },
+];
 
 const typeIcons: Record<string, React.ElementType> = {
   appointment: Calendar,
