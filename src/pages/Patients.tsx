@@ -36,6 +36,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LIFECYCLE_STATUSES } from "@/lib/patient-lifecycle";
+
 
 interface Patient {
   id: string;
@@ -53,6 +55,7 @@ interface Patient {
   default_session_value?: number | null;
   payment_day?: number | null;
   monthly_plan_value?: number | null;
+  lifecycle_status?: string | null;
 }
 
 const formatPhone = (value: string): string => {
@@ -106,6 +109,7 @@ export default function Patients() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [lifecycleFilter, setLifecycleFilter] = useState<string>("all");
   const [importOpen, setImportOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -503,7 +507,10 @@ export default function Patients() {
       patient.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.cpf?.includes(searchTerm);
     const matchesStatus = statusFilter === "all" || patient.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesLifecycle =
+      lifecycleFilter === "all" ||
+      (patient.lifecycle_status || "active") === lifecycleFilter;
+    return matchesSearch && matchesStatus && matchesLifecycle;
   });
 
   const scheduleSummary = scheduleEnabled ? {
@@ -543,6 +550,15 @@ export default function Patients() {
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="active">Ativos</SelectItem>
               <SelectItem value="inactive">Inativos</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={lifecycleFilter} onValueChange={setLifecycleFilter}>
+            <SelectTrigger className="w-[170px]"><SelectValue placeholder="Ciclo de vida" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os ciclos</SelectItem>
+              {LIFECYCLE_STATUSES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "table")}>

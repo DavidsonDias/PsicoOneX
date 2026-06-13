@@ -1,31 +1,34 @@
- import { motion } from "framer-motion";
- import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
- import { Badge } from "@/components/ui/badge";
- import { ActionMenu } from "@/components/ui/action-menu";
- import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { motion } from "framer-motion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Mail, Phone, Calendar, MapPin, AlertCircle, Clock, FileText } from "lucide-react";
 import { WhatsAppButton } from "./WhatsAppButton";
- import { format, differenceInYears } from "date-fns";
- import { ptBR } from "date-fns/locale";
+import { format, differenceInYears } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { getLifecycleMeta } from "@/lib/patient-lifecycle";
+import { cn } from "@/lib/utils";
  
- interface Patient {
-   id: string;
-   full_name: string;
-   email: string | null;
-   phone: string | null;
-   birth_date: string | null;
-   notes: string | null;
-   status: string;
-   cpf: string | null;
-   address: string | null;
-   emergency_contact: string | null;
-   emergency_phone: string | null;
-   created_at?: string;
-   _count?: {
-     appointments: number;
-     records: number;
-   };
- }
+interface Patient {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  birth_date: string | null;
+  notes: string | null;
+  status: string;
+  cpf: string | null;
+  address: string | null;
+  emergency_contact: string | null;
+  emergency_phone: string | null;
+  created_at?: string;
+  lifecycle_status?: string | null;
+  _count?: {
+    appointments: number;
+    records: number;
+  };
+}
  
 interface PatientCardProps {
   patient: Patient;
@@ -115,16 +118,25 @@ interface PatientCardProps {
              </div>
            )}
            
-            <div className="flex items-center justify-between pt-3 border-t border-border">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={patient.status === "active" ? "default" : "secondary"}
-                  className="capitalize cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); onToggleStatus?.(); }}
-                >
-                  {patient.status === "active" ? "Ativo" : "Inativo"}
-                </Badge>
-              </div>
+             <div className="flex items-center justify-between pt-3 border-t border-border">
+               <div className="flex items-center gap-2 flex-wrap">
+                 <Badge
+                   variant={patient.status === "active" ? "default" : "secondary"}
+                   className="capitalize cursor-pointer"
+                   onClick={(e) => { e.stopPropagation(); onToggleStatus?.(); }}
+                 >
+                   {patient.status === "active" ? "Ativo" : "Inativo"}
+                 </Badge>
+                 {patient.lifecycle_status && patient.lifecycle_status !== "active" && (() => {
+                   const meta = getLifecycleMeta(patient.lifecycle_status);
+                   return (
+                     <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold", meta.className)}>
+                       <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+                       {meta.label}
+                     </span>
+                   );
+                 })()}
+               </div>
              
              {patient._count && (
                <div className="flex items-center gap-3 text-xs text-muted-foreground">

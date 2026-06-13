@@ -173,12 +173,14 @@ export default function Agenda() {
   const loadPatients = async (psychologistId: string) => {
     const { data } = await supabase
       .from("patients")
-      .select("id, full_name, email, default_session_value, payment_day, monthly_plan_value")
+      .select("id, full_name, email, default_session_value, payment_day, monthly_plan_value, lifecycle_status")
       .eq("psychologist_id", psychologistId)
       .eq("status", "active")
       .is("deleted_at", null)
       .order("full_name");
-    setPatients((data || []) as Patient[]);
+    // Exclude patients in lifecycle states that should not receive new appointments
+    const blocked = new Set(["discharged", "dropout", "closed", "archived"]);
+    setPatients(((data || []) as any[]).filter((p) => !blocked.has(p.lifecycle_status)) as Patient[]);
   };
 
   const checkConflicts = useCallback((date: string, time: string, duration: number, excludeId?: string) => {
