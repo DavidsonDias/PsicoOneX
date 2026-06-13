@@ -552,6 +552,15 @@ export default function Patients() {
               <SelectItem value="inactive">Inativos</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={lifecycleFilter} onValueChange={setLifecycleFilter}>
+            <SelectTrigger className="w-[170px]"><SelectValue placeholder="Ciclo de vida" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os ciclos</SelectItem>
+              {LIFECYCLE_STATUSES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "table")}>
             <TabsList className="h-9">
               <TabsTrigger value="grid" className="px-3"><LayoutGrid className="h-4 w-4" /></TabsTrigger>
