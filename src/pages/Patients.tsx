@@ -109,6 +109,7 @@ export default function Patients() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [lifecycleFilter, setLifecycleFilter] = useState<string>("all");
   const [importOpen, setImportOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
