@@ -118,16 +118,25 @@ interface PatientCardProps {
              </div>
            )}
            
-            <div className="flex items-center justify-between pt-3 border-t border-border">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={patient.status === "active" ? "default" : "secondary"}
-                  className="capitalize cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); onToggleStatus?.(); }}
-                >
-                  {patient.status === "active" ? "Ativo" : "Inativo"}
-                </Badge>
-              </div>
+             <div className="flex items-center justify-between pt-3 border-t border-border">
+               <div className="flex items-center gap-2 flex-wrap">
+                 <Badge
+                   variant={patient.status === "active" ? "default" : "secondary"}
+                   className="capitalize cursor-pointer"
+                   onClick={(e) => { e.stopPropagation(); onToggleStatus?.(); }}
+                 >
+                   {patient.status === "active" ? "Ativo" : "Inativo"}
+                 </Badge>
+                 {patient.lifecycle_status && patient.lifecycle_status !== "active" && (() => {
+                   const meta = getLifecycleMeta(patient.lifecycle_status);
+                   return (
+                     <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold", meta.className)}>
+                       <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+                       {meta.label}
+                     </span>
+                   );
+                 })()}
+               </div>
              
              {patient._count && (
                <div className="flex items-center gap-3 text-xs text-muted-foreground">
