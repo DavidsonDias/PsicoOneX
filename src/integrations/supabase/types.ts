@@ -1833,6 +1833,19 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      dispatch_notification_async: {
+        Args: {
+          _action_label?: string
+          _action_path?: string
+          _category: string
+          _message: string
+          _metadata?: Json
+          _title: string
+          _type: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
