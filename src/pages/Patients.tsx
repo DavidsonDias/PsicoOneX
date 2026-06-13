@@ -36,6 +36,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LIFECYCLE_STATUSES } from "@/lib/patient-lifecycle";
+
 
 interface Patient {
   id: string;
