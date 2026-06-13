@@ -507,7 +507,10 @@ export default function Patients() {
       patient.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.cpf?.includes(searchTerm);
     const matchesStatus = statusFilter === "all" || patient.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesLifecycle =
+      lifecycleFilter === "all" ||
+      (patient.lifecycle_status || "active") === lifecycleFilter;
+    return matchesSearch && matchesStatus && matchesLifecycle;
   });
 
   const scheduleSummary = scheduleEnabled ? {
