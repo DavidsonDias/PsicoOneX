@@ -21,6 +21,7 @@ import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { CustomizableDashboard, type DashboardWidgetDef } from "@/components/dashboard/CustomizableDashboard";
 import { NextSessionWidget, RevenueForecastWidget, OverdueWidget, InactivePatientsWidget } from "@/components/dashboard/SmartWidgets";
+import { ActivePatientsWidget, AbandonmentRiskWidget, UpcomingPaymentsWidget, PendingRecordsWidget } from "@/components/dashboard/ClinicalWidgets";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
@@ -269,6 +270,26 @@ export default function Dashboard() {
       id: "inactive_patients", label: "Pacientes Inativos",
       description: "Pacientes sem sessão há mais de 30 dias",
       render: () => <InactivePatientsWidget />,
+    },
+    {
+      id: "active_patients", label: "Pacientes Ativos",
+      description: "Total em acompanhamento clínico ativo",
+      render: () => <ActivePatientsWidget />,
+    },
+    {
+      id: "abandonment_risk", label: "Risco de Abandono",
+      description: "Ativos sem sessão há mais de 30 dias",
+      render: () => <AbandonmentRiskWidget />,
+    },
+    {
+      id: "upcoming_payments", label: "Próximos Pagamentos",
+      description: "Recebíveis dos próximos 7 dias",
+      render: () => <UpcomingPaymentsWidget />,
+    },
+    {
+      id: "pending_records", label: "Pendências Clínicas",
+      description: "Sessões concluídas há +48h sem prontuário",
+      render: () => <PendingRecordsWidget />,
     },
   ];
 
