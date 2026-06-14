@@ -271,6 +271,26 @@ export default function Dashboard() {
       description: "Pacientes sem sessão há mais de 30 dias",
       render: () => <InactivePatientsWidget />,
     },
+    {
+      id: "active_patients", label: "Pacientes Ativos",
+      description: "Total em acompanhamento clínico ativo",
+      render: () => <ActivePatientsWidget />,
+    },
+    {
+      id: "abandonment_risk", label: "Risco de Abandono",
+      description: "Ativos sem sessão há mais de 30 dias",
+      render: () => <AbandonmentRiskWidget />,
+    },
+    {
+      id: "upcoming_payments", label: "Próximos Pagamentos",
+      description: "Recebíveis dos próximos 7 dias",
+      render: () => <UpcomingPaymentsWidget />,
+    },
+    {
+      id: "pending_records", label: "Pendências Clínicas",
+      description: "Sessões concluídas há +48h sem prontuário",
+      render: () => <PendingRecordsWidget />,
+    },
   ];
 
   return (
