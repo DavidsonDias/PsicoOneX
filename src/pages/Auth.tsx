@@ -1,46 +1,58 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Brain, Loader2, Mail } from "lucide-react";
+import { Brain, Loader2, Mail, KeyRound, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
-
-const isLovablePreview = window.location.hostname.includes("lovable.app");
 import { Separator } from "@/components/ui/separator";
 
+const isLovablePreview = window.location.hostname.includes("lovable.app");
+const LAST_ID_KEY = "psicoone:last_identifier";
+const REMEMBER_KEY = "psicoone:remember_me";
+
 const getRedirectPath = async (userId: string): Promise<string> => {
-  const { data } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-  const roles = data?.map(r => r.role) || [];
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const roles = data?.map((r) => r.role) || [];
   return roles.includes("super_admin") ? "/super-admin" : "/dashboard";
 };
+
+async function resolveEmail(identifier: string): Promise<string> {
+  const id = identifier.trim();
+  if (id.includes("@")) return id;
+  const { data, error } = await supabase.rpc("get_email_by_username", { _username: id });
+  if (error) throw error;
+  if (!data) throw new Error("Usuário não encontrado");
+  return data as string;
+}
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [lastIdentifier, setLastIdentifier] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setLastIdentifier(localStorage.getItem(LAST_ID_KEY) || "");
+    setRemember(localStorage.getItem(REMEMBER_KEY) !== "false");
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
       if (isLovablePreview) {
-        const { error } = await lovable.auth.signInWithOAuth("google", {
-          redirect_uri: window.location.origin,
-        });
+        const { error } = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
         if (error) throw error;
       } else {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "google",
-          options: {
-            redirectTo: window.location.origin,
-          },
+          options: { redirectTo: window.location.origin },
         });
         if (error) throw error;
       }
@@ -53,24 +65,17 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     const fullName = formData.get("fullName") as string;
-
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { full_name: fullName },
-          emailRedirectTo: window.location.origin,
-        },
+        options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
       });
-
       if (error) throw error;
-
       toast.success("Conta criada! Verifique seu e-mail para confirmar o cadastro.", { duration: 6000 });
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar conta");
@@ -82,18 +87,17 @@ export default function Auth() {
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
+    const identifier = (formData.get("identifier") as string).trim();
     const password = formData.get("password") as string;
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const email = await resolveEmail(identifier);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+
+      localStorage.setItem(REMEMBER_KEY, String(remember));
+      localStorage.setItem(LAST_ID_KEY, identifier);
 
       toast.success("Login realizado com sucesso!");
       const path = data.user ? await getRedirectPath(data.user.id) : "/dashboard";
@@ -105,13 +109,35 @@ export default function Auth() {
     }
   };
 
+  const handleMagicLink = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    const fd = new FormData(e.currentTarget);
+    const identifier = (fd.get("magic-identifier") as string).trim();
+    try {
+      const email = await resolveEmail(identifier);
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+      });
+      if (error) throw error;
+      localStorage.setItem(LAST_ID_KEY, identifier);
+      toast.success("Link mágico enviado!", { description: "Verifique seu e-mail para entrar." });
+    } catch (error: any) {
+      toast.error(error.message || "Não foi possível enviar o link");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleForgotPassword = async () => {
-    const email = (document.getElementById("signin-email") as HTMLInputElement)?.value;
-    if (!email) {
-      toast.error("Digite seu e-mail no campo acima primeiro");
+    const idValue = (document.getElementById("signin-identifier") as HTMLInputElement)?.value;
+    if (!idValue) {
+      toast.error("Digite seu e-mail ou usuário no campo acima primeiro");
       return;
     }
     try {
+      const email = await resolveEmail(idValue);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -136,10 +162,9 @@ export default function Auth() {
         <Card className="border-border shadow-xl">
           <CardHeader>
             <CardTitle>Acesse sua conta</CardTitle>
-            <CardDescription>Faça login ou crie uma nova conta para começar</CardDescription>
+            <CardDescription>Entre com e-mail ou usuário, ou receba um link mágico</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Google Sign In */}
             <Button
               type="button"
               variant="outline"
@@ -161,39 +186,75 @@ export default function Auth() {
             </Button>
 
             <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator className="w-full" />
-              </div>
+              <div className="absolute inset-0 flex items-center"><Separator className="w-full" /></div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">ou continue com e-mail</span>
+                <span className="bg-card px-2 text-muted-foreground">ou</span>
               </div>
             </div>
 
             <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Entrar</TabsTrigger>
-                <TabsTrigger value="signup">Cadastrar</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="signin" className="gap-1.5 text-xs"><KeyRound className="h-3.5 w-3.5" />Entrar</TabsTrigger>
+                <TabsTrigger value="magic" className="gap-1.5 text-xs"><Sparkles className="h-3.5 w-3.5" />Link mágico</TabsTrigger>
+                <TabsTrigger value="signup" className="gap-1.5 text-xs"><Mail className="h-3.5 w-3.5" />Cadastrar</TabsTrigger>
               </TabsList>
 
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signin-email">E-mail</Label>
-                    <Input id="signin-email" name="email" type="email" placeholder="seu@email.com" required disabled={loading} />
+                    <Label htmlFor="signin-identifier">E-mail ou usuário</Label>
+                    <Input
+                      id="signin-identifier"
+                      name="identifier"
+                      type="text"
+                      placeholder="seu@email.com ou usuario"
+                      defaultValue={lastIdentifier}
+                      autoComplete="username"
+                      required
+                      disabled={loading}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signin-password">Senha</Label>
-                    <Input id="signin-password" name="password" type="password" placeholder="••••••••" required disabled={loading} />
+                    <Input id="signin-password" name="password" type="password" placeholder="••••••••" autoComplete="current-password" required disabled={loading} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                      <Checkbox checked={remember} onCheckedChange={(v) => setRemember(v === true)} />
+                      Manter conectado
+                    </label>
+                    <Button type="button" variant="link" className="text-xs px-0 h-auto" onClick={handleForgotPassword}>
+                      Esqueceu a senha?
+                    </Button>
                   </div>
                   <Button type="submit" className="w-full" variant="hero" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Entrar
                   </Button>
-                  <div className="text-center">
-                    <Button type="button" variant="link" className="text-xs text-muted-foreground" onClick={handleForgotPassword}>
-                      Esqueceu sua senha?
-                    </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="magic">
+                <form onSubmit={handleMagicLink} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="magic-identifier">E-mail ou usuário</Label>
+                    <Input
+                      id="magic-identifier"
+                      name="magic-identifier"
+                      type="text"
+                      placeholder="seu@email.com ou usuario"
+                      defaultValue={lastIdentifier}
+                      required
+                      disabled={loading}
+                    />
                   </div>
+                  <Button type="submit" className="w-full" variant="hero" disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Enviar link mágico
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Enviamos um link único para você entrar sem senha.
+                  </p>
                 </form>
               </TabsContent>
 
