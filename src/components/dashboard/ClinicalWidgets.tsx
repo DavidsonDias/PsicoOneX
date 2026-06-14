@@ -159,7 +159,7 @@ export function UpcomingPaymentsWidget() {
       if (!session) return;
       const now = new Date();
       const in7 = new Date(); in7.setDate(in7.getDate() + 7);
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("financial_transactions")
         .select("id, amount, due_date, patients(full_name)")
         .eq("user_id", session.user.id)
@@ -171,7 +171,7 @@ export function UpcomingPaymentsWidget() {
         .order("due_date", { ascending: true })
         .limit(8);
       const rows = (data as any[]) || [];
-      setItems(rows.map((r) => ({
+      setItems(rows.map((r: any) => ({
         id: r.id, due: r.due_date, amount: Number(r.amount || 0),
         patient: r.patients?.full_name ?? null,
       })));
