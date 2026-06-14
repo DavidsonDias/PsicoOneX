@@ -21,6 +21,7 @@ import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { CustomizableDashboard, type DashboardWidgetDef } from "@/components/dashboard/CustomizableDashboard";
 import { NextSessionWidget, RevenueForecastWidget, OverdueWidget, InactivePatientsWidget } from "@/components/dashboard/SmartWidgets";
+import { ActivePatientsWidget, AbandonmentRiskWidget, UpcomingPaymentsWidget, PendingRecordsWidget } from "@/components/dashboard/ClinicalWidgets";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
