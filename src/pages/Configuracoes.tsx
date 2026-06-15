@@ -677,7 +677,8 @@ export default function Configuracoes() {
         </TabsContent>
 
         {/* ── NOTIFICATIONS ── */}
-        <TabsContent value="notifications">
+        <TabsContent value="notifications" className="space-y-4">
+          <PushNotificationsCard />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -710,6 +711,7 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
         </TabsContent>
+
 
         {/* ── APPEARANCE ── */}
         <TabsContent value="appearance">
