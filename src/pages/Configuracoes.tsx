@@ -21,6 +21,7 @@ import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSett
 import WhatsAppLogsPanel from "@/components/settings/WhatsAppLogsPanel";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PluginManager as PluginManagerComponent } from "@/components/settings/PluginManager";
+import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 import { AccessibilitySettings } from "@/components/settings/AccessibilitySettings";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
 import { useUserRole } from "@/hooks/useUserRole";
