@@ -1340,6 +1340,7 @@ export type Database = {
           id: string
           onboarding_completed: boolean
           phone: string | null
+          phone_is_whatsapp: boolean
           preferred_clinical_style: string | null
           specialty: string | null
           updated_at: string | null
@@ -1355,6 +1356,7 @@ export type Database = {
           id: string
           onboarding_completed?: boolean
           phone?: string | null
+          phone_is_whatsapp?: boolean
           preferred_clinical_style?: string | null
           specialty?: string | null
           updated_at?: string | null
@@ -1370,6 +1372,7 @@ export type Database = {
           id?: string
           onboarding_completed?: boolean
           phone?: string | null
+          phone_is_whatsapp?: boolean
           preferred_clinical_style?: string | null
           specialty?: string | null
           updated_at?: string | null
