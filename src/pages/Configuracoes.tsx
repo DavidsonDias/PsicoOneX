@@ -21,6 +21,7 @@ import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSett
 import WhatsAppLogsPanel from "@/components/settings/WhatsAppLogsPanel";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PluginManager as PluginManagerComponent } from "@/components/settings/PluginManager";
+import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 import { AccessibilitySettings } from "@/components/settings/AccessibilitySettings";
 import { exportMultiSheetExcel, exportToCSV } from "@/lib/export-utils";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -144,19 +145,43 @@ export default function Configuracoes() {
     if (!user) return;
     setSaving(true);
 
+    const usernameRaw = (formData.get("username") as string || "").trim();
     const { error } = await supabase.from("profiles").update({
       full_name: formData.get("name") as string,
+      username: usernameRaw || null,
       crp: formData.get("crp") as string,
       phone: formData.get("phone") as string,
+      phone_is_whatsapp: formData.get("phone_is_whatsapp") === "on",
       specialty: formData.get("specialty") as string,
       clinic_name: formData.get("clinic_name") as string,
       preferred_clinical_style: formData.get("preferred_clinical_style") as string,
-    }).eq("id", user.id);
+    } as any).eq("id", user.id);
+
+    // Also persist notification channel toggles set on the profile tab
+    try {
+      await savePrefs({
+        settings: {
+          ...prefs.settings,
+          enable_whatsapp: settings.enable_whatsapp,
+          enable_email: settings.enable_email,
+        },
+      });
+    } catch {}
 
     setSaving(false);
-    if (error) { toast.error("Erro ao atualizar perfil"); return; }
+    if (error) {
+      const msg = (error as any)?.message || "";
+      if (msg.includes("profiles_username_unique") || msg.toLowerCase().includes("duplicate")) {
+        toast.error("Este nome de usuário já está em uso");
+      } else {
+        toast.error("Erro ao atualizar perfil");
+      }
+      return;
+    }
     toast.success("Perfil atualizado com sucesso!");
+    setProfile((p: any) => ({ ...(p || {}), username: usernameRaw || null, phone_is_whatsapp: formData.get("phone_is_whatsapp") === "on" }));
   };
+
 
   const handleChangePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -568,11 +593,44 @@ export default function Configuracoes() {
                   <div className="space-y-2">
                     <Label htmlFor="phone">Telefone</Label>
                     <Input id="phone" name="phone" defaultValue={profile?.phone} placeholder="(00) 00000-0000" />
+                    <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                      <Switch
+                        id="phone_is_whatsapp"
+                        name="phone_is_whatsapp"
+                        defaultChecked={!!profile?.phone_is_whatsapp}
+                      />
+                      <span className="text-xs text-muted-foreground">Este número é WhatsApp (receber notificações por WA)</span>
+                    </label>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="specialty">Especialidade</Label>
                     <Input id="specialty" name="specialty" defaultValue={profile?.specialty} placeholder="Ex: Psicologia Clínica" />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Nome de usuário (para login)</Label>
+                    <Input id="username" name="username" defaultValue={profile?.username || ""} placeholder="ex: dr.silva" autoComplete="username" />
+                    <p className="text-xs text-muted-foreground">Use letras/números sem espaços. Permite entrar sem digitar o e-mail.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Canais de notificação</Label>
+                    <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                      <label className="flex items-center justify-between gap-3 cursor-pointer">
+                        <span className="text-sm">Receber notificações por e-mail</span>
+                        <Switch
+                          checked={settings.enable_email}
+                          onCheckedChange={(v) => setSettings({ ...settings, enable_email: v })}
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-3 cursor-pointer">
+                        <span className="text-sm">Receber notificações por WhatsApp</span>
+                        <Switch
+                          checked={settings.enable_whatsapp}
+                          onCheckedChange={(v) => setSettings({ ...settings, enable_whatsapp: v })}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="col-span-1 sm:col-span-2 space-y-2">
                     <Label htmlFor="clinic_name">Nome da Clínica</Label>
                     <Input id="clinic_name" name="clinic_name" defaultValue={profile?.clinic_name || ""} placeholder="Nome do consultório ou clínica" />
@@ -620,7 +678,8 @@ export default function Configuracoes() {
         </TabsContent>
 
         {/* ── NOTIFICATIONS ── */}
-        <TabsContent value="notifications">
+        <TabsContent value="notifications" className="space-y-4">
+          <PushNotificationsCard />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -653,6 +712,7 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
         </TabsContent>
+
 
         {/* ── APPEARANCE ── */}
         <TabsContent value="appearance">

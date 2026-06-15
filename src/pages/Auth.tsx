@@ -41,7 +41,15 @@ export default function Auth() {
   useEffect(() => {
     setLastIdentifier(localStorage.getItem(LAST_ID_KEY) || "");
     setRemember(localStorage.getItem(REMEMBER_KEY) !== "false");
-  }, []);
+    // If user already has a session (e.g. PWA reopened), skip the form.
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const path = await getRedirectPath(session.user.id);
+        navigate(path, { replace: true });
+      }
+    })();
+  }, [navigate]);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
