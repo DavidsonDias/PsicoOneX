@@ -144,19 +144,43 @@ export default function Configuracoes() {
     if (!user) return;
     setSaving(true);
 
+    const usernameRaw = (formData.get("username") as string || "").trim();
     const { error } = await supabase.from("profiles").update({
       full_name: formData.get("name") as string,
+      username: usernameRaw || null,
       crp: formData.get("crp") as string,
       phone: formData.get("phone") as string,
+      phone_is_whatsapp: formData.get("phone_is_whatsapp") === "on",
       specialty: formData.get("specialty") as string,
       clinic_name: formData.get("clinic_name") as string,
       preferred_clinical_style: formData.get("preferred_clinical_style") as string,
-    }).eq("id", user.id);
+    } as any).eq("id", user.id);
+
+    // Also persist notification channel toggles set on the profile tab
+    try {
+      await savePrefs({
+        settings: {
+          ...prefs.settings,
+          enable_whatsapp: settings.enable_whatsapp,
+          enable_email: settings.enable_email,
+        },
+      });
+    } catch {}
 
     setSaving(false);
-    if (error) { toast.error("Erro ao atualizar perfil"); return; }
+    if (error) {
+      const msg = (error as any)?.message || "";
+      if (msg.includes("profiles_username_unique") || msg.toLowerCase().includes("duplicate")) {
+        toast.error("Este nome de usuário já está em uso");
+      } else {
+        toast.error("Erro ao atualizar perfil");
+      }
+      return;
+    }
     toast.success("Perfil atualizado com sucesso!");
+    setProfile((p: any) => ({ ...(p || {}), username: usernameRaw || null, phone_is_whatsapp: formData.get("phone_is_whatsapp") === "on" }));
   };
+
 
   const handleChangePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
