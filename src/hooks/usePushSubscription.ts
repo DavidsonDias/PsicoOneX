@@ -67,7 +67,9 @@ export function usePushSubscription() {
         (await navigator.serviceWorker.register("/push-sw.js"));
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapid).buffer as ArrayBuffer,
+        // Some mobile browsers (notably Android Chrome) reject ArrayBuffer
+        // — pass the Uint8Array directly per the Web Push spec.
+        applicationServerKey: urlBase64ToUint8Array(vapid) as unknown as BufferSource,
       });
       const json: any = sub.toJSON();
       const { data: { session } } = await supabase.auth.getSession();

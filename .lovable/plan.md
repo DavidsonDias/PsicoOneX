@@ -1,96 +1,66 @@
-# Wave 3 — Segurança Clínica + Notificações Reais + Login Enterprise
+## Auditoria Enterprise — Plano de Execução
 
-Escopo grande. Divido em **5 blocos independentes**, cada um testável isoladamente. Posso entregar tudo em sequência ou só os blocos que você priorizar.
-
----
-
-## Bloco A — Prontuário à prova de falhas 🛡️
-*Maior prioridade clínica (você já perdeu prontuário antes).*
-
-- **AutoSave a cada 10s** no `ProntuarioEditor` reaproveitando `useAutosave` que já existe (hoje está a 3s mas sem indicador visível em todos os fluxos).
-- **Draft local em IndexedDB** (não só localStorage) via `offline-store.ts` — sobrevive a crash de aba, queda de internet e logout acidental.
-- **Banner "Rascunho recuperado"** ao reabrir prontuário com diff visual (texto atual × rascunho) e botões *Restaurar* / *Descartar*.
-- **Histórico de versões**: nova tabela `medical_record_versions` (snapshot a cada save bem-sucedido, máx 50 por prontuário) + aba "Versões" com timeline e botão *Restaurar esta versão*.
-- **Trigger de auditoria** em `medical_records` (INSERT/UPDATE/DELETE → `audit_logs` com diff jsonb) — já planejado na Wave 5 do plano original, antecipo aqui.
-
-## Bloco B — Notificações ponta a ponta 🔔
-*Conectar a infra de push já pronta aos eventos reais.*
-
-- **Edge function `dispatch-notification`** (helper único) que recebe `{user_ids, category, title, body, url}` e: (1) insere em `notifications`, (2) chama `send-push`, (3) opcionalmente enfileira email/WhatsApp conforme `user_preferences`.
-- **Triggers automáticos** (DB triggers + chamadas em hooks):
-  - Paciente conclui onboarding → psicólogo recebe push + email + sino.
-  - Paciente atualiza cadastro (endereço/telefone/CPF) → diff resumido na notificação.
-  - Agenda: nova sessão, reagendada, cancelada, paciente entrou na sala de espera.
-  - Financeiro: pagamento recebido, vencido, PIX gerado, inadimplência detectada.
-  - Prontuário: save falhou, rascunho recuperado.
-- **Central unificada `/notificacoes`** (refazer a página atual):
-  - Tabs: Todas / Agenda / Financeiro / Pacientes / Sistema (contador de não-lidas por tab).
-  - Busca por texto, filtro por período, marcar lida, arquivar, marcar todas como lidas.
-  - Realtime via canal Supabase já em uso no `useNotifications`.
-- **Preferências por categoria** em Configurações: liga/desliga push/email/WhatsApp por tipo de evento (grava em `user_preferences`).
-
-## Bloco C — Ciclo de vida do paciente 🔄
-*Componente `PatientLifecycleManager` já existe parcialmente — completar.*
-
-- Migration: nova coluna `lifecycle_status` em `patients` (enum `ativo|pausado|alta|encaminhado|abandono|encerrado|arquivado`) + `lifecycle_reason text` + `lifecycle_changed_at`.
-- Tabela `patient_status_history` (já existe) recebe trigger automático em cada UPDATE de `lifecycle_status` com `from_status`, `to_status`, `reason`, `changed_by`.
-- Badge colorido do status no `PatientCard`, `PatientProfile` e listagem.
-- Filtro por status na lista de pacientes (`Patients.tsx`).
-- Regra: paciente em `alta|abandono|encerrado|arquivado` não aparece em agenda nova nem em sugestões de cobrança recorrente.
-- Timeline unificada já existe (`PatientUnifiedTimeline`) — adiciono entradas de mudança de status.
-
-## Bloco D — Login Enterprise 🔐
-*Multi-identificador + persistência real.*
-
-- **Remember Me persistente**: `supabase.auth` já usa localStorage; vou ajustar refresh agressivo + checkbox "Manter conectado por 30 dias" (controla `expiresIn` no signIn).
-- **Login por email OU username**: campo único "Email ou usuário". Se não tiver `@`, faço lookup em `profiles.username` (índice unique já existe) → recupero email → chamo `signInWithPassword`.
-- **Magic Link** como botão alternativo em `/auth` (já suportado pelo Supabase, falta UI).
-- **Login por telefone**: pulando SMS conforme você pediu — apenas deixo o campo username pronto e o magic link cobre o caso de "não lembro senha".
-- Tela `/auth` redesenhada: 3 tabs (Entrar / Cadastrar / Magic Link), validação inline, lembrar último identificador usado.
-
-## Bloco E — Dashboard clínico 📊
-*Widgets reais conectados aos dados, não placeholders.*
-
-Novos cards no `CustomizableDashboard` (já é drag-drop):
-- **Pacientes ativos** (count `lifecycle_status = 'ativo'`).
-- **Risco de abandono** (sem sessão há +30 dias, status ainda `ativo`) — clicável, abre lista filtrada.
-- **Receita prevista vs recebida** (mês corrente, gráfico barra dupla).
-- **Próximos pagamentos** (próximos 7 dias, ordenado por vencimento).
-- **Sessões da semana** (calendário compacto, hoje destacado).
-- **Pendências clínicas** (prontuários não finalizados >48h após sessão).
-- **Alertas IA** (reaproveita `proactive-insights`, já existe).
+Escopo grande. Vou dividir em 5 blocos entregáveis, do mais crítico ao mais estrutural. Cada bloco é independente e verificável.
 
 ---
 
-## Detalhes técnicos
+### Bloco 1 — Timezone unificado (corrige "1 hora" quando faltam 2h)
 
-- **Migrations novas**:
-  - `medical_record_versions` (record_id, version_number, content jsonb, created_by, created_at) + RLS por psicólogo dono.
-  - `patients.lifecycle_status` + trigger de histórico.
-  - Triggers de auditoria em `medical_records` e `patients`.
-  - Índice em `medical_records(patient_id, updated_at desc)` para a aba versões.
-- **Edge functions novas**:
-  - `dispatch-notification` (orquestrador único).
-  - Hooks em `appointments`, `financial_transactions`, `medical_records` chamam via `pg_net` ou direto no client.
-- **Componentes novos**:
-  - `medical-records/VersionHistory.tsx`, `medical-records/DraftRecoveryBanner.tsx`
-  - `notifications/NotificationFilters.tsx`, `notifications/NotificationPreferences.tsx`
-  - `auth/MagicLinkForm.tsx`, refactor de `pages/Auth.tsx`
-  - `dashboard/widgets/AbandonmentRisk.tsx`, `RevenueForecast.tsx`, `UpcomingPayments.tsx`, `PendingRecords.tsx`
-- **Sem mexer em**: telehealth, onboarding já entregue, Stripe, plugins.
+**Diagnóstico provável:** lembretes usam `now() + 1h` em UTC comparado com `appointments.scheduled_at` que em alguns pontos é tratado como horário local (sem TZ). O envio dispara cedo e o template renderiza "em 1 hora" baseado em diferença errada.
+
+**Ação:**
+- Criar `src/lib/clinic-datetime.ts` com `formatClinicDate / formatClinicTime / parseClinicDate / diffHoursBR` — único ponto de verdade (America/Sao_Paulo). Reaproveita `src/lib/datetime.ts`.
+- Auditar `send-appointment-reminders`, `send-appointment-email`, `whatsapp-notify-appointment`, `dispatch-notification`: tudo passa a calcular janela em UTC puro (`scheduled_at` é `timestamptz`) e renderizar BR só na saída.
+- Templates de e-mail (`appointment-reminder.tsx`) recebem `hoursUntil` calculado no servidor (não recalculam).
+- Front (Agenda, PatientAgendaTab, EmailPreview): substituir `new Date(str)` e `format(...)` diretos pelos helpers.
+
+### Bloco 2 — AppointmentForm único
+
+**Diagnóstico:** existem dois formulários — o completo da Agenda e o "mini" do perfil do paciente (screenshot 7). O mini tem horário/data divergentes (mostra `06/15/2026` formato US, sem recorrência, sem validação, sem update financeiro).
+
+**Ação:**
+- Promover o formulário da Agenda a `src/components/appointments/AppointmentForm.tsx` (componente reutilizável, props: `defaultPatientId`, `lockPatient`, `defaultDate`, `onCreated`).
+- Substituir o mini-form de `PatientAgendaTab` por esse componente, com `lockPatient` e paciente pré-selecionado (sem dropdown).
+- Mesma lógica: IA, recorrência, conflito, financeiro, resumo, notificações.
+
+### Bloco 3 — Integração Financeiro ↔ Agenda
+
+**Ação:**
+- Trigger `appointments_financial_sync` (DB) — INSERT/UPDATE/DELETE em `appointments`:
+  - INSERT → cria `financial_transactions` pendente (se `session_value > 0` e paciente tem `billing_mode='per_session'`).
+  - UPDATE de `scheduled_at`/`session_value` → atualiza transação vinculada.
+  - UPDATE para `status='cancelado'` → marca transação como cancelada.
+  - DELETE → soft delete da transação.
+- Coluna `financial_transactions.appointment_id` (se ainda não existe) para vinculação 1:1.
+- Recorrência: ao criar série, gerar transações de uma vez via mesmo trigger.
+
+### Bloco 4 — Push PWA Mobile + Diagnóstico
+
+**Diagnóstico:** `usePushSubscription` bloqueia em iframe e em qualquer `*.lovableproject.com`. No PWA instalado isso funciona; problemas comuns mobile:
+- VAPID `applicationServerKey` precisa ser `Uint8Array`, não `.buffer` (corrigir).
+- Falta tela de diagnóstico para o usuário verificar.
+
+**Ação:**
+- Fix `applicationServerKey: urlBase64ToUint8Array(vapid)` (sem `.buffer`).
+- Garantir SW registrado no domínio publicado (`scope: '/'`).
+- Nova rota `/configuracoes/diagnostico-push` (`PushDiagnostics.tsx`): Permissão, Subscription, Endpoint (mascarado), SW status, VAPID configurado, último push (de `push_send_log`), último erro, botão "Enviar Notificação de Teste" → invoca `send-push` com `user_ids:[me]`.
+- Tabela `push_send_log` (timestamp, user_id, endpoint, status, error) preenchida pelo `send-push`.
+
+### Bloco 5 — Auditoria & Observabilidade
+
+**Ação:**
+- Tabela `audit_log` (actor_id, entity, entity_id, action, before, after, ip, ua, tz, created_at).
+- Triggers genéricos em `appointments`, `financial_transactions`, `patients`, `medical_records`.
+- Rota `/sistema/auditoria` (admin only): tabs Agenda / E-mails / Push / Financeiro / Pacientes / Erros, com filtros e exportação.
 
 ---
 
-## Ordem sugerida de entrega
+### Ordem de entrega
 
-Recomendo: **A → B → C → D → E**.
-- **A** resolve risco clínico real (perda de prontuário).
-- **B** torna a infra de push que já está paga efetivamente útil.
-- **C** desbloqueia métricas reais para **E**.
-- **D** é independente, posso fazer em paralelo.
+1. Bloco 1 (timezone) — ataca o bug reportado diretamente.
+2. Bloco 2 (form único) — elimina divergência visível no perfil.
+3. Bloco 4 (push + diagnóstico) — sua queixa do PWA mobile.
+4. Bloco 3 (financeiro automático).
+5. Bloco 5 (auditoria/observabilidade).
 
-## Como prosseguir?
-
-1. **"Executar tudo A→E"** — entrego em 4-5 mensagens sequenciais.
-2. **"Só Bloco X"** — foco e concluo um bloco antes do próximo.
-3. **"Trocar ordem / remover bloco"** — ajusto o plano antes.
+Cada bloco vira 1 turno com migração + código + verificação. Posso começar pelo **Bloco 1** já no próximo turno, ou você prefere outra ordem?

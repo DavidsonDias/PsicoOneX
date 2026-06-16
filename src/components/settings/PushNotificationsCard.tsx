@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BellRing, Loader2, BellOff } from "lucide-react";
+import { BellRing, Loader2, BellOff, Stethoscope } from "lucide-react";
+import { Link } from "react-router-dom";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 
 export function PushNotificationsCard() {
@@ -35,6 +36,13 @@ export function PushNotificationsCard() {
             Ativar notificações neste dispositivo
           </Button>
         )}
+        <div className="pt-2">
+          <Button asChild variant="ghost" size="sm" className="gap-2 text-xs">
+            <Link to="/configuracoes/diagnostico-push">
+              <Stethoscope className="h-3.5 w-3.5" /> Abrir diagnóstico avançado
+            </Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

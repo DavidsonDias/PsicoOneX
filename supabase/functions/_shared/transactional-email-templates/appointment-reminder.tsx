@@ -30,15 +30,23 @@ const AppointmentReminderEmail = ({
   portalUrl,
   hoursAhead,
 }: AppointmentReminderProps) => {
-  const isImminent = hoursAhead === '1'
+  const h = hoursAhead || '24'
+  const isQuarter = h === '0.25'
+  const isImminent = h === '1'
+  const headline = isQuarter
+    ? '⏰ Sua sessão começa em 15 minutos. Prepare-se!'
+    : isImminent
+    ? '⏰ Sua sessão começa em 1 hora. Prepare-se!'
+    : '📅 Lembrete amigável: sua sessão é amanhã.'
+  const previewText = isQuarter
+    ? `Sua sessão começa em 15 minutos — ${time || ''}`
+    : isImminent
+    ? `Sua sessão começa em 1 hora — ${time || ''}`
+    : `Lembrete: sua sessão é amanhã às ${time || ''}`
   return (
     <Html lang="pt-BR" dir="ltr">
       <Head />
-      <Preview>
-        {isImminent
-          ? `Sua sessão começa em 1 hora — ${time || ''}`
-          : `Lembrete: sua sessão é amanhã às ${time || ''}`}
-      </Preview>
+      <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
           <div style={logoWrap}>
@@ -49,11 +57,7 @@ const AppointmentReminderEmail = ({
           <Text style={greeting}>
             Olá{patientName ? `, ${patientName}` : ''}!
           </Text>
-          <Text style={text}>
-            {isImminent
-              ? '⏰ Sua sessão começa em 1 hora. Prepare-se!'
-              : '📅 Lembrete amigável: sua sessão é amanhã.'}
-          </Text>
+          <Text style={text}>{headline}</Text>
 
           <Section style={detailsBox}>
             <Text style={detailLabel}>📅 Data</Text>
@@ -78,7 +82,7 @@ const AppointmentReminderEmail = ({
           )}
 
           <Text style={footnote}>
-            {isImminent
+            {(isImminent || isQuarter)
               ? 'Recomendamos testar sua câmera e microfone antes do horário.'
               : 'Caso precise reagendar, entre em contato com seu profissional.'}
           </Text>
@@ -97,7 +101,9 @@ const AppointmentReminderEmail = ({
 export const template = {
   component: AppointmentReminderEmail,
   subject: (data: Record<string, any>) =>
-    data.hoursAhead === '1'
+    data.hoursAhead === '0.25'
+      ? `⏰ Sua sessão começa em 15 minutos`
+      : data.hoursAhead === '1'
       ? `⏰ Sua sessão começa em 1 hora`
       : `📅 Lembrete: sessão amanhã às ${data.time || ''}`,
   displayName: 'Lembrete de sessão (24h / 1h)',
