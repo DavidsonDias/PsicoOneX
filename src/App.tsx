@@ -26,6 +26,7 @@ const Agenda = lazy(() => import("./pages/Agenda"));
 const MedicalRecords = lazy(() => import("./pages/MedicalRecords"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const PushDiagnostics = lazy(() => import("./pages/PushDiagnostics"));
 const PortalPaciente = lazy(() => import("./pages/PortalPaciente"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Teleatendimento = lazy(() => import("./pages/Teleatendimento"));
@@ -92,6 +93,7 @@ const App = () => (
                   <Route path="/prontuarios" element={<MedicalRecords />} />
                   <Route path="/financeiro" element={<Financeiro />} />
                   <Route path="/configuracoes" element={<Configuracoes />} />
+                  <Route path="/configuracoes/diagnostico-push" element={<PushDiagnostics />} />
                   <Route path="/portal-paciente" element={<PortalPaciente />} />
                   <Route path="/relatorios" element={<Relatorios />} />
                   <Route path="/teleatendimento" element={<Teleatendimento />} />
