@@ -75,7 +75,14 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { toast.error("Sessão expirada"); setSaving(false); return; }
 
-    const scheduledAt = `${formData.date}T${formData.time}:00`;
+    // CRITICAL: convert local clinic time → UTC ISO. Persisting the naive
+    // string makes Postgres treat it as UTC, shifting reminders by 3 hours.
+    let scheduledAt: string;
+    try {
+      scheduledAt = (await import("@/lib/clinic-datetime")).toUTCFromClinicLocal(formData.date, formData.time);
+    } catch {
+      toast.error("Data/hora inválida"); setSaving(false); return;
+    }
 
     const { data: newApt, error } = await supabase.from("appointments").insert({
       patient_id: patientId,
