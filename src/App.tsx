@@ -37,6 +37,7 @@ const EscalasPsicologicas = lazy(() => import("./pages/EscalasPsicologicas"));
 const AssistenteIA = lazy(() => import("./pages/AssistenteIA"));
 const Notificacoes = lazy(() => import("./pages/Notificacoes"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
+const SistemaAuditoria = lazy(() => import("./pages/SistemaAuditoria"));
 const Lixeira = lazy(() => import("./pages/Lixeira"));
 const PatientProfile = lazy(() => import("./pages/PatientProfile"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
