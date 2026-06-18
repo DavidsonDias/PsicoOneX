@@ -37,6 +37,7 @@ const EscalasPsicologicas = lazy(() => import("./pages/EscalasPsicologicas"));
 const AssistenteIA = lazy(() => import("./pages/AssistenteIA"));
 const Notificacoes = lazy(() => import("./pages/Notificacoes"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
+const SistemaAuditoria = lazy(() => import("./pages/SistemaAuditoria"));
 const Lixeira = lazy(() => import("./pages/Lixeira"));
 const PatientProfile = lazy(() => import("./pages/PatientProfile"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
@@ -104,6 +105,7 @@ const App = () => (
                   <Route path="/assistente-ia" element={<AssistenteIA />} />
                   <Route path="/notificacoes" element={<Notificacoes />} />
                   <Route path="/super-admin" element={<SuperAdmin />} />
+                  <Route path="/sistema/auditoria" element={<SistemaAuditoria />} />
                   <Route path="/lixeira" element={<Lixeira />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
                   <Route path="/portal/login" element={<PortalLogin />} />
