@@ -59,6 +59,7 @@ const secondaryNavItems: NavItem[] = [
   { icon: MessageSquare, label: "Assistente IA", path: "/assistente-ia", badge: "IA" },
   { icon: Trash2, label: "Lixeira", path: "/lixeira" },
   { icon: Shield, label: "Usuários", path: "/admin/usuarios", adminOnly: true },
+  { icon: Database, label: "Auditoria", path: "/sistema/auditoria", adminOnly: true },
   { icon: Shield, label: "Super Admin", path: "/super-admin", superAdminOnly: true },
 ];
 
