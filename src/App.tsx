@@ -105,6 +105,7 @@ const App = () => (
                   <Route path="/assistente-ia" element={<AssistenteIA />} />
                   <Route path="/notificacoes" element={<Notificacoes />} />
                   <Route path="/super-admin" element={<SuperAdmin />} />
+                  <Route path="/sistema/auditoria" element={<SistemaAuditoria />} />
                   <Route path="/lixeira" element={<Lixeira />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
                   <Route path="/portal/login" element={<PortalLogin />} />
