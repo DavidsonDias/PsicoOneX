@@ -1338,6 +1338,7 @@ export type Database = {
           crp: string | null
           full_name: string
           id: string
+          notification_emails: string[]
           onboarding_completed: boolean
           phone: string | null
           phone_is_whatsapp: boolean
@@ -1354,6 +1355,7 @@ export type Database = {
           crp?: string | null
           full_name: string
           id: string
+          notification_emails?: string[]
           onboarding_completed?: boolean
           phone?: string | null
           phone_is_whatsapp?: boolean
@@ -1370,6 +1372,7 @@ export type Database = {
           crp?: string | null
           full_name?: string
           id?: string
+          notification_emails?: string[]
           onboarding_completed?: boolean
           phone?: string | null
           phone_is_whatsapp?: boolean
