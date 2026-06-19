@@ -99,13 +99,30 @@ export default function PatientOnboarding() {
 
   async function uploadDoc(file: File) {
     if (!patient) return;
-    const path = `${patient.id}/${Date.now()}_${file.name}`;
-    const { error: e } = await supabase.storage.from("patient-documents").upload(path, file);
-    if (e) {
-      toast({ title: "Erro no upload", description: e.message, variant: "destructive" });
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Arquivo muito grande", description: "Tamanho máximo 10MB.", variant: "destructive" });
       return;
     }
-    setDocs((d) => [...d, { name: file.name, path, type: file.type }]);
+    try {
+      // Converte para base64 e envia via edge function (contorna RLS com segurança via token)
+      const b64: string = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(",")[1] || "");
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+      });
+      const res = await fetch(`${FUNCTION_URL}?token=${token}&action=upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({ filename: file.name, content_type: file.type, data: b64 }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Falha no upload");
+      setDocs((d) => [...d, { name: j.name, path: j.path, type: j.type }]);
+      toast({ title: "Documento enviado", description: file.name });
+    } catch (e: any) {
+      toast({ title: "Erro no upload", description: e.message || "Falha no upload", variant: "destructive" });
+    }
   }
 
   function addChild() {
