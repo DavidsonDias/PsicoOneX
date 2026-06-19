@@ -177,6 +177,7 @@ export default function Configuracoes() {
       specialty: formData.get("specialty") as string,
       clinic_name: formData.get("clinic_name") as string,
       preferred_clinical_style: formData.get("preferred_clinical_style") as string,
+      notification_emails: notifEmails,
     } as any).eq("id", user.id);
 
     // Also persist notification channel toggles set on the profile tab
