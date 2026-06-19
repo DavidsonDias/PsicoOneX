@@ -655,6 +655,50 @@ export default function Configuracoes() {
                   </div>
 
                   <div className="col-span-1 sm:col-span-2 space-y-2">
+                    <Label>E-mails que recebem notificações</Label>
+                    <div className="rounded-lg border border-border p-3 space-y-3">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <Bell className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-muted-foreground">E-mail principal da conta:</span>
+                          <span className="font-medium text-foreground">{userEmail || "—"}</span>
+                        </div>
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Padrão</span>
+                      </div>
+
+                      {notifEmails.length > 0 && (
+                        <ul className="space-y-1.5">
+                          {notifEmails.map((em) => (
+                            <li key={em} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm">
+                              <span className="truncate">{em}</span>
+                              <Button type="button" variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive" onClick={() => removeNotifEmail(em)}>
+                                Remover
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <div className="flex gap-2">
+                        <Input
+                          type="email"
+                          placeholder="adicionar outro e-mail (ex: secretaria@clinica.com)"
+                          value={newNotifEmail}
+                          onChange={(e) => setNewNotifEmail(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); addNotifEmail(); }
+                          }}
+                        />
+                        <Button type="button" variant="outline" onClick={addNotifEmail}>Adicionar</Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Todos os e-mails desta lista recebem cópia dos alertas (lembretes, agendamentos, pagamentos, etc.).
+                      </p>
+                    </div>
+                  </div>
+
+
+                  <div className="col-span-1 sm:col-span-2 space-y-2">
                     <Label htmlFor="clinic_name">Nome da Clínica</Label>
                     <Input id="clinic_name" name="clinic_name" defaultValue={profile?.clinic_name || ""} placeholder="Nome do consultório ou clínica" />
                   </div>
