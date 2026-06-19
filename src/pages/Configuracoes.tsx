@@ -49,6 +49,9 @@ export default function Configuracoes() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [notifEmails, setNotifEmails] = useState<string[]>([]);
+  const [newNotifEmail, setNewNotifEmail] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
