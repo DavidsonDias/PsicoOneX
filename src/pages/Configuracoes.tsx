@@ -106,9 +106,11 @@ export default function Configuracoes() {
   const checkAuthAndLoadData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    setUserEmail(user.email || "");
     const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single();
     if (profileData) {
       setProfile(profileData);
+      setNotifEmails(Array.isArray((profileData as any).notification_emails) ? (profileData as any).notification_emails : []);
       setSettings(prev => ({
         ...prev,
         clinic_name: profileData.clinic_name || "",
@@ -116,6 +118,23 @@ export default function Configuracoes() {
     }
     setLoading(false);
   };
+
+  const addNotifEmail = () => {
+    const e = newNotifEmail.trim().toLowerCase();
+    if (!e) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      toast.error("E-mail inválido");
+      return;
+    }
+    if (e === userEmail.toLowerCase() || notifEmails.includes(e)) {
+      toast.error("Este e-mail já está na lista");
+      return;
+    }
+    setNotifEmails((arr) => [...arr, e]);
+    setNewNotifEmail("");
+  };
+  const removeNotifEmail = (e: string) => setNotifEmails((arr) => arr.filter((x) => x !== e));
+
 
   const handleSaveSettings = async () => {
     setSaving(true);
