@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Eraser, Check } from "lucide-react";
 
@@ -7,122 +7,124 @@ interface SignaturePadProps {
   initialSignature?: string | null;
 }
 
+/**
+ * Assinatura digital com fundo branco fixo (legibilidade garantida em dark mode),
+ * traço escuro e suporte a alta densidade (DPR) — funciona em mouse e touch.
+ */
 export function SignaturePad({ onSignatureChange, initialSignature }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const drawingRef = useRef(false);
   const [hasSignature, setHasSignature] = useState(false);
 
-  useEffect(() => {
+  const getCtx = () => canvasRef.current?.getContext("2d") || null;
+
+  const paintBackground = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const ctx = getCtx();
+    if (!canvas || !ctx) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }, []);
 
-    const ctx = canvas.getContext("2d");
+  const setupStroke = useCallback(() => {
+    const ctx = getCtx();
     if (!ctx) return;
-
-    // Set canvas size
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-
-    // Set drawing style
-    ctx.strokeStyle = "#1a1a2e";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 2.2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+  }, []);
 
-    // Load initial signature if exists
+  const resize = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = getCtx();
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    paintBackground();
+    setupStroke();
+  }, [paintBackground, setupStroke]);
+
+  useEffect(() => {
+    resize();
+    const ro = new ResizeObserver(() => resize());
+    if (canvasRef.current) ro.observe(canvasRef.current);
+
     if (initialSignature) {
       const img = new Image();
       img.onload = () => {
-        ctx.drawImage(img, 0, 0);
+        const ctx = getCtx();
+        const canvas = canvasRef.current;
+        if (!ctx || !canvas) return;
+        ctx.drawImage(img, 0, 0, canvas.clientWidth, canvas.clientHeight);
         setHasSignature(true);
       };
       img.src = initialSignature;
     }
-  }, [initialSignature]);
+    return () => ro.disconnect();
+  }, [initialSignature, resize]);
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    setIsDrawing(true);
-    setHasSignature(true);
-
+  const pointerPos = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
-    let x, y;
-
     if ("touches" in e) {
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
-    } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
     }
+    const me = e as React.MouseEvent;
+    return { x: me.clientX - rect.left, y: me.clientY - rect.top };
+  };
 
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    const ctx = getCtx();
+    if (!ctx) return;
+    drawingRef.current = true;
+    setHasSignature(true);
+    const { x, y } = pointerPos(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!drawingRef.current) return;
+    if ("touches" in e) e.preventDefault();
+    const ctx = getCtx();
     if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    let x, y;
-
-    if ("touches" in e) {
-      e.preventDefault();
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
-    } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
-    }
-
+    const { x, y } = pointerPos(e);
     ctx.lineTo(x, y);
     ctx.stroke();
   };
 
   const stopDrawing = () => {
-    if (isDrawing) {
-      setIsDrawing(false);
-      saveSignature();
-    }
-  };
-
-  const saveSignature = () => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const signature = canvas.toDataURL("image/png");
-    onSignatureChange(signature);
+    onSignatureChange(canvas.toDataURL("image/png"));
   };
 
   const clearSignature = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
+    const ctx = getCtx();
+    if (!canvas || !ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    paintBackground();
+    setupStroke();
     setHasSignature(false);
     onSignatureChange(null);
   };
 
   return (
     <div className="space-y-2">
-      <div className="relative border-2 border-dashed border-muted-foreground/30 rounded-lg bg-card">
+      <div className="relative rounded-lg border-2 border-dashed border-primary/40 bg-white overflow-hidden shadow-sm">
         <canvas
           ref={canvasRef}
-          className="w-full h-32 cursor-crosshair touch-none"
+          className="block w-full h-40 cursor-crosshair touch-none bg-white"
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
@@ -133,25 +135,17 @@ export function SignaturePad({ onSignatureChange, initialSignature }: SignatureP
         />
         {!hasSignature && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-muted-foreground text-sm">Assine aqui</span>
+            <span className="text-slate-400 text-sm select-none">Assine aqui</span>
           </div>
         )}
       </div>
       <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={clearSignature}
-          className="gap-1"
-        >
-          <Eraser className="h-3 w-3" />
-          Limpar
+        <Button type="button" variant="outline" size="sm" onClick={clearSignature} className="gap-1">
+          <Eraser className="h-3 w-3" /> Limpar
         </Button>
         {hasSignature && (
-          <div className="flex items-center gap-1 text-sm text-green-600">
-            <Check className="h-3 w-3" />
-            Assinatura capturada
+          <div className="flex items-center gap-1 text-sm text-emerald-500">
+            <Check className="h-3 w-3" /> Assinatura capturada
           </div>
         )}
       </div>
