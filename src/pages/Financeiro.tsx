@@ -897,13 +897,17 @@ export default function Financeiro() {
                 <SelectItem value="cancelled">Cancelado</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filterPatient} onValueChange={setFilterPatient}>
-              <SelectTrigger className="w-[180px]"><User className="h-4 w-4 mr-2" /><SelectValue placeholder="Todos pacientes" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos pacientes</SelectItem>
-                {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="w-[200px]">
+              <PatientCombobox
+                patients={patients}
+                value={filterPatient}
+                onChange={setFilterPatient}
+                allowAll
+                allLabel="Todos pacientes"
+                placeholder="Todos pacientes"
+              />
+            </div>
+
           </div>
 
           {/* Transactions Table */}
