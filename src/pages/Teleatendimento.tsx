@@ -487,16 +487,13 @@ const Teleatendimento = () => {
 
           <div className="space-y-2">
             <Label>Paciente</Label>
-            <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-              <SelectTrigger>
-                <SelectValue placeholder="Escolha um paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                {patients.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <PatientCombobox
+              patients={patients}
+              value={selectedPatient}
+              onChange={setSelectedPatient}
+              placeholder="Escolha um paciente"
+            />
+
           </div>
 
           <Button onClick={handleStartPreCall} className="w-full gap-2" size="lg">
