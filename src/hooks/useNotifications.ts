@@ -93,7 +93,7 @@ export function useNotifications() {
             toast(newNotif.title, {
               description: newNotif.message,
               duration: isOnboarding ? 12000 : 5000,
-              important: isOnboarding,
+              className: isOnboarding ? "border-primary shadow-lg" : undefined,
               action: newNotif.action_path
                 ? {
                     label: newNotif.action_label || "Abrir",
