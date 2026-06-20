@@ -104,21 +104,13 @@ export const ProntuarioEditor = memo(function ProntuarioEditor({
               </div>
             ) : (
               <div className="flex gap-2">
-                <Select
+                <PatientCombobox
+                  className="flex-1"
+                  patients={patients}
                   value={formData.patient_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, patient_id: value }))}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Selecione o paciente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map(patient => (
-                      <SelectItem key={patient.id} value={patient.id}>
-                        {patient.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setFormData(prev => ({ ...prev, patient_id: value }))}
+                />
+
                 {onOpenQuickPatient && (
                   <Button
                     type="button"
