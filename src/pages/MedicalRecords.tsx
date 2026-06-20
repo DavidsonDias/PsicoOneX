@@ -1025,18 +1025,17 @@ const MedicalRecords = () => {
                 className="pl-10 w-[250px]"
               />
             </div>
-            <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-              <SelectTrigger className="w-[180px]">
-                <User className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filtrar paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os pacientes</SelectItem>
-                {patients.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-[220px]">
+              <PatientCombobox
+                patients={patients}
+                value={selectedPatient}
+                onChange={setSelectedPatient}
+                allowAll
+                allLabel="Todos os pacientes"
+                placeholder="Filtrar paciente"
+              />
+            </div>
+
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             if (open) {
