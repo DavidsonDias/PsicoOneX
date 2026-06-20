@@ -522,10 +522,13 @@ export default function Financeiro() {
             </div>
             <div>
               <Label>Paciente</Label>
-              <Select value={formData.patient_id} onValueChange={(v) => handlePatientSelect(v, !!isEdit)} {...(!isEdit && { name: "patient_id" })}>
-                <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
-              </Select>
+              <PatientCombobox
+                patients={patients}
+                value={formData.patient_id}
+                onChange={(v) => handlePatientSelect(v, !!isEdit)}
+                placeholder="Opcional"
+              />
+
             </div>
           </div>
 
