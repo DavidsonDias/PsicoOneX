@@ -39,33 +39,80 @@ export function useNotifications() {
   useEffect(() => {
     loadNotifications();
 
-    // Real-time subscription
-    const channel = supabase
-      .channel("notifications-realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
-        (payload) => {
-          const newNotif = payload.new as AppNotification;
-          setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
-          setUnreadCount((prev) => prev + 1);
-          // Realtime toast — destaque para conclusão de cadastro
-          const isOnboarding = newNotif.type === "patient_onboarding";
-          toast(newNotif.title, {
-            description: newNotif.message,
-            duration: isOnboarding ? 8000 : 5000,
-            action: newNotif.action_path
-              ? { label: newNotif.action_label || "Abrir", onClick: () => { window.location.href = newNotif.action_path!; } }
-              : undefined,
-          });
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      channel = supabase
+        .channel(`notifications-realtime-${session.user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          (payload) => {
+            const newNotif = payload.new as AppNotification;
+            setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
+            setUnreadCount((prev) => prev + 1);
+
+            const isOnboarding = newNotif.type === "patient_onboarding";
+
+            // Sonar — destaque sonoro/visual em eventos relevantes
+            try {
+              if (isOnboarding && typeof window !== "undefined" && "Audio" in window) {
+                const audio = new Audio(
+                  "data:audio/wav;base64,UklGRl9vAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
+                );
+                audio.volume = 0.4;
+                audio.play().catch(() => {});
+              }
+              // Browser-level notification (when the tab is hidden but page is open)
+              if (
+                typeof window !== "undefined" &&
+                "Notification" in window &&
+                Notification.permission === "granted" &&
+                document.visibilityState !== "visible"
+              ) {
+                const n = new Notification(newNotif.title, {
+                  body: newNotif.message,
+                  icon: "/icon-192.png",
+                  tag: newNotif.type,
+                });
+                n.onclick = () => {
+                  window.focus();
+                  if (newNotif.action_path) window.location.href = newNotif.action_path;
+                };
+              }
+            } catch {}
+
+            toast(newNotif.title, {
+              description: newNotif.message,
+              duration: isOnboarding ? 12000 : 5000,
+              className: isOnboarding ? "border-primary shadow-lg" : undefined,
+              action: newNotif.action_path
+                ? {
+                    label: newNotif.action_label || "Abrir",
+                    onClick: () => {
+                      window.location.href = newNotif.action_path!;
+                    },
+                  }
+                : undefined,
+            });
+          }
+        )
+        .subscribe();
+    })();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [loadNotifications]);
+
 
   const markAsRead = async (id: string) => {
     await supabase.from("notifications").update({ read: true }).eq("id", id);

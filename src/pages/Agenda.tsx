@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PatientCombobox } from "@/components/shared/PatientCombobox";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -810,23 +812,12 @@ export default function Agenda() {
       {/* Patient selector */}
       <div className="space-y-2">
         <Label>Paciente *</Label>
-        <Select value={formData.patient_id} onValueChange={handlePatientSelect}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione o paciente" />
-          </SelectTrigger>
-          <SelectContent>
-            {patients.map(patient => (
-              <SelectItem key={patient.id} value={patient.id}>
-                <span className="flex items-center gap-2">
-                  {patient.full_name}
-                  {patient.default_session_value && (
-                    <span className="text-muted-foreground text-xs">R$ {patient.default_session_value}</span>
-                  )}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PatientCombobox
+          patients={patients}
+          value={formData.patient_id}
+          onChange={handlePatientSelect}
+        />
+
 
         {/* Financial context card */}
         <AnimatePresence>

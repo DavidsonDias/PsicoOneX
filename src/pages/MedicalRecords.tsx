@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PatientCombobox } from "@/components/shared/PatientCombobox";
+
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -1023,18 +1025,17 @@ const MedicalRecords = () => {
                 className="pl-10 w-[250px]"
               />
             </div>
-            <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-              <SelectTrigger className="w-[180px]">
-                <User className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filtrar paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os pacientes</SelectItem>
-                {patients.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-[220px]">
+              <PatientCombobox
+                patients={patients}
+                value={selectedPatient}
+                onChange={setSelectedPatient}
+                allowAll
+                allLabel="Todos os pacientes"
+                placeholder="Filtrar paciente"
+              />
+            </div>
+
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             if (open) {

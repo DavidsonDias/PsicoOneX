@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PatientCombobox } from "@/components/shared/PatientCombobox";
+
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
@@ -520,10 +522,13 @@ export default function Financeiro() {
             </div>
             <div>
               <Label>Paciente</Label>
-              <Select value={formData.patient_id} onValueChange={(v) => handlePatientSelect(v, !!isEdit)} {...(!isEdit && { name: "patient_id" })}>
-                <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                <SelectContent>{patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
-              </Select>
+              <PatientCombobox
+                patients={patients}
+                value={formData.patient_id}
+                onChange={(v) => handlePatientSelect(v, !!isEdit)}
+                placeholder="Opcional"
+              />
+
             </div>
           </div>
 
@@ -892,13 +897,17 @@ export default function Financeiro() {
                 <SelectItem value="cancelled">Cancelado</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filterPatient} onValueChange={setFilterPatient}>
-              <SelectTrigger className="w-[180px]"><User className="h-4 w-4 mr-2" /><SelectValue placeholder="Todos pacientes" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos pacientes</SelectItem>
-                {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="w-[200px]">
+              <PatientCombobox
+                patients={patients}
+                value={filterPatient}
+                onChange={setFilterPatient}
+                allowAll
+                allLabel="Todos pacientes"
+                placeholder="Todos pacientes"
+              />
+            </div>
+
           </div>
 
           {/* Transactions Table */}
