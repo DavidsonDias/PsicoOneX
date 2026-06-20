@@ -92,7 +92,7 @@ export function PatientCombobox({
             return haystack.includes(search.toLowerCase()) ? 1 : 0;
           }}
         >
-          <CommandInput placeholder="Buscar paciente..." icon={<Search className="h-4 w-4" />} />
+          <CommandInput placeholder="Buscar paciente..." />
           <CommandList>
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
