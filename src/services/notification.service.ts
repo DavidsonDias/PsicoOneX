@@ -145,8 +145,13 @@ export async function sendAppointmentNotification(
           ? false
           : options.psychologistEmailEvent || (templateName === "appointment-confirmation" ? "appointment_created" : false);
       const alertEnabled = psychEvent === "access_sent" || psychologistAlerts.on_create !== false;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const ownEmail = sessionData.session?.user?.id === ctx.psychologistId ? sessionData.session.user.email : undefined;
       const recipients = Array.from(
-        new Set([...(Array.isArray((prof as any)?.notification_emails) ? (prof as any).notification_emails : [])].filter(Boolean))
+        new Set([
+          ...(Array.isArray((prof as any)?.notification_emails) ? (prof as any).notification_emails : []),
+          ownEmail,
+        ].filter(Boolean))
       );
 
       if (ok && recipients.length > 0 && (wantsCopy || (psychEvent && alertEnabled))) {
