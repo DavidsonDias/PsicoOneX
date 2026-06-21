@@ -1,18 +1,28 @@
-// Sends 24h-ahead and 1h-ahead reminders for upcoming appointments.
-// Triggered by pg_cron every 15 minutes.
-// Idempotency is enforced via deterministic idempotencyKey in send-transactional-email.
+// Sends configurable reminders ahead of upcoming appointments.
+// Triggered by pg_cron every 5–15 minutes.
 //
 // Strategy:
-// - 24h reminder: catch appointments scheduled in [now+23h45m, now+24h15m]
-// - 1h reminder:  catch appointments scheduled in [now+45m,    now+1h15m]
-//
-// We dedupe by checking email_send_log for prior sends with matching template + appointment_id.
+// - For each enabled offset (in minutes) from the psychologist's preferences,
+//   find appointments scheduled in [now + offset - WINDOW/2, now + offset + WINDOW/2].
+// - Idempotency is enforced by a deterministic idempotencyKey: `apt-rem-{offsetMin}-{appointmentId}`.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const DEFAULT_OFFSETS_MIN = [1440, 180, 60, 15];
+// Half-window in minutes around each offset. Must cover the cron interval.
+const HALF_WINDOW: Record<number, number> = {
+  1440: 15, // 24h ± 15min
+  720: 15,
+  180: 10,
+  120: 10,
+  60: 10,
+  30: 7,
+  15: 5,
 };
 
 interface AptRow {
@@ -24,25 +34,36 @@ interface AptRow {
   type: string | null;
   status: string | null;
   patients: { full_name: string; email: string | null } | null;
-  profiles?: { full_name: string; clinic_name: string | null } | null;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceKey);
 
   const now = new Date();
-  const stats = { checked: 0, sent24h: 0, sent1h: 0, sent15m: 0, skipped: 0, failed: 0 };
+  const stats: Record<string, number> = { checked: 0, sent: 0, skipped: 0, failed: 0 };
 
-  async function processWindow(hoursAhead: 24 | 1 | 0.25, fromMin: number, toMin: number) {
-    const from = new Date(now.getTime() + fromMin * 60_000).toISOString();
-    const to = new Date(now.getTime() + toMin * 60_000).toISOString();
+  // Map psychologist_id -> enabled offsets
+  const { data: prefRows } = await supabase
+    .from("user_preferences")
+    .select("user_id, settings");
+  const prefMap = new Map<string, number[]>();
+  for (const r of (prefRows ?? []) as any[]) {
+    const list = r?.settings?.reminder_minutes;
+    if (Array.isArray(list) && list.length) prefMap.set(r.user_id, list);
+  }
 
+  // All offsets that might be enabled across users
+  const allOffsets = new Set<number>(DEFAULT_OFFSETS_MIN);
+  prefMap.forEach((arr) => arr.forEach((m) => allOffsets.add(m)));
+
+  for (const offset of allOffsets) {
+    const half = HALF_WINDOW[offset] ?? 10;
+    const from = new Date(now.getTime() + (offset - half) * 60_000).toISOString();
+    const to = new Date(now.getTime() + (offset + half) * 60_000).toISOString();
 
     const { data: apts, error } = await supabase
       .from("appointments")
@@ -54,81 +75,65 @@ Deno.serve(async (req) => {
       .returns<AptRow[]>();
 
     if (error) {
-      console.error(`[reminders] Failed to query window ${hoursAhead}h:`, error);
-      return;
+      console.error(`[reminders] window ${offset}m query failed:`, error);
+      continue;
     }
-
-    if (!apts || apts.length === 0) return;
+    if (!apts?.length) continue;
 
     for (const apt of apts) {
       stats.checked++;
-      if (!apt.patients?.email) {
-        stats.skipped++;
-        continue;
-      }
+      if (!apt.patients?.email) { stats.skipped++; continue; }
 
-      // Dedup: check if reminder for this appointment + window already sent
+      // Honor psychologist preference (fallback to defaults)
+      const enabled = prefMap.get(apt.psychologist_id) ?? DEFAULT_OFFSETS_MIN;
+      if (!enabled.includes(offset)) { stats.skipped++; continue; }
+
+      const idempotencyKey = `apt-rem-${offset}-${apt.id}`;
+
+      // Dedup via email_send_log
       const { data: existing } = await supabase
         .from("email_send_log")
         .select("id")
         .eq("template_name", "appointment-reminder")
-        .eq("recipient_email", apt.patients.email)
-        .ilike("error_message", `%apt-rem-${hoursAhead}-${apt.id}%`)
+        .or(`metadata->>idempotency_key.eq.${idempotencyKey},error_message.ilike.%${idempotencyKey}%`)
         .limit(1)
         .maybeSingle();
+      if (existing) { stats.skipped++; continue; }
 
-      // Also check via message_id-style idempotency by querying recent logs
-      const { data: recent } = await supabase
-        .from("email_send_log")
-        .select("id, status, created_at")
-        .eq("template_name", "appointment-reminder")
-        .eq("recipient_email", apt.patients.email)
-        .gte("created_at", new Date(now.getTime() - 26 * 60 * 60_000).toISOString())
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      // Heuristic dedup: if a reminder for this same recipient was sent in the last 23h
-      // and the latest one is newer than (scheduled - hoursAhead - 30min), skip.
-      const aptTime = new Date(apt.scheduled_at).getTime();
-      const cutoff = aptTime - (hoursAhead * 60 + 30) * 60_000;
-      const alreadySent = (recent || []).some(r =>
-        r.status !== "failed" && new Date(r.created_at).getTime() >= cutoff
-      );
-      if (existing || alreadySent) {
-        stats.skipped++;
-        continue;
-      }
-
-      // Fetch profile separately (RLS-bypass via service)
       const { data: prof } = await supabase
         .from("profiles")
         .select("full_name, clinic_name")
         .eq("id", apt.psychologist_id)
         .single();
 
-      // Generate fresh access link (24h validity for reminder)
-      const expiresAt = new Date(aptTime + 6 * 60 * 60_000).toISOString();
+      const aptTime = new Date(apt.scheduled_at).getTime();
+      const linkExpiresAt = new Date(aptTime + 6 * 60 * 60_000).toISOString();
       const { data: link } = await supabase
         .from("patient_access_links")
         .insert({
           patient_id: apt.patient_id,
           appointment_id: apt.id,
           created_by: apt.psychologist_id,
-          expires_at: expiresAt,
+          expires_at: linkExpiresAt,
         })
         .select("token")
         .single();
 
       const portalUrl = link?.token ? `https://psicoone.com/portal/${link.token}` : undefined;
-
-      const aptDate = new Date(apt.scheduled_at);
-      const dateStr = aptDate.toLocaleDateString("pt-BR", {
+      const dateStr = new Date(apt.scheduled_at).toLocaleDateString("pt-BR", {
         weekday: "long", day: "2-digit", month: "long", year: "numeric",
         timeZone: "America/Sao_Paulo",
       });
-      const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+      const timeStr = new Date(apt.scheduled_at).toLocaleTimeString("pt-BR", {
+        hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo",
+      });
 
-      // Invoke send-transactional-email
+      // Friendly label per offset
+      const label =
+        offset >= 1440 ? "24 horas" :
+        offset >= 60 ? `${Math.round(offset / 60)} hora${offset >= 120 ? "s" : ""}` :
+        `${offset} minutos`;
+
       const sendRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
         method: "POST",
         headers: {
@@ -139,7 +144,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           templateName: "appointment-reminder",
           recipientEmail: apt.patients.email,
-          idempotencyKey: `apt-rem-${hoursAhead}-${apt.id}`,
+          idempotencyKey,
           templateData: {
             patientName: apt.patients.full_name.split(" ")[0],
             date: dateStr,
@@ -149,30 +154,27 @@ Deno.serve(async (req) => {
             psychologistName: prof?.full_name,
             clinicName: prof?.clinic_name,
             portalUrl,
-            hoursAhead: String(hoursAhead),
+            hoursAhead: String(offset / 60),
+            offsetLabel: label,
+          },
+          metadata: {
+            appointment_id: apt.id,
+            patient_id: apt.patient_id,
+            idempotency_key: idempotencyKey,
+            offset_minutes: offset,
           },
         }),
       });
 
-      if (sendRes.ok) {
-        if (hoursAhead === 24) stats.sent24h++;
-        else if (hoursAhead === 1) stats.sent1h++;
-        else stats.sent15m++;
-      } else {
+      if (sendRes.ok) stats.sent++;
+      else {
         stats.failed++;
-        console.error(`[reminders] Failed for apt ${apt.id}:`, await sendRes.text());
+        console.error(`[reminders] send failed apt=${apt.id} offset=${offset}:`, await sendRes.text());
       }
     }
   }
 
-  await processWindow(24, 23 * 60 + 45, 24 * 60 + 15);
-  await processWindow(1, 45, 75);
-  // 15-minute heads-up — narrow window so it lands once per appointment
-  await processWindow(0.25, 10, 20);
-
-
-  console.log("[reminders] Done", stats);
-
+  console.log("[reminders] done", stats);
   return new Response(JSON.stringify({ ok: true, stats }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
