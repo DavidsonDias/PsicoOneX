@@ -67,8 +67,9 @@ export async function sendAppointmentNotification(
       day: "2-digit",
       month: "long",
       year: "numeric",
+      timeZone: "America/Sao_Paulo",
     });
-    const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
     // 3. Idempotency key — distinct per template + appointment
     const idempotencyKey =

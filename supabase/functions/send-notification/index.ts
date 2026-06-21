@@ -121,7 +121,7 @@ serve(async (req) => {
                 user_id: userId,
                 type: 'reminder',
                 title: `Sessão em breve: ${pName}`,
-                message: `Agendada para ${new Date(apt.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+                message: `Agendada para ${new Date(apt.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}`,
                 action_label: 'Ver agenda',
                 action_path: '/agenda',
               });
