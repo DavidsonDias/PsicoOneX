@@ -38,7 +38,13 @@ const APP_BASE_URL =
  */
 export async function sendAppointmentNotification(
   ctx: AppointmentNotificationContext,
-  options: { templateName?: "appointment-confirmation" | "appointment-reminder"; hoursAhead?: number; expiresInHours?: number; skipEmail?: boolean } = {}
+  options: {
+    templateName?: "appointment-confirmation" | "appointment-reminder";
+    hoursAhead?: number;
+    expiresInHours?: number;
+    skipEmail?: boolean;
+    psychologistEmailEvent?: "appointment_created" | "access_sent" | false;
+  } = {}
 ): Promise<NotificationResult> {
   const templateName = options.templateName || "appointment-confirmation";
   const expiresInHours = options.expiresInHours || 72;
@@ -132,12 +138,18 @@ export async function sendAppointmentNotification(
         .select("settings")
         .eq("user_id", ctx.psychologistId)
         .maybeSingle();
-      const wantsCopy = (prefs as any)?.settings?.psychologist_alerts?.bcc_self_on_patient_emails === true;
+      const psychologistAlerts = (prefs as any)?.settings?.psychologist_alerts ?? {};
+      const wantsCopy = psychologistAlerts.bcc_self_on_patient_emails === true;
+      const psychEvent =
+        options.psychologistEmailEvent === false
+          ? false
+          : options.psychologistEmailEvent || (templateName === "appointment-confirmation" ? "appointment_created" : false);
+      const alertEnabled = psychEvent === "access_sent" || psychologistAlerts.on_create !== false;
       const recipients = Array.from(
         new Set([...(Array.isArray((prof as any)?.notification_emails) ? (prof as any).notification_emails : [])].filter(Boolean))
       );
 
-      if (ok && wantsCopy && recipients.length > 0) {
+      if (ok && recipients.length > 0 && (wantsCopy || (psychEvent && alertEnabled))) {
         await Promise.all(
           recipients.map((recipientEmail) =>
             supabase.functions.invoke("send-transactional-email", {
@@ -148,10 +160,13 @@ export async function sendAppointmentNotification(
                 templateData: {
                   psychologistName: prof?.full_name,
                   patientName: patient.full_name,
-                  actionType: templateName === "appointment-reminder" ? "message" : "access_sent",
+                  actionType: psychEvent || "access_sent",
                   appointmentDate: dateStr,
                   appointmentTime: timeStr,
-                  message: `O acesso seguro do paciente foi ${templateName === "appointment-reminder" ? "incluído no lembrete" : "enviado"}.`,
+                  message:
+                    psychEvent === "appointment_created"
+                      ? "O agendamento foi criado e o acesso seguro do paciente foi enviado."
+                      : "O acesso seguro do paciente foi reenviado.",
                   agendaUrl: `${APP_BASE_URL}/agenda`,
                 },
                 metadata: {
