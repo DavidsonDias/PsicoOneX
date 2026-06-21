@@ -10,7 +10,7 @@ const SITE_NAME = 'PsicoOne'
 interface Props {
   psychologistName?: string
   patientName?: string
-  actionType?: 'cancel' | 'reschedule' | 'message' | 'confirm'
+  actionType?: 'cancel' | 'reschedule' | 'message' | 'confirm' | 'access_sent' | 'appointment_created' | 'diagnostic'
   appointmentDate?: string
   appointmentTime?: string
   reason?: string
@@ -43,6 +43,24 @@ const ACTION_META: Record<string, { emoji: string; title: string; preview: strin
     title: 'Presença confirmada',
     preview: 'Um paciente confirmou presença na sessão',
     cta: 'Abrir Agenda',
+  },
+  access_sent: {
+    emoji: '🔗',
+    title: 'Acesso de teleatendimento enviado',
+    preview: 'O link seguro de acesso do paciente foi gerado e enviado',
+    cta: 'Abrir Agenda',
+  },
+  appointment_created: {
+    emoji: '📅',
+    title: 'Novo agendamento criado',
+    preview: 'Um novo agendamento foi criado e o paciente recebeu o acesso',
+    cta: 'Abrir Agenda',
+  },
+  diagnostic: {
+    emoji: '🧪',
+    title: 'Teste completo de notificações',
+    preview: 'Diagnóstico enterprise de e-mail, push e notificação interna',
+    cta: 'Abrir Diagnóstico',
   },
 }
 
