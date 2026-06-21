@@ -235,7 +235,7 @@ export async function resendAppointmentAccess(
       durationMinutes: apt.duration_minutes || 50,
       type: apt.type || "presential",
     },
-    emailEnabled ? {} : { skipEmail: true }
+    emailEnabled ? { psychologistEmailEvent: "access_sent" } : { skipEmail: true, psychologistEmailEvent: "access_sent" }
   );
 
   // Internal audit + notification (best effort, never block UX)
