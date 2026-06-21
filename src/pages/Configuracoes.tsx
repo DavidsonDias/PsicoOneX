@@ -168,41 +168,53 @@ export default function Configuracoes() {
     setSaving(true);
 
     const usernameRaw = (formData.get("username") as string || "").trim();
-    const { error } = await supabase.from("profiles").update({
+    const clinicName = (formData.get("clinic_name") as string) ?? "";
+    // Radix Switch with `name` posts the literal string "on" when checked, or
+    // omits the entry entirely when unchecked. We accept both shapes.
+    const phoneIsWhatsapp = formData.get("phone_is_whatsapp") != null;
+    const profilePatch: Record<string, any> = {
       full_name: formData.get("name") as string,
       username: usernameRaw || null,
       crp: formData.get("crp") as string,
       phone: formData.get("phone") as string,
-      phone_is_whatsapp: formData.get("phone_is_whatsapp") === "on",
+      phone_is_whatsapp: phoneIsWhatsapp,
       specialty: formData.get("specialty") as string,
-      clinic_name: formData.get("clinic_name") as string,
-      preferred_clinical_style: formData.get("preferred_clinical_style") as string,
+      clinic_name: clinicName,
+      preferred_clinical_style: (formData.get("preferred_clinical_style") as string) || "neutral",
       notification_emails: notifEmails,
-    } as any).eq("id", user.id);
+    };
 
-    // Also persist notification channel toggles set on the profile tab
+    const { error } = await supabase.from("profiles").update(profilePatch).eq("id", user.id);
+
+    // Persist ALL settings tied to the profile tab in one shot so nothing is left behind.
+    let prefsError: any = null;
     try {
       await savePrefs({
         settings: {
           ...prefs.settings,
+          session_duration: settings.session_duration,
+          session_price: settings.session_price,
           enable_whatsapp: settings.enable_whatsapp,
           enable_email: settings.enable_email,
         },
       });
-    } catch {}
+    } catch (err) {
+      prefsError = err;
+    }
 
     setSaving(false);
-    if (error) {
-      const msg = (error as any)?.message || "";
+    if (error || prefsError) {
+      const msg = (error as any)?.message || (prefsError as any)?.message || "";
       if (msg.includes("profiles_username_unique") || msg.toLowerCase().includes("duplicate")) {
         toast.error("Este nome de usuário já está em uso");
       } else {
-        toast.error("Erro ao atualizar perfil");
+        console.error("[Configuracoes] save profile failed", { error, prefsError });
+        toast.error(`Erro ao atualizar perfil${msg ? `: ${msg}` : ""}`);
       }
       return;
     }
     toast.success("Perfil atualizado com sucesso!");
-    setProfile((p: any) => ({ ...(p || {}), username: usernameRaw || null, phone_is_whatsapp: formData.get("phone_is_whatsapp") === "on" }));
+    setProfile((p: any) => ({ ...(p || {}), ...profilePatch }));
   };
 
 

@@ -143,7 +143,8 @@ export default function NotificationDiagnostics() {
         body: { user_id: me?.id, title: "Teste de push", body: "Diagnóstico de notificações ✓" },
       });
       if (error) throw error;
-      toast.success("Push enviado");
+      toast.success("Push enviado — verifique notificações do dispositivo (precisa estar inscrito)");
+      runChecks();
     });
 
   const testNotification = () =>
@@ -155,10 +156,13 @@ export default function NotificationDiagnostics() {
           type: "alert",
           title: "Diagnóstico",
           message: "Notificação de teste do painel.",
+          action_path: "/configuracoes/diagnostico-notificacoes",
+          action_label: "Abrir diagnóstico",
         },
       });
       if (error) throw error;
-      toast.success("Notificação disparada");
+      toast.success("Notificação disparada — abra o sino 🔔 no topo");
+      runChecks();
     });
 
   const checks: CheckResult[] = [email, realtime, queue, push];
