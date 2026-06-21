@@ -77,6 +77,12 @@ export async function sendAppointmentNotification(
         ? `apt-rem-${options.hoursAhead || 24}-${ctx.appointmentId}`
         : `apt-confirm-${ctx.appointmentId}`;
 
+    // Short-circuit: if caller wants only the portal link (no email)
+    if (options.skipEmail) {
+      return { success: true, emailSent: false, portalUrl, reason: "skipped_by_preference" };
+    }
+
+
     // 4. Invoke transactional email function
     const { data, error } = await supabase.functions.invoke("send-transactional-email", {
       body: {
