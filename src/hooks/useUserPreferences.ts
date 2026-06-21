@@ -105,6 +105,22 @@ const DEFAULTS: UserPreferences = {
     enable_sms: false,
     terms_of_service: "",
     privacy_policy: "",
+    reminder_minutes: [1440, 180, 60, 15],
+    email_events: {
+      on_create: true,
+      on_reschedule: true,
+      on_cancel: true,
+      on_onboarding_complete: true,
+      on_access_share: true,
+    },
+    psychologist_alerts: {
+      on_create: true,
+      on_reschedule: true,
+      on_cancel: true,
+      on_onboarding_complete: true,
+      on_financial: true,
+      bcc_self_on_patient_emails: false,
+    },
   },
 };
 
