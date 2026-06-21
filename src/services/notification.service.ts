@@ -32,7 +32,7 @@ export interface NotificationResult {
  */
 export async function sendAppointmentNotification(
   ctx: AppointmentNotificationContext,
-  options: { templateName?: "appointment-confirmation" | "appointment-reminder"; hoursAhead?: number; expiresInHours?: number } = {}
+  options: { templateName?: "appointment-confirmation" | "appointment-reminder"; hoursAhead?: number; expiresInHours?: number; skipEmail?: boolean } = {}
 ): Promise<NotificationResult> {
   const templateName = options.templateName || "appointment-confirmation";
   const expiresInHours = options.expiresInHours || 72;
@@ -77,6 +77,12 @@ export async function sendAppointmentNotification(
         ? `apt-rem-${options.hoursAhead || 24}-${ctx.appointmentId}`
         : `apt-confirm-${ctx.appointmentId}`;
 
+    // Short-circuit: if caller wants only the portal link (no email)
+    if (options.skipEmail) {
+      return { success: true, emailSent: false, portalUrl, reason: "skipped_by_preference" };
+    }
+
+
     // 4. Invoke transactional email function
     const { data, error } = await supabase.functions.invoke("send-transactional-email", {
       body: {
@@ -120,12 +126,13 @@ export async function sendAppointmentNotification(
 
 /**
  * Resends access link for an existing appointment.
- * Generates a fresh token and re-triggers the confirmation email.
+ * Generates a fresh token, re-triggers the confirmation email, registers audit
+ * log + internal notification for the psychologist, and respects the
+ * `email_events.on_access_share` user preference.
  */
 export async function resendAppointmentAccess(
   appointmentId: string
 ): Promise<NotificationResult> {
-  // Fetch full appointment context
   const { data: apt, error } = await supabase
     .from("appointments")
     .select("id, patient_id, psychologist_id, scheduled_at, duration_minutes, type")
@@ -136,14 +143,63 @@ export async function resendAppointmentAccess(
     return { success: false, emailSent: false, reason: "appointment_not_found" };
   }
 
-  return sendAppointmentNotification({
-    appointmentId: apt.id,
-    patientId: apt.patient_id,
-    psychologistId: apt.psychologist_id,
-    scheduledAt: apt.scheduled_at,
-    durationMinutes: apt.duration_minutes || 50,
-    type: apt.type || "presential",
-  });
+  // Honor user preference: skip e-mail when the toggle is OFF, but still rotate token.
+  let emailEnabled = true;
+  try {
+    const { data: prefs } = await supabase
+      .from("user_preferences" as any)
+      .select("settings")
+      .eq("user_id", apt.psychologist_id)
+      .maybeSingle();
+    const ev = (prefs as any)?.settings?.email_events;
+    if (ev && ev.on_access_share === false) emailEnabled = false;
+  } catch {/* non-fatal */}
+
+  const result = await sendAppointmentNotification(
+    {
+      appointmentId: apt.id,
+      patientId: apt.patient_id,
+      psychologistId: apt.psychologist_id,
+      scheduledAt: apt.scheduled_at,
+      durationMinutes: apt.duration_minutes || 50,
+      type: apt.type || "presential",
+    },
+    emailEnabled ? {} : { skipEmail: true }
+  );
+
+  // Internal audit + notification (best effort, never block UX)
+  try {
+    await supabase.from("audit_logs").insert({
+      user_id: apt.psychologist_id,
+      action_type: "resend_access",
+      entity_type: "appointment",
+      entity_id: apt.id,
+      new_data: {
+        sent: result.emailSent,
+        portal_url: result.portalUrl,
+        email_enabled: emailEnabled,
+      } as any,
+    } as any);
+  } catch {/* ignore */}
+
+  try {
+    await supabase.functions.invoke("dispatch-notification", {
+      body: {
+        user_id: apt.psychologist_id,
+        category: "agenda",
+        type: "appointment",
+        title: result.emailSent ? "Acesso reenviado" : "Link de acesso gerado",
+        message: result.emailSent
+          ? "E-mail enviado ao paciente com o link de acesso."
+          : "Link copiado. Compartilhe manualmente com o paciente.",
+        action_path: "/agenda",
+        action_label: "Ver agenda",
+        metadata: { appointment_id: apt.id, event: "resend_access" },
+      },
+    });
+  } catch {/* ignore */}
+
+  return result;
 }
 
 /**
