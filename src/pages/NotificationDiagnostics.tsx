@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, AlertCircle, Loader2, Mail, BellRing, Radio, ListChecks, Send } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle, Loader2, Mail, BellRing, Radio, ListChecks, Send, TestTube2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -16,6 +16,8 @@ interface CheckResult {
   label: string;
   detail?: string;
 }
+
+type FullTestResults = Record<"internal" | "push" | "email", CheckResult>;
 
 function StatusDot({ s }: { s: Health }) {
   if (s === "loading") return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
@@ -33,6 +35,7 @@ export default function NotificationDiagnostics() {
   const [lastFailure, setLastFailure] = useState<any>(null);
   const [sending, setSending] = useState<string | null>(null);
   const [me, setMe] = useState<{ id: string; email: string } | null>(null);
+  const [fullTest, setFullTest] = useState<FullTestResults | null>(null);
 
   const runChecks = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -165,6 +168,21 @@ export default function NotificationDiagnostics() {
       runChecks();
     });
 
+  const testFull = () =>
+    runTest("full", async () => {
+      const { data, error } = await supabase.functions.invoke("notification-full-test", { body: {} });
+      if (error) throw error;
+      if (!data?.results) throw new Error(data?.error || "Teste completo sem retorno");
+      setFullTest(data.results as FullTestResults);
+      const values = Object.values(data.results as FullTestResults);
+      const failed = values.filter((r) => r.status === "fail").length;
+      const warned = values.filter((r) => r.status === "warn").length;
+      if (failed) toast.error(`Teste completo finalizado com ${failed} falha(s)`);
+      else if (warned) toast.warning("Teste completo finalizado com alerta(s)");
+      else toast.success("Teste completo aprovado em todos os canais");
+      runChecks();
+    });
+
   const checks: CheckResult[] = [email, realtime, queue, push];
 
   return (
@@ -218,11 +236,40 @@ export default function NotificationDiagnostics() {
               {sending === "notif" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Disparar notificação
             </Button>
+            <Button onClick={testFull} disabled={!!sending} className="gap-2">
+              {sending === "full" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
+              Teste completo
+            </Button>
             <Button asChild variant="outline" className="gap-2">
               <Link to="/configuracoes/diagnostico-push"><Radio className="h-4 w-4" />Diagnóstico avançado de Push</Link>
             </Button>
           </CardContent>
         </Card>
+
+        {fullTest && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Resultado do teste completo</CardTitle>
+              <CardDescription>Registro simultâneo de push, notificação interna e e-mail</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {Object.entries(fullTest).map(([key, result]) => (
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                  <div className="flex items-center gap-3">
+                    <StatusDot s={result.status} />
+                    <div>
+                      <div className="font-medium">{result.label}</div>
+                      <div className="text-xs text-muted-foreground">{result.detail}</div>
+                    </div>
+                  </div>
+                  <Badge variant={result.status === "ok" ? "default" : result.status === "warn" ? "secondary" : "destructive"}>
+                    {result.status.toUpperCase()}
+                  </Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

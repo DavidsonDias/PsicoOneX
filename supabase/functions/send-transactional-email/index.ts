@@ -352,10 +352,28 @@ Deno.serve(async (req) => {
     })
   }
 
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/process-email-queue`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${supabaseServiceKey}`,
+        apikey: supabaseServiceKey,
+      },
+      body: JSON.stringify({ source: 'send-transactional-email', messageId }),
+    })
+  } catch (queueKickError) {
+    console.warn('Email queued but immediate processing kick failed', {
+      templateName,
+      effectiveRecipient,
+      error: queueKickError instanceof Error ? queueKickError.message : String(queueKickError),
+    })
+  }
+
   console.log('Transactional email enqueued', { templateName, effectiveRecipient })
 
   return new Response(
-    JSON.stringify({ success: true, queued: true }),
+    JSON.stringify({ success: true, queued: true, messageId }),
     {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

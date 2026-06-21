@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 interface PushPayload {
+  user_id?: string;
   user_ids?: string[];
   category?: string;
   title: string;
@@ -35,7 +36,8 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     let query = supabase.from("push_subscriptions").select("*");
-    if (payload.user_ids?.length) query = query.in("user_id", payload.user_ids);
+    const userIds = payload.user_ids?.length ? payload.user_ids : payload.user_id ? [payload.user_id] : [];
+    if (userIds.length) query = query.in("user_id", userIds);
     const { data: subs, error } = await query;
     if (error) throw error;
 
