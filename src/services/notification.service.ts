@@ -164,7 +164,7 @@ export async function resendAppointmentAccess(
       durationMinutes: apt.duration_minutes || 50,
       type: apt.type || "presential",
     },
-    emailEnabled ? {} : { templateName: undefined as any }
+    emailEnabled ? {} : { skipEmail: true }
   );
 
   // Internal audit + notification (best effort, never block UX)
