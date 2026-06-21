@@ -47,12 +47,8 @@ export async function sendAppointmentNotification(
     // 1. Fetch patient + psychologist data
     const [{ data: patient }, { data: prof }] = await Promise.all([
       supabase.from("patients").select("full_name, email").eq("id", ctx.patientId).single(),
-      supabase.from("profiles").select("full_name, clinic_name").eq("id", ctx.psychologistId).single(),
+      supabase.from("profiles").select("full_name, clinic_name, notification_emails").eq("id", ctx.psychologistId).single(),
     ]);
-
-    if (!patient?.email) {
-      return { success: false, emailSent: false, reason: "no_email" };
-    }
 
     // 2. Generate fresh access token
     const token = await createPatientAccessLink({
@@ -67,6 +63,11 @@ export async function sendAppointmentNotification(
     }
 
     const portalUrl = getPortalUrl(token);
+
+    if (!patient?.email) {
+      return { success: true, emailSent: false, portalUrl, reason: "no_email" };
+    }
+
     const aptDate = new Date(ctx.scheduledAt);
     const dateStr = aptDate.toLocaleDateString("pt-BR", {
       weekday: "long",
