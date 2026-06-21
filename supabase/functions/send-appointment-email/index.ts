@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
+import { calendarButtonsHtml } from "../_shared/calendar-links.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -89,7 +90,15 @@ Deno.serve(async (req) => {
               Acessar Portal da Sessão
             </a>
           </div>
-          
+
+          ${calendarButtonsHtml({
+            title: `Sessão${prof?.full_name ? ` com ${prof.full_name}` : ""}`,
+            description: `Sessão ${apt.type === "online" ? "online" : "presencial"}${prof?.clinic_name ? ` · ${prof.clinic_name}` : ""}. Portal: ${portalUrl}`,
+            location: apt.type === "online" ? portalUrl : (prof?.clinic_name || ""),
+            startISO: apt.scheduled_at,
+            durationMinutes: apt.duration_minutes || 50,
+          })}
+
           <p style="font-size: 13px; color: #999; text-align: center;">
             Neste portal você pode confirmar presença${apt.type === "online" ? ", entrar na videochamada" : ""} e ver os detalhes da sessão.
           </p>
