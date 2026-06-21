@@ -747,12 +747,112 @@ export default function Configuracoes() {
         {/* ── NOTIFICATIONS ── */}
         <TabsContent value="notifications" className="space-y-4">
           <PushNotificationsCard />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" /> Configurações de Notificações
+                <Bell className="h-5 w-5 text-primary" /> Lembretes automáticos para o paciente
               </CardTitle>
-              <CardDescription>Configure como deseja notificar seus pacientes</CardDescription>
+              <CardDescription>
+                Escolha quantos lembretes serão enviados antes de cada sessão. Disparados por job a cada 15 minutos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { m: 1440, label: "24 horas antes" },
+                { m: 180, label: "3 horas antes" },
+                { m: 120, label: "2 horas antes" },
+                { m: 60, label: "1 hora antes" },
+                { m: 30, label: "30 minutos antes" },
+                { m: 15, label: "15 minutos antes" },
+              ].map(({ m, label }) => {
+                const selected = (prefs.settings.reminder_minutes ?? [1440, 180, 60, 15]).includes(m);
+                return (
+                  <div key={m} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                    <Label className="cursor-pointer">{label}</Label>
+                    <Switch
+                      checked={selected}
+                      onCheckedChange={(c) => {
+                        const cur = new Set(prefs.settings.reminder_minutes ?? [1440, 180, 60, 15]);
+                        if (c) cur.add(m); else cur.delete(m);
+                        savePrefs({ settings: { ...prefs.settings, reminder_minutes: [...cur].sort((a, b) => b - a) } });
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" /> E-mails automáticos
+              </CardTitle>
+              <CardDescription>Quais eventos disparam e-mail para o paciente</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { k: "on_create" as const, label: "Após criar agendamento" },
+                { k: "on_reschedule" as const, label: "Após reagendamento" },
+                { k: "on_cancel" as const, label: "Após cancelamento" },
+                { k: "on_onboarding_complete" as const, label: "Após conclusão do cadastro" },
+                { k: "on_access_share" as const, label: "Ao compartilhar acesso" },
+              ].map(({ k, label }) => {
+                const ev = prefs.settings.email_events ?? {};
+                return (
+                  <div key={k} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                    <Label className="cursor-pointer">{label}</Label>
+                    <Switch
+                      checked={ev[k] !== false}
+                      onCheckedChange={(c) =>
+                        savePrefs({ settings: { ...prefs.settings, email_events: { ...ev, [k]: c } } })
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" /> Notificações do psicólogo
+              </CardTitle>
+              <CardDescription>Eventos em que você quer ser alertado</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { k: "on_create" as const, label: "Novo agendamento" },
+                { k: "on_reschedule" as const, label: "Reagendamento" },
+                { k: "on_cancel" as const, label: "Cancelamento" },
+                { k: "on_onboarding_complete" as const, label: "Conclusão de cadastro" },
+                { k: "on_financial" as const, label: "Eventos financeiros" },
+                { k: "bcc_self_on_patient_emails" as const, label: "Receber cópia (BCC) dos e-mails enviados ao paciente" },
+              ].map(({ k, label }) => {
+                const al = prefs.settings.psychologist_alerts ?? {};
+                return (
+                  <div key={k} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                    <Label className="cursor-pointer">{label}</Label>
+                    <Switch
+                      checked={al[k] !== false}
+                      onCheckedChange={(c) =>
+                        savePrefs({ settings: { ...prefs.settings, psychologist_alerts: { ...al, [k]: c } } })
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" /> Canais de comunicação
+              </CardTitle>
+              <CardDescription>Habilite/desabilite canais globalmente</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {[
@@ -768,13 +868,20 @@ export default function Configuracoes() {
                   <Switch checked={settings[key]} onCheckedChange={(checked) => setSettings({ ...settings, [key]: checked })} />
                 </div>
               ))}
-              <div className="space-y-2">
-                <Label htmlFor="reminder_hours">Antecedência dos Lembretes (horas)</Label>
-                <Input id="reminder_hours" type="number" value={settings.reminder_hours} onChange={(e) => setSettings({ ...settings, reminder_hours: Number(e.target.value) })} />
-                <p className="text-sm text-muted-foreground">Pacientes receberão lembretes com esta antecedência</p>
-              </div>
               <Button onClick={handleSaveSettings} disabled={saving} className="gap-2 w-full sm:w-auto">
                 <Save className="h-4 w-4" />{saving ? "Salvando..." : "Salvar Configurações"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Diagnóstico de Notificações</CardTitle>
+              <CardDescription>Verifique o estado de SMTP, Push, Realtime e Fila</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" onClick={() => window.location.assign("/configuracoes/diagnostico-notificacoes")} className="gap-2">
+                Abrir diagnóstico completo
               </Button>
             </CardContent>
           </Card>
