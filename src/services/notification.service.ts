@@ -21,10 +21,16 @@ export interface AppointmentNotificationContext {
 export interface NotificationResult {
   success: boolean;
   emailSent: boolean;
+  psychologistEmailSent?: boolean;
   portalUrl?: string;
   reason?: string;
   error?: string;
 }
+
+const APP_BASE_URL =
+  typeof window !== "undefined"
+    ? window.location.origin
+    : "https://psicoone.lovable.app";
 
 /**
  * Sends appointment confirmation email + generates patient portal link.
@@ -83,6 +89,13 @@ export async function sendAppointmentNotification(
     }
 
 
+    const metadata = {
+      appointment_id: ctx.appointmentId,
+      patient_id: ctx.patientId,
+      idempotency_key: idempotencyKey,
+      channel: "patient_email",
+    };
+
     // 4. Invoke transactional email function
     const { data, error } = await supabase.functions.invoke("send-transactional-email", {
       body: {
@@ -100,10 +113,7 @@ export async function sendAppointmentNotification(
           portalUrl,
           hoursAhead: options.hoursAhead ? String(options.hoursAhead) : undefined,
         },
-        metadata: {
-          appointment_id: ctx.appointmentId,
-          patient_id: ctx.patientId,
-        },
+        metadata,
       },
     });
 
@@ -113,7 +123,52 @@ export async function sendAppointmentNotification(
     }
 
     const ok = data?.success || data?.queued;
-    return { success: !!ok, emailSent: !!ok, portalUrl, reason: data?.reason };
+
+    let psychologistEmailSent = false;
+    try {
+      const { data: prefs } = await supabase
+        .from("user_preferences" as any)
+        .select("settings")
+        .eq("user_id", ctx.psychologistId)
+        .maybeSingle();
+      const wantsCopy = (prefs as any)?.settings?.psychologist_alerts?.bcc_self_on_patient_emails === true;
+      const recipients = Array.from(
+        new Set([...(Array.isArray((prof as any)?.notification_emails) ? (prof as any).notification_emails : [])].filter(Boolean))
+      );
+
+      if (ok && wantsCopy && recipients.length > 0) {
+        await Promise.all(
+          recipients.map((recipientEmail) =>
+            supabase.functions.invoke("send-transactional-email", {
+              body: {
+                templateName: "psychologist-patient-action",
+                recipientEmail,
+                idempotencyKey: `${idempotencyKey}-psych-${recipientEmail}`,
+                templateData: {
+                  psychologistName: prof?.full_name,
+                  patientName: patient.full_name,
+                  actionType: templateName === "appointment-reminder" ? "message" : "access_sent",
+                  appointmentDate: dateStr,
+                  appointmentTime: timeStr,
+                  message: `O acesso seguro do paciente foi ${templateName === "appointment-reminder" ? "incluído no lembrete" : "enviado"}.`,
+                  agendaUrl: `${APP_BASE_URL}/agenda`,
+                },
+                metadata: {
+                  ...metadata,
+                  channel: "psychologist_email_copy",
+                  recipient: recipientEmail,
+                },
+              },
+            })
+          )
+        );
+        psychologistEmailSent = true;
+      }
+    } catch (copyError) {
+      console.warn("[NotificationService] psychologist copy failed", copyError);
+    }
+
+    return { success: !!ok, emailSent: !!ok, psychologistEmailSent, portalUrl, reason: data?.reason };
   } catch (err) {
     console.error("[NotificationService] Unexpected error:", err);
     return {
