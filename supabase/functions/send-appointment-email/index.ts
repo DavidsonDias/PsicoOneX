@@ -56,8 +56,8 @@ Deno.serve(async (req) => {
       .single();
 
     const date = new Date(apt.scheduled_at);
-    const dateStr = date.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-    const timeStr = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const dateStr = date.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
+    const timeStr = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
     const portalUrl = `${Deno.env.get("SUPABASE_URL")?.replace("supabase.co", "lovable.app") || "https://psicoone.com"}/portal/${token}`;
 
     // Try to send via Lovable email queue (pgmq)

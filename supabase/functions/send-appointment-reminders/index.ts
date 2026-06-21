@@ -124,8 +124,9 @@ Deno.serve(async (req) => {
       const aptDate = new Date(apt.scheduled_at);
       const dateStr = aptDate.toLocaleDateString("pt-BR", {
         weekday: "long", day: "2-digit", month: "long", year: "numeric",
+        timeZone: "America/Sao_Paulo",
       });
-      const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const timeStr = aptDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
       // Invoke send-transactional-email
       const sendRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {

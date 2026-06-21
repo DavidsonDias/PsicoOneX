@@ -145,8 +145,8 @@ Deno.serve(async (req) => {
       if (!apt?.scheduled_at) return { date: "", time: "" };
       const d = new Date(apt.scheduled_at);
       return {
-        date: d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }),
-        time: d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        date: d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" }),
+        time: d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }),
       };
     };
 
@@ -300,6 +300,7 @@ Deno.serve(async (req) => {
       const newDate = new Date(proposedDate).toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "short",
+        timeZone: "America/Sao_Paulo",
       });
       const aptFmtR = await formatAptDateTime();
       await notifyPsychologist(
