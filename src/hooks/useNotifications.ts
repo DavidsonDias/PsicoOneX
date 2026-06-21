@@ -40,10 +40,83 @@ export function useNotifications() {
     loadNotifications();
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let userId: string | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let lastSeenAt: string = new Date().toISOString();
+
+    const showLiveToast = (newNotif: AppNotification) => {
+      const isOnboarding = newNotif.type === "patient_onboarding";
+      try {
+        if (typeof window !== "undefined" && "Audio" in window) {
+          const audio = new Audio(
+            "data:audio/wav;base64,UklGRl9vAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
+          );
+          audio.volume = 0.4;
+          audio.play().catch(() => {});
+        }
+        if (
+          typeof window !== "undefined" &&
+          "Notification" in window &&
+          Notification.permission === "granted" &&
+          document.visibilityState !== "visible"
+        ) {
+          const n = new Notification(newNotif.title, {
+            body: newNotif.message,
+            icon: "/icon-192.png",
+            tag: newNotif.type,
+          });
+          n.onclick = () => {
+            window.focus();
+            if (newNotif.action_path) window.location.href = newNotif.action_path;
+          };
+        }
+      } catch {}
+
+      toast(newNotif.title, {
+        description: newNotif.message,
+        duration: isOnboarding ? 12000 : 5000,
+        className: isOnboarding ? "border-primary shadow-lg" : undefined,
+        action: newNotif.action_path
+          ? {
+              label: newNotif.action_label || "Abrir",
+              onClick: () => {
+                window.location.href = newNotif.action_path!;
+              },
+            }
+          : undefined,
+      });
+    };
+
+    const handleIncoming = (newNotif: AppNotification) => {
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === newNotif.id)) return prev;
+        return [newNotif, ...prev].slice(0, 50);
+      });
+      setUnreadCount((prev) => prev + 1);
+      lastSeenAt = newNotif.created_at;
+      showLiveToast(newNotif);
+    };
+
+    // Polling fallback — pega qualquer evento perdido pelo realtime (rede instável, sleep, etc)
+    const pollNewSince = async () => {
+      if (!userId) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .gt("created_at", lastSeenAt)
+        .order("created_at", { ascending: true })
+        .limit(20);
+      if (data && data.length) {
+        for (const n of data as AppNotification[]) handleIncoming(n);
+      }
+    };
 
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
+      userId = session.user.id;
 
       channel = supabase
         .channel(`notifications-realtime-${session.user.id}`)
@@ -55,63 +128,23 @@ export function useNotifications() {
             table: "notifications",
             filter: `user_id=eq.${session.user.id}`,
           },
-          (payload) => {
-            const newNotif = payload.new as AppNotification;
-            setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
-            setUnreadCount((prev) => prev + 1);
-
-            const isOnboarding = newNotif.type === "patient_onboarding";
-
-            // Sonar — destaque sonoro/visual em eventos relevantes
-            try {
-              if (isOnboarding && typeof window !== "undefined" && "Audio" in window) {
-                const audio = new Audio(
-                  "data:audio/wav;base64,UklGRl9vAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
-                );
-                audio.volume = 0.4;
-                audio.play().catch(() => {});
-              }
-              // Browser-level notification (when the tab is hidden but page is open)
-              if (
-                typeof window !== "undefined" &&
-                "Notification" in window &&
-                Notification.permission === "granted" &&
-                document.visibilityState !== "visible"
-              ) {
-                const n = new Notification(newNotif.title, {
-                  body: newNotif.message,
-                  icon: "/icon-192.png",
-                  tag: newNotif.type,
-                });
-                n.onclick = () => {
-                  window.focus();
-                  if (newNotif.action_path) window.location.href = newNotif.action_path;
-                };
-              }
-            } catch {}
-
-            toast(newNotif.title, {
-              description: newNotif.message,
-              duration: isOnboarding ? 12000 : 5000,
-              className: isOnboarding ? "border-primary shadow-lg" : undefined,
-              action: newNotif.action_path
-                ? {
-                    label: newNotif.action_label || "Abrir",
-                    onClick: () => {
-                      window.location.href = newNotif.action_path!;
-                    },
-                  }
-                : undefined,
-            });
-          }
+          (payload) => handleIncoming(payload.new as AppNotification)
         )
         .subscribe();
+
+      pollTimer = setInterval(pollNewSince, 20000);
+      window.addEventListener("focus", pollNewSince);
+      document.addEventListener("visibilitychange", pollNewSince);
     })();
 
     return () => {
       if (channel) supabase.removeChannel(channel);
+      if (pollTimer) clearInterval(pollTimer);
+      window.removeEventListener("focus", pollNewSince);
+      document.removeEventListener("visibilitychange", pollNewSince);
     };
   }, [loadNotifications]);
+
 
 
   const markAsRead = async (id: string) => {
