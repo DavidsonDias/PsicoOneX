@@ -56,6 +56,25 @@ export interface UserPreferences {
     enable_sms: boolean;
     terms_of_service: string;
     privacy_policy: string;
+    /** Minutos antes da sessão para disparar lembretes ao paciente. Ex.: [1440,180,120,60,30,15] */
+    reminder_minutes?: number[];
+    /** Eventos que disparam e-mail ao paciente */
+    email_events?: {
+      on_create?: boolean;
+      on_reschedule?: boolean;
+      on_cancel?: boolean;
+      on_onboarding_complete?: boolean;
+      on_access_share?: boolean;
+    };
+    /** Eventos que disparam notificação interna ao psicólogo */
+    psychologist_alerts?: {
+      on_create?: boolean;
+      on_reschedule?: boolean;
+      on_cancel?: boolean;
+      on_onboarding_complete?: boolean;
+      on_financial?: boolean;
+      bcc_self_on_patient_emails?: boolean;
+    };
   };
 }
 
