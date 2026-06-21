@@ -32,7 +32,7 @@ export interface NotificationResult {
  */
 export async function sendAppointmentNotification(
   ctx: AppointmentNotificationContext,
-  options: { templateName?: "appointment-confirmation" | "appointment-reminder"; hoursAhead?: number; expiresInHours?: number } = {}
+  options: { templateName?: "appointment-confirmation" | "appointment-reminder"; hoursAhead?: number; expiresInHours?: number; skipEmail?: boolean } = {}
 ): Promise<NotificationResult> {
   const templateName = options.templateName || "appointment-confirmation";
   const expiresInHours = options.expiresInHours || 72;
