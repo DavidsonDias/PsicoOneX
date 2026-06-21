@@ -114,19 +114,10 @@ Deno.serve(async (req) => {
         .update({ status: "used", used_at: new Date().toISOString() })
         .eq("id", v.row.id);
 
-      // Notificação in-app
-      const { data: notif } = await supabase.from("notifications").insert({
-        user_id: v.row.psychologist_id,
-        type: "patient_onboarding",
-        title: "Paciente concluiu o cadastro",
-        message: `${patientData.full_name || "Paciente"} preencheu o formulário e aguarda revisão.`,
-        action_path: `/pacientes/${v.row.patient_id}`,
-        action_label: "Revisar informações",
-      }).select("id").maybeSingle();
-
-      // Push real para o celular do psicólogo (best-effort, não bloqueia resposta)
+      // Notificação unificada via dispatch-notification (insert + push + preferências)
+      // Mesmo fluxo de Agenda/Financeiro: garante toast + badge + central + push
       try {
-        await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+        await fetch(`${SUPABASE_URL}/functions/v1/dispatch-notification`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -134,17 +125,27 @@ Deno.serve(async (req) => {
             apikey: SERVICE_KEY,
           },
           body: JSON.stringify({
-            user_ids: [v.row.psychologist_id],
+            user_id: v.row.psychologist_id,
+            category: "paciente",
+            type: "patient_onboarding",
             title: "Paciente concluiu o cadastro",
-            body: `${patientData.full_name || "Paciente"} preencheu o formulário e aguarda revisão.`,
-            url: `/pacientes/${v.row.patient_id}`,
-            tag: "patient_onboarding",
-            category: "patient_onboarding",
-            notification_id: notif?.id,
+            message: `${patientData.full_name || "Paciente"} preencheu o formulário e aguarda revisão.`,
+            action_path: `/pacientes/${v.row.patient_id}`,
+            action_label: "Revisar informações",
+            metadata: { patient_id: v.row.patient_id, event: "completed" },
           }),
         });
       } catch (e) {
-        console.warn("[patient-onboarding] push falhou:", e);
+        console.warn("[patient-onboarding] dispatch falhou, fallback direto:", e);
+        await supabase.from("notifications").insert({
+          user_id: v.row.psychologist_id,
+          type: "patient_onboarding",
+          category: "paciente",
+          title: "Paciente concluiu o cadastro",
+          message: `${patientData.full_name || "Paciente"} preencheu o formulário e aguarda revisão.`,
+          action_path: `/pacientes/${v.row.patient_id}`,
+          action_label: "Revisar informações",
+        });
       }
 
       return json({ ok: true });
