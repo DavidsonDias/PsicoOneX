@@ -164,7 +164,22 @@ export const FreeFormEditor = memo(function FreeFormEditor({
         body: { text: value, action, approach, customInstruction: customInstruction || undefined },
       });
 
-      if (error) throw error;
+      // supabase.functions.invoke does not parse the error body for non-2xx;
+      // fetch it manually so we can surface 402 (credits) / 429 (rate limit) properly.
+      if (error) {
+        let serverMsg: string | null = null;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.json();
+            serverMsg = body?.error || null;
+          } else if (ctx && typeof ctx.text === "function") {
+            const txt = await ctx.text();
+            try { serverMsg = JSON.parse(txt)?.error ?? txt; } catch { serverMsg = txt; }
+          }
+        } catch {}
+        throw new Error(serverMsg || error.message || "Erro ao processar com IA");
+      }
       if (data?.error) throw new Error(data.error);
 
       setRefinementModal({
@@ -175,7 +190,14 @@ export const FreeFormEditor = memo(function FreeFormEditor({
       });
     } catch (err: any) {
       console.error("AI error:", err);
-      toast.error(err.message || "Erro ao processar com IA");
+      const msg: string = err?.message || "Erro ao processar com IA";
+      if (/cr[eé]ditos/i.test(msg) || /402/.test(msg)) {
+        toast.error("Créditos de IA insuficientes. Adicione créditos no workspace para continuar usando o assistente.");
+      } else if (/limite/i.test(msg) || /429/.test(msg)) {
+        toast.error("Muitas requisições. Aguarde alguns instantes e tente novamente.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsProcessing(false);
       setCurrentAction(null);
