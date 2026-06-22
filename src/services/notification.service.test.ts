@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// ---- Mock supabase client ----
-type Invoke = ReturnType<typeof vi.fn>;
-
-const invokeMock: Invoke = vi.fn();
+const invokeMock = vi.fn();
 const fromMock = vi.fn();
 const getSessionMock = vi.fn();
 
