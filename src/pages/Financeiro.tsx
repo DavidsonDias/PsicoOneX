@@ -134,7 +134,14 @@ export default function Financeiro() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "by_patient">("list");
+  const [viewMode, setViewMode] = useState<"list" | "by_patient">(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("financeiro:viewMode") : null;
+    return (saved === "list" || saved === "by_patient") ? saved : "by_patient";
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("financeiro:viewMode", viewMode); } catch {}
+  }, [viewMode]);
 
   const [formData, setFormData] = useState({
     type: "income", amount: "", description: "", category: "",
