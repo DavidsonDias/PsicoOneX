@@ -40,10 +40,19 @@ export function BillingPlansPanel({ patients }: { patients: { id: string; full_n
     sessions_per_cycle: 4,
     session_value: "",
     day_of_month: 5,
+    start_date: new Date().toISOString().slice(0, 10),
     description: "",
   });
   const { issues, check, clear } = useConsistencyCheck();
   const [showIssues, setShowIssues] = useState(false);
+
+  // Helper: contextual description by billing type
+  const HELP: Record<string, string> = {
+    per_session: "Sem cobrança recorrente — cada agendamento gera uma cobrança individual automaticamente.",
+    weekly: "Uma cobrança gerada a cada 7 dias, sem dia fixo do mês.",
+    biweekly: "Uma cobrança gerada a cada 15 dias, sem dia fixo do mês.",
+    monthly: "Uma cobrança mensal vencendo em um dia fixo escolhido.",
+  };
 
   const load = async () => {
     const { data } = await supabase
