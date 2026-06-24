@@ -1170,6 +1170,7 @@ export default function Financeiro() {
               )}
             </div>
           </div>
+          )}
         </TabsContent>
 
         {/* ========== STRIPE TAB ========== */}
