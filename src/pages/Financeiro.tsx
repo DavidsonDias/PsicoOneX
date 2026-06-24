@@ -134,6 +134,7 @@ export default function Financeiro() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "by_patient">("list");
 
   const [formData, setFormData] = useState({
     type: "income", amount: "", description: "", category: "",
