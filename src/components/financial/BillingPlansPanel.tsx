@@ -197,6 +197,13 @@ export function BillingPlansPanel({ patients }: { patients: { id: string; full_n
                 <Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
               </div>
             </div>
+            {/* Contextual help per type */}
+            <div className="flex items-start gap-2 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+              <span>{HELP[form.billing_type]}</span>
+            </div>
+
+            {/* MONTHLY: day of month + sessions/month */}
             {form.billing_type === "monthly" && (
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -213,6 +220,23 @@ export function BillingPlansPanel({ patients }: { patients: { id: string; full_n
                 </div>
               </div>
             )}
+
+            {/* WEEKLY / BIWEEKLY: start date only */}
+            {(form.billing_type === "weekly" || form.billing_type === "biweekly") && (
+              <div>
+                <Label>Data da 1ª cobrança</Label>
+                <Input
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  As próximas cobranças serão geradas a cada {form.billing_type === "weekly" ? "7" : "15"} dias a partir desta data.
+                </p>
+              </div>
+            )}
+
+            {/* PER SESSION: nothing extra — explained in help */}
             <div>
               <Label>Descrição (opcional)</Label>
               <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
