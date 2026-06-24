@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Calendar, Repeat, Trash2, Sparkles } from "lucide-react";
+import { Plus, Calendar, Repeat, Trash2, Sparkles, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useConsistencyCheck } from "@/hooks/useConsistencyCheck";
 import { ConsistencyDialog } from "@/components/shared/ConsistencyDialog";
@@ -40,10 +40,19 @@ export function BillingPlansPanel({ patients }: { patients: { id: string; full_n
     sessions_per_cycle: 4,
     session_value: "",
     day_of_month: 5,
+    start_date: new Date().toISOString().slice(0, 10),
     description: "",
   });
   const { issues, check, clear } = useConsistencyCheck();
   const [showIssues, setShowIssues] = useState(false);
+
+  // Helper: contextual description by billing type
+  const HELP: Record<string, string> = {
+    per_session: "Sem cobrança recorrente — cada agendamento gera uma cobrança individual automaticamente.",
+    weekly: "Uma cobrança gerada a cada 7 dias, sem dia fixo do mês.",
+    biweekly: "Uma cobrança gerada a cada 15 dias, sem dia fixo do mês.",
+    monthly: "Uma cobrança mensal vencendo em um dia fixo escolhido.",
+  };
 
   const load = async () => {
     const { data } = await supabase
@@ -86,8 +95,9 @@ export function BillingPlansPanel({ patients }: { patients: { id: string; full_n
       patient_id: form.patient_id,
       billing_type: form.billing_type,
       amount: Number(form.amount),
-      sessions_per_cycle: Number(form.sessions_per_cycle) || null,
+      sessions_per_cycle: form.billing_type === "monthly" ? Number(form.sessions_per_cycle) || null : null,
       day_of_month: form.billing_type === "monthly" ? Number(form.day_of_month) : null,
+      start_date: (form.billing_type === "weekly" || form.billing_type === "biweekly") ? form.start_date : null,
       description: form.description || null,
     });
     if (error) return toast.error(error.message);
@@ -188,6 +198,13 @@ export function BillingPlansPanel({ patients }: { patients: { id: string; full_n
                 <Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
               </div>
             </div>
+            {/* Contextual help per type */}
+            <div className="flex items-start gap-2 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+              <span>{HELP[form.billing_type]}</span>
+            </div>
+
+            {/* MONTHLY: day of month + sessions/month */}
             {form.billing_type === "monthly" && (
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -204,6 +221,23 @@ export function BillingPlansPanel({ patients }: { patients: { id: string; full_n
                 </div>
               </div>
             )}
+
+            {/* WEEKLY / BIWEEKLY: start date only */}
+            {(form.billing_type === "weekly" || form.billing_type === "biweekly") && (
+              <div>
+                <Label>Data da 1ª cobrança</Label>
+                <Input
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  As próximas cobranças serão geradas a cada {form.billing_type === "weekly" ? "7" : "15"} dias a partir desta data.
+                </p>
+              </div>
+            )}
+
+            {/* PER SESSION: nothing extra — explained in help */}
             <div>
               <Label>Descrição (opcional)</Label>
               <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />

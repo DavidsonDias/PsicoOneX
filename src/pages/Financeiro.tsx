@@ -134,6 +134,7 @@ export default function Financeiro() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "by_patient">("list");
 
   const [formData, setFormData] = useState({
     type: "income", amount: "", description: "", category: "",
@@ -908,9 +909,118 @@ export default function Financeiro() {
               />
             </div>
 
+            {/* View mode toggle */}
+            <div className="ml-auto inline-flex rounded-md border bg-muted/30 p-0.5">
+              <Button
+                type="button"
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setViewMode("list")}
+              >
+                Lista
+              </Button>
+              <Button
+                type="button"
+                variant={viewMode === "by_patient" ? "default" : "ghost"}
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setViewMode("by_patient")}
+              >
+                <User className="h-3.5 w-3.5 mr-1" />Por paciente
+              </Button>
+            </div>
           </div>
 
-          {/* Transactions Table */}
+          {/* GROUPED BY PATIENT VIEW */}
+          {viewMode === "by_patient" && (() => {
+            const groups = new Map<string, { name: string; items: Transaction[] }>();
+            filteredTransactions.forEach(t => {
+              const key = t.patient_id || "__none__";
+              const name = t.patient_name || "Sem paciente";
+              if (!groups.has(key)) groups.set(key, { name, items: [] });
+              groups.get(key)!.items.push(t);
+            });
+            const arr = Array.from(groups.entries()).sort((a, b) => a[1].name.localeCompare(b[1].name));
+            if (arr.length === 0) {
+              return (
+                <div className="rounded-xl border bg-card py-16 text-center text-muted-foreground">
+                  <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">Nenhuma transação encontrada</p>
+                </div>
+              );
+            }
+            return (
+              <div className="space-y-3">
+                {arr.map(([key, g]) => {
+                  const total = g.items.reduce((s, x) => s + (x.type === "income" ? Number(x.amount) : -Number(x.amount)), 0);
+                  const paid = g.items.filter(x => x.payment_status === "paid").reduce((s, x) => s + Number(x.amount), 0);
+                  const pending = g.items.filter(x => x.payment_status === "pending").reduce((s, x) => s + Number(x.amount), 0);
+                  return (
+                    <Card key={key} className="overflow-hidden">
+                      <div className="flex items-center justify-between gap-3 px-4 py-3 bg-muted/30 border-b">
+                        <button
+                          className="flex items-center gap-3 min-w-0 text-left hover:underline"
+                          onClick={() => key !== "__none__" && navigate(`/pacientes/${key}`)}
+                          disabled={key === "__none__"}
+                        >
+                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm truncate">{g.name}</p>
+                            <p className="text-xs text-muted-foreground">{g.items.length} transação(ões)</p>
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-3 text-xs shrink-0">
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">Pago {fmtCurrency(paid)}</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">Pendente {fmtCurrency(pending)}</span>
+                          <span className={cn("font-bold", total >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                            {fmtCurrency(total)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-border">
+                        {g.items.map(t => {
+                          const sc = getStatusConfig(t.payment_status);
+                          const SI = sc.icon;
+                          return (
+                            <div key={t.id} className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-muted/20">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0", sc.bg, sc.color, sc.border)}>
+                                  <SI className="h-3 w-3" />{sc.label}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-sm truncate">{t.description}</p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {getTypeLabel(t)} · Venc. {t.due_date && format(new Date(t.due_date), "dd/MM/yyyy")}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={cn("text-sm font-semibold", t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                  {t.type === "income" ? "+" : "-"}{fmtCurrency(Number(t.amount))}
+                                </span>
+                                {t.payment_status === "pending" && (
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => handleMarkAsPaid(t)} title="Marcar como pago">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <ActionMenu onEdit={() => openEditDialog(t)} onDelete={() => handleDeleteTransaction(t.id)}
+                                  deleteTitle="Excluir Transação" deleteDescription="Excluir esta transação?" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {viewMode === "list" && (
           <div className="rounded-xl border border-border overflow-hidden bg-card">
             <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => {
               const file = e.target.files?.[0];
@@ -1058,6 +1168,7 @@ export default function Financeiro() {
               )}
             </div>
           </div>
+          )}
         </TabsContent>
 
         {/* ========== STRIPE TAB ========== */}
