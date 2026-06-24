@@ -1021,8 +1021,6 @@ export default function Financeiro() {
           })()}
 
           {viewMode === "list" && (
-
-          {/* Transactions Table */}
           <div className="rounded-xl border border-border overflow-hidden bg-card">
             <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => {
               const file = e.target.files?.[0];
