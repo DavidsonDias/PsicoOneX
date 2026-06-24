@@ -95,8 +95,9 @@ export function BillingPlansPanel({ patients }: { patients: { id: string; full_n
       patient_id: form.patient_id,
       billing_type: form.billing_type,
       amount: Number(form.amount),
-      sessions_per_cycle: Number(form.sessions_per_cycle) || null,
+      sessions_per_cycle: form.billing_type === "monthly" ? Number(form.sessions_per_cycle) || null : null,
       day_of_month: form.billing_type === "monthly" ? Number(form.day_of_month) : null,
+      start_date: (form.billing_type === "weekly" || form.billing_type === "biweekly") ? form.start_date : null,
       description: form.description || null,
     });
     if (error) return toast.error(error.message);
