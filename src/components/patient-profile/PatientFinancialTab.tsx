@@ -3,16 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { DollarSign, AlertTriangle, CheckCircle, Clock, Plus, Sparkles } from "lucide-react";
+import { DollarSign, AlertTriangle, CheckCircle, Clock, Plus } from "lucide-react";
 import { format, isAfter } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { SmartTransactionDialog } from "@/components/financial/SmartTransactionDialog";
 
 interface Transaction {
   id: string;
@@ -49,14 +45,6 @@ export function PatientFinancialTab({ patientId, patientName, defaultSessionValu
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({
-    amount: defaultSessionValue?.toString() || "200",
-    description: "Sessão de psicoterapia",
-    due_date: format(new Date(), "yyyy-MM-dd"),
-    payment_method: "pix",
-    type: "income" as string,
-  });
 
   useEffect(() => { loadTransactions(); }, [patientId]);
 
@@ -94,29 +82,6 @@ export function PatientFinancialTab({ patientId, patientName, defaultSessionValu
       .eq("id", txId);
     if (error) { toast.error("Erro ao registrar pagamento"); return; }
     toast.success("Pagamento registrado!");
-    loadTransactions();
-  };
-
-  const handleCreatePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { toast.error("Sessão expirada"); setSaving(false); return; }
-
-    const { error } = await supabase.from("financial_transactions").insert({
-      patient_id: patientId,
-      psychologist_id: session.user.id,
-      amount: parseFloat(formData.amount),
-      description: formData.description,
-      due_date: formData.due_date,
-      payment_method: formData.payment_method,
-      type: formData.type,
-      status: "pending",
-    });
-    setSaving(false);
-    if (error) { toast.error("Erro ao registrar"); return; }
-    toast.success("Transação registrada!");
-    setCreateOpen(false);
     loadTransactions();
   };
 
@@ -227,72 +192,17 @@ export function PatientFinancialTab({ patientId, patientName, defaultSessionValu
         </Button>
       </div>
 
-      {/* Create Payment Dialog — patient auto-filled */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Registrar Pagamento</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreatePayment} className="space-y-4">
-            <div className="bg-muted/30 rounded-lg p-3 flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Paciente</p>
-                <p className="font-medium text-sm">{patientName}</p>
-              </div>
-              <Badge variant="secondary" className="ml-auto text-xs">Contexto automático</Badge>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={formData.type} onValueChange={(v) => setFormData(prev => ({ ...prev, type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">Receita</SelectItem>
-                    <SelectItem value="expense">Despesa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Input value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data de Vencimento</Label>
-                <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Forma de Pagamento</Label>
-                <Select value={formData.payment_method} onValueChange={(v) => setFormData(prev => ({ ...prev, payment_method: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="credit_card">Cartão Crédito</SelectItem>
-                    <SelectItem value="debit_card">Cartão Débito</SelectItem>
-                    <SelectItem value="cash">Dinheiro</SelectItem>
-                    <SelectItem value="bank_transfer">Transferência</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={saving}>
-              {saving ? "Salvando..." : "Registrar"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Unified smart transaction dialog (patient locked) */}
+      <SmartTransactionDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        lockedPatient={{
+          id: patientId,
+          full_name: patientName,
+          default_session_value: defaultSessionValue ?? null,
+        }}
+        onCreated={loadTransactions}
+      />
     </div>
   );
 }
