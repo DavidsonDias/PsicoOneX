@@ -153,7 +153,7 @@ export function SmartTransactionDialog({
         .limit(1)
         .maybeSingle();
 
-      const plan = (data as ActivePlan | null) || null;
+      const plan = (data ? (data as unknown as ActivePlan) : null);
       setActivePlan(plan);
 
       const patient =
