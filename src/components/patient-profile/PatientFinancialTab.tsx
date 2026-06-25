@@ -192,72 +192,17 @@ export function PatientFinancialTab({ patientId, patientName, defaultSessionValu
         </Button>
       </div>
 
-      {/* Create Payment Dialog — patient auto-filled */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Registrar Pagamento</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreatePayment} className="space-y-4">
-            <div className="bg-muted/30 rounded-lg p-3 flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Paciente</p>
-                <p className="font-medium text-sm">{patientName}</p>
-              </div>
-              <Badge variant="secondary" className="ml-auto text-xs">Contexto automático</Badge>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={formData.type} onValueChange={(v) => setFormData(prev => ({ ...prev, type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">Receita</SelectItem>
-                    <SelectItem value="expense">Despesa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Input value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data de Vencimento</Label>
-                <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Forma de Pagamento</Label>
-                <Select value={formData.payment_method} onValueChange={(v) => setFormData(prev => ({ ...prev, payment_method: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="credit_card">Cartão Crédito</SelectItem>
-                    <SelectItem value="debit_card">Cartão Débito</SelectItem>
-                    <SelectItem value="cash">Dinheiro</SelectItem>
-                    <SelectItem value="bank_transfer">Transferência</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={saving}>
-              {saving ? "Salvando..." : "Registrar"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Unified smart transaction dialog (patient locked) */}
+      <SmartTransactionDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        lockedPatient={{
+          id: patientId,
+          full_name: patientName,
+          default_session_value: defaultSessionValue ?? null,
+        }}
+        onCreated={loadTransactions}
+      />
     </div>
   );
 }
