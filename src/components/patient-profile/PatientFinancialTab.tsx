@@ -45,14 +45,6 @@ export function PatientFinancialTab({ patientId, patientName, defaultSessionValu
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({
-    amount: defaultSessionValue?.toString() || "200",
-    description: "Sessão de psicoterapia",
-    due_date: format(new Date(), "yyyy-MM-dd"),
-    payment_method: "pix",
-    type: "income" as string,
-  });
 
   useEffect(() => { loadTransactions(); }, [patientId]);
 
@@ -93,30 +85,6 @@ export function PatientFinancialTab({ patientId, patientName, defaultSessionValu
     loadTransactions();
   };
 
-  const handleCreatePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { toast.error("Sessão expirada"); setSaving(false); return; }
-
-    const { error } = await supabase.from("financial_transactions").insert({
-      patient_id: patientId,
-      psychologist_id: session.user.id,
-      amount: parseFloat(formData.amount),
-      description: formData.description,
-      due_date: formData.due_date,
-      payment_method: formData.payment_method,
-      type: formData.type,
-      status: "pending",
-    });
-    setSaving(false);
-    if (error) { toast.error("Erro ao registrar"); return; }
-    toast.success("Transação registrada!");
-    setCreateOpen(false);
-    loadTransactions();
-  };
-
-  if (loading) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
