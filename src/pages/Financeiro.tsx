@@ -200,7 +200,7 @@ export default function Financeiro() {
     if (data) setPatients(data);
   };
 
-  const handlePatientSelect = (patientId: string, isEdit: boolean) => {
+  const handlePatientSelect = async (patientId: string, isEdit: boolean) => {
     if (isEdit) {
       setFormData(prev => ({ ...prev, patient_id: patientId }));
       return;
@@ -210,11 +210,40 @@ export default function Financeiro() {
       setFormData(prev => ({ ...prev, patient_id: patientId }));
       return;
     }
-    const cat = formData.category || "Consulta psicológica";
-    const smartValue = cat === "Pacote mensal" && patient.monthly_plan_value
-      ? String(patient.monthly_plan_value)
-      : patient.default_session_value ? String(patient.default_session_value) : formData.amount;
-    const smartDueDate = patient.payment_day ? calcSmartDueDate(patient.payment_day) : formData.due_date;
+
+    // Smart: check for active billing plan first → falls back to cadastro
+    const { data: planData } = await supabase
+      .from("patient_billing_plans" as any)
+      .select("billing_type, amount, day_of_month")
+      .eq("patient_id", patientId)
+      .eq("active", true)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const plan = planData as any;
+
+    let cat = formData.category || "Consulta psicológica";
+    let smartValue = formData.amount;
+    let smartDueDate = formData.due_date;
+
+    if (plan) {
+      smartValue = String(plan.amount);
+      cat = plan.billing_type === "monthly" ? "Pacote mensal" : "Consulta psicológica";
+      if (plan.billing_type === "monthly" && plan.day_of_month) {
+        smartDueDate = calcSmartDueDate(plan.day_of_month);
+      } else if (plan.billing_type === "weekly") {
+        smartDueDate = format(addMonths(new Date(), 0).setDate(new Date().getDate() + 7) as any, "yyyy-MM-dd");
+        smartDueDate = format(new Date(Date.now() + 7 * 86400000), "yyyy-MM-dd");
+      } else if (plan.billing_type === "biweekly") {
+        smartDueDate = format(new Date(Date.now() + 15 * 86400000), "yyyy-MM-dd");
+      }
+    } else {
+      smartValue = cat === "Pacote mensal" && patient.monthly_plan_value
+        ? String(patient.monthly_plan_value)
+        : patient.default_session_value ? String(patient.default_session_value) : formData.amount;
+      smartDueDate = patient.payment_day ? calcSmartDueDate(patient.payment_day) : formData.due_date;
+    }
     const smartDesc = suggestDescription(patient.full_name, cat);
 
     setFormData(prev => ({
