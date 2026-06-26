@@ -44,12 +44,25 @@ interface ActivePlan {
   description: string | null;
 }
 
+export interface EditingTransaction {
+  id: string;
+  type: "income" | "expense";
+  amount: number;
+  description: string;
+  category: string;
+  payment_method: string;
+  status: "pending" | "paid" | "overdue" | "cancelled" | "refunded";
+  due_date: string;
+  patient_id?: string | null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lockedPatient?: PatientLite | null; // when set: patient field is read-only
   onCreated?: () => void;
   defaultType?: "income" | "expense";
+  editing?: EditingTransaction | null;
 }
 
 const INCOME_CATEGORIES = [
