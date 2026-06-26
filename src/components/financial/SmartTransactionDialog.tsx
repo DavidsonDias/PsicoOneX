@@ -188,6 +188,9 @@ export function SmartTransactionDialog({
       const plan = (data ? (data as unknown as ActivePlan) : null);
       setActivePlan(plan);
 
+      // In edit mode, only surface the plan (banner) — don't overwrite user values
+      if (isEdit) return;
+
       const patient =
         lockedPatient && lockedPatient.id === form.patient_id
           ? lockedPatient
