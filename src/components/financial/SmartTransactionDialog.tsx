@@ -283,7 +283,7 @@ export function SmartTransactionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            {lockedPatient ? "Registrar Pagamento" : "Nova Transação"}
+            {isEdit ? "Editar Transação" : (lockedPatient ? "Registrar Pagamento" : "Nova Transação")}
           </DialogTitle>
         </DialogHeader>
 
