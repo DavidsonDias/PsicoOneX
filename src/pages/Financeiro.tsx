@@ -1366,13 +1366,23 @@ export default function Financeiro() {
         </TabsContent>
       </Tabs>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingTransaction} onOpenChange={(open) => { if (!open) { setEditingTransaction(null); resetForm(); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Editar Transação</DialogTitle></DialogHeader>
-          <TransactionForm onSubmit={handleEditTransaction} isEdit />
-        </DialogContent>
-      </Dialog>
+      {/* Edit Dialog — unified SmartTransactionDialog (plan-aware) */}
+      <SmartTransactionDialog
+        open={!!editingTransaction}
+        onOpenChange={(o) => { if (!o) { setEditingTransaction(null); resetForm(); } }}
+        onCreated={() => { if (userId) loadTransactions(userId); }}
+        editing={editingTransaction ? {
+          id: editingTransaction.id,
+          type: editingTransaction.type as "income" | "expense",
+          amount: Number(editingTransaction.amount),
+          description: editingTransaction.description || "",
+          category: editingTransaction.category || "",
+          payment_method: editingTransaction.payment_method || "pix",
+          status: editingTransaction.payment_status as any,
+          due_date: editingTransaction.due_date,
+          patient_id: editingTransaction.patient_id || null,
+        } : null}
+      />
     </AppLayout>
   );
 }
