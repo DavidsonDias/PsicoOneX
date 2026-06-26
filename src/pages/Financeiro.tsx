@@ -872,15 +872,14 @@ export default function Financeiro() {
                   }}>PDF</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { guardWrite(() => setDialogOpen(true)); } else { setDialogOpen(false); resetForm(); } }}>
-                <DialogTrigger asChild>
-                  <Button className="gap-2"><Plus className="h-4 w-4" />Nova Transação</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader><DialogTitle>Nova Transação</DialogTitle></DialogHeader>
-                  <TransactionForm onSubmit={handleCreateTransaction} />
-                </DialogContent>
-              </Dialog>
+              <Button className="gap-2" onClick={() => guardWrite(() => setDialogOpen(true))}>
+                <Plus className="h-4 w-4" />Nova Transação
+              </Button>
+              <SmartTransactionDialog
+                open={dialogOpen}
+                onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}
+                onCreated={() => { if (userId) loadTransactions(userId); }}
+              />
             </div>
           </div>
 
