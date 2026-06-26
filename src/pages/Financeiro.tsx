@@ -37,6 +37,7 @@ import { FinancialGrowth } from "@/components/financial/FinancialGrowth";
 import { RecurringBillingsPanel } from "@/components/financial/RecurringBillingsPanel";
 import { BillingPlansPanel } from "@/components/financial/BillingPlansPanel";
 import { OverdueSemaforo } from "@/components/financial/OverdueSemaforo";
+import { SmartTransactionDialog } from "@/components/financial/SmartTransactionDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
