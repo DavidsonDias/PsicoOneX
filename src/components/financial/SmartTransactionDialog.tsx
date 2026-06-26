@@ -113,23 +113,42 @@ const PLAN_LABEL: Record<ActivePlan["billing_type"], string> = {
 };
 
 export function SmartTransactionDialog({
-  open, onOpenChange, lockedPatient = null, onCreated, defaultType = "income",
+  open, onOpenChange, lockedPatient = null, onCreated, defaultType = "income", editing = null,
 }: Props) {
+  const isEdit = !!editing;
   const [userId, setUserId] = useState<string>("");
   const [patients, setPatients] = useState<PatientLite[]>([]);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
-    type: defaultType as "income" | "expense",
-    patient_id: lockedPatient?.id || "",
-    category: "Consulta psicológica",
-    amount: "",
-    description: "",
-    due_date: format(new Date(), "yyyy-MM-dd"),
-    payment_method: "pix",
-    status: "pending" as "pending" | "paid",
+    type: (editing?.type || defaultType) as "income" | "expense",
+    patient_id: editing?.patient_id || lockedPatient?.id || "",
+    category: editing?.category || "Consulta psicológica",
+    amount: editing ? String(editing.amount) : "",
+    description: editing?.description || "",
+    due_date: editing?.due_date || format(new Date(), "yyyy-MM-dd"),
+    payment_method: editing?.payment_method || "pix",
+    status: (editing?.status === "paid" ? "paid" : "pending") as "pending" | "paid",
   });
+
+  // hydrate form when editing target changes / dialog opens
+  useEffect(() => {
+    if (!open) return;
+    if (editing) {
+      setForm({
+        type: editing.type,
+        patient_id: editing.patient_id || "",
+        category: editing.category,
+        amount: String(editing.amount),
+        description: editing.description,
+        due_date: editing.due_date,
+        payment_method: editing.payment_method || "pix",
+        status: editing.status === "paid" ? "paid" : "pending",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editing?.id]);
 
   // bootstrap user + patient list
   useEffect(() => {
