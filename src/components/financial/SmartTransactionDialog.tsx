@@ -44,12 +44,25 @@ interface ActivePlan {
   description: string | null;
 }
 
+export interface EditingTransaction {
+  id: string;
+  type: "income" | "expense";
+  amount: number;
+  description: string;
+  category: string;
+  payment_method: string;
+  status: "pending" | "paid" | "overdue" | "cancelled" | "refunded";
+  due_date: string;
+  patient_id?: string | null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lockedPatient?: PatientLite | null; // when set: patient field is read-only
   onCreated?: () => void;
   defaultType?: "income" | "expense";
+  editing?: EditingTransaction | null;
 }
 
 const INCOME_CATEGORIES = [
@@ -100,23 +113,42 @@ const PLAN_LABEL: Record<ActivePlan["billing_type"], string> = {
 };
 
 export function SmartTransactionDialog({
-  open, onOpenChange, lockedPatient = null, onCreated, defaultType = "income",
+  open, onOpenChange, lockedPatient = null, onCreated, defaultType = "income", editing = null,
 }: Props) {
+  const isEdit = !!editing;
   const [userId, setUserId] = useState<string>("");
   const [patients, setPatients] = useState<PatientLite[]>([]);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
-    type: defaultType as "income" | "expense",
-    patient_id: lockedPatient?.id || "",
-    category: "Consulta psicológica",
-    amount: "",
-    description: "",
-    due_date: format(new Date(), "yyyy-MM-dd"),
-    payment_method: "pix",
-    status: "pending" as "pending" | "paid",
+    type: (editing?.type || defaultType) as "income" | "expense",
+    patient_id: editing?.patient_id || lockedPatient?.id || "",
+    category: editing?.category || "Consulta psicológica",
+    amount: editing ? String(editing.amount) : "",
+    description: editing?.description || "",
+    due_date: editing?.due_date || format(new Date(), "yyyy-MM-dd"),
+    payment_method: editing?.payment_method || "pix",
+    status: (editing?.status === "paid" ? "paid" : "pending") as "pending" | "paid",
   });
+
+  // hydrate form when editing target changes / dialog opens
+  useEffect(() => {
+    if (!open) return;
+    if (editing) {
+      setForm({
+        type: editing.type,
+        patient_id: editing.patient_id || "",
+        category: editing.category,
+        amount: String(editing.amount),
+        description: editing.description,
+        due_date: editing.due_date,
+        payment_method: editing.payment_method || "pix",
+        status: editing.status === "paid" ? "paid" : "pending",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editing?.id]);
 
   // bootstrap user + patient list
   useEffect(() => {
@@ -155,6 +187,9 @@ export function SmartTransactionDialog({
 
       const plan = (data ? (data as unknown as ActivePlan) : null);
       setActivePlan(plan);
+
+      // In edit mode, only surface the plan (banner) — don't overwrite user values
+      if (isEdit) return;
 
       const patient =
         lockedPatient && lockedPatient.id === form.patient_id
@@ -205,8 +240,7 @@ export function SmartTransactionDialog({
       return;
     }
     setSaving(true);
-    const payload: any = {
-      psychologist_id: userId,
+    const basePayload: any = {
       type: form.type,
       amount: parseFloat(form.amount),
       description: form.description || "Transação",
@@ -214,19 +248,33 @@ export function SmartTransactionDialog({
       payment_method: form.payment_method,
       status: form.status,
       due_date: form.due_date,
+      patient_id: form.patient_id || null,
     };
-    if (form.patient_id) payload.patient_id = form.patient_id;
-    if (form.status === "paid") payload.paid_date = new Date().toISOString().slice(0, 10);
 
-    const { error } = await supabase.from("financial_transactions").insert(payload);
-    setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (isEdit && editing) {
+      const updateData = { ...basePayload };
+      if (form.status === "paid" && editing.status !== "paid") {
+        updateData.paid_date = new Date().toISOString().slice(0, 10);
+      }
+      const { error } = await supabase
+        .from("financial_transactions")
+        .update(updateData)
+        .eq("id", editing.id);
+      setSaving(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Transação atualizada");
+    } else {
+      const payload: any = { ...basePayload, psychologist_id: userId };
+      if (form.status === "paid") payload.paid_date = new Date().toISOString().slice(0, 10);
+      const { error } = await supabase.from("financial_transactions").insert(payload);
+      setSaving(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Transação registrada");
+    }
 
-    toast.success("Transação registrada");
     onOpenChange(false);
     onCreated?.();
-    // soft-reset for next use
-    setForm(f => ({ ...f, amount: "", description: "" }));
+    if (!isEdit) setForm(f => ({ ...f, amount: "", description: "" }));
   };
 
   return (
@@ -235,7 +283,7 @@ export function SmartTransactionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            {lockedPatient ? "Registrar Pagamento" : "Nova Transação"}
+            {isEdit ? "Editar Transação" : (lockedPatient ? "Registrar Pagamento" : "Nova Transação")}
           </DialogTitle>
         </DialogHeader>
 

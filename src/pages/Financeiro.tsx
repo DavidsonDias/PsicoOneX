@@ -1209,8 +1209,30 @@ export default function Financeiro() {
 
         {/* ========== STRIPE TAB ========== */}
         <TabsContent value="stripe" className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold">Cobranças & Recorrências</h3>
+              <p className="text-xs text-muted-foreground">
+                Use o mesmo motor inteligente: o vencimento e o valor são calculados pelo plano ativo do paciente.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-[220px]">
+                <PatientCombobox
+                  patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))}
+                  value={filterPatient === "all" ? "" : filterPatient}
+                  onChange={(v) => setFilterPatient(v || "all")}
+                  placeholder="Filtrar por paciente"
+                />
+              </div>
+              <Button className="gap-2" onClick={() => guardWrite(() => setDialogOpen(true))}>
+                <Plus className="h-4 w-4" />Nova Cobrança
+              </Button>
+            </div>
+          </div>
+
           <OverdueSemaforo
-            transactions={transactions as any}
+            transactions={(filterPatient === "all" ? transactions : transactions.filter(t => t.patient_id === filterPatient)) as any}
             onSync={async () => {
               const t = toast.loading("Sincronizando pagamentos Stripe...");
               try {
@@ -1366,13 +1388,23 @@ export default function Financeiro() {
         </TabsContent>
       </Tabs>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingTransaction} onOpenChange={(open) => { if (!open) { setEditingTransaction(null); resetForm(); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Editar Transação</DialogTitle></DialogHeader>
-          <TransactionForm onSubmit={handleEditTransaction} isEdit />
-        </DialogContent>
-      </Dialog>
+      {/* Edit Dialog — unified SmartTransactionDialog (plan-aware) */}
+      <SmartTransactionDialog
+        open={!!editingTransaction}
+        onOpenChange={(o) => { if (!o) { setEditingTransaction(null); resetForm(); } }}
+        onCreated={() => { if (userId) loadTransactions(userId); }}
+        editing={editingTransaction ? {
+          id: editingTransaction.id,
+          type: editingTransaction.type as "income" | "expense",
+          amount: Number(editingTransaction.amount),
+          description: editingTransaction.description || "",
+          category: editingTransaction.category || "",
+          payment_method: editingTransaction.payment_method || "pix",
+          status: editingTransaction.payment_status as any,
+          due_date: editingTransaction.due_date,
+          patient_id: editingTransaction.patient_id || null,
+        } : null}
+      />
     </AppLayout>
   );
 }
