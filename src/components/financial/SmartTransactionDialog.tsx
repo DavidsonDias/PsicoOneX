@@ -240,8 +240,7 @@ export function SmartTransactionDialog({
       return;
     }
     setSaving(true);
-    const payload: any = {
-      psychologist_id: userId,
+    const basePayload: any = {
       type: form.type,
       amount: parseFloat(form.amount),
       description: form.description || "Transação",
@@ -249,19 +248,33 @@ export function SmartTransactionDialog({
       payment_method: form.payment_method,
       status: form.status,
       due_date: form.due_date,
+      patient_id: form.patient_id || null,
     };
-    if (form.patient_id) payload.patient_id = form.patient_id;
-    if (form.status === "paid") payload.paid_date = new Date().toISOString().slice(0, 10);
 
-    const { error } = await supabase.from("financial_transactions").insert(payload);
-    setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (isEdit && editing) {
+      const updateData = { ...basePayload };
+      if (form.status === "paid" && editing.status !== "paid") {
+        updateData.paid_date = new Date().toISOString().slice(0, 10);
+      }
+      const { error } = await supabase
+        .from("financial_transactions")
+        .update(updateData)
+        .eq("id", editing.id);
+      setSaving(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Transação atualizada");
+    } else {
+      const payload: any = { ...basePayload, psychologist_id: userId };
+      if (form.status === "paid") payload.paid_date = new Date().toISOString().slice(0, 10);
+      const { error } = await supabase.from("financial_transactions").insert(payload);
+      setSaving(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Transação registrada");
+    }
 
-    toast.success("Transação registrada");
     onOpenChange(false);
     onCreated?.();
-    // soft-reset for next use
-    setForm(f => ({ ...f, amount: "", description: "" }));
+    if (!isEdit) setForm(f => ({ ...f, amount: "", description: "" }));
   };
 
   return (
