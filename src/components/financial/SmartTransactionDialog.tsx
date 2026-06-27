@@ -8,24 +8,30 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { PatientCombobox } from "@/components/shared/PatientCombobox";
-import { Sparkles, Repeat, Calendar as CalendarIcon } from "lucide-react";
+import { Sparkles, Repeat, Calendar as CalendarIcon, Info } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays } from "date-fns";
 
 /**
- * SmartTransactionDialog
- * -----------------------
- * Unified transaction creator used in:
- *  - Financeiro main page ("Nova Transação")
- *  - PatientProfile → Financeiro tab ("Registrar Pagamento")
- *  - (future) AgendaForm quick-pay
+ * SmartTransactionDialog — UNIFIED Financial Launcher
+ * ---------------------------------------------------
+ * One form for every financial action across the app:
+ *  - Nova Transação (Pagamentos tab)
+ *  - Nova Cobrança (Stripe tab)
+ *  - Novo Plano de Cobrança (recurring) — toggle "Recorrente"
+ *  - Registrar Pagamento (PatientProfile)
+ *  - Editar Transação
  *
- * Intelligence:
+ * Modes:
+ *  - mode="single"     → financial_transactions (income/expense)
+ *  - mode="recurring"  → patient_billing_plans (weekly/biweekly/monthly/per_session)
+ *
+ * Smart logic:
  *  - Reads patient cadastro: default_session_value, monthly_plan_value, payment_day
- *  - Reads active patient_billing_plans → infers frequency (weekly/biweekly/monthly/per_session)
- *  - Auto-fills amount, description and due_date based on plan rules
- *  - Locks patient when used from a patient profile (contexto automático)
+ *  - Reads active patient_billing_plans → infers frequency & autofills amount/due_date
+ *  - Mobile-first responsive grid (1 col → 2 cols ≥ sm)
  */
 
 interface PatientLite {
@@ -59,10 +65,13 @@ export interface EditingTransaction {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  lockedPatient?: PatientLite | null; // when set: patient field is read-only
+  lockedPatient?: PatientLite | null;
   onCreated?: () => void;
   defaultType?: "income" | "expense";
+  defaultMode?: "single" | "recurring";
   editing?: EditingTransaction | null;
+  /** lock the mode switch (e.g. force recurring from "Novo plano") */
+  lockMode?: boolean;
 }
 
 const INCOME_CATEGORIES = [
@@ -74,25 +83,24 @@ const EXPENSE_CATEGORIES = [
   "Aluguel consultório", "Impostos", "Equipamentos", "Outros",
 ];
 
+const RECURRING_HELP: Record<string, string> = {
+  per_session: "Sem cobrança fixa — cada agendamento gera uma cobrança individual.",
+  weekly: "Cobrança a cada 7 dias a partir da data inicial.",
+  biweekly: "Cobrança a cada 15 dias a partir da data inicial.",
+  monthly: "Cobrança mensal em um dia fixo escolhido.",
+};
+
 function smartDueDateFromDay(day: number): string {
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-  const target = day < d
-    ? new Date(y, m + 1, day)
-    : new Date(y, m, day);
+  const target = day < d ? new Date(y, m + 1, day) : new Date(y, m, day);
   return format(target, "yyyy-MM-dd");
 }
 
 function smartDueDateFromPlan(plan: ActivePlan): string {
-  if (plan.billing_type === "monthly" && plan.day_of_month) {
-    return smartDueDateFromDay(plan.day_of_month);
-  }
-  if (plan.billing_type === "weekly") {
-    return format(addDays(new Date(), 7), "yyyy-MM-dd");
-  }
-  if (plan.billing_type === "biweekly") {
-    return format(addDays(new Date(), 15), "yyyy-MM-dd");
-  }
+  if (plan.billing_type === "monthly" && plan.day_of_month) return smartDueDateFromDay(plan.day_of_month);
+  if (plan.billing_type === "weekly") return format(addDays(new Date(), 7), "yyyy-MM-dd");
+  if (plan.billing_type === "biweekly") return format(addDays(new Date(), 15), "yyyy-MM-dd");
   return format(new Date(), "yyyy-MM-dd");
 }
 
@@ -113,13 +121,15 @@ const PLAN_LABEL: Record<ActivePlan["billing_type"], string> = {
 };
 
 export function SmartTransactionDialog({
-  open, onOpenChange, lockedPatient = null, onCreated, defaultType = "income", editing = null,
+  open, onOpenChange, lockedPatient = null, onCreated,
+  defaultType = "income", defaultMode = "single", editing = null, lockMode = false,
 }: Props) {
   const isEdit = !!editing;
   const [userId, setUserId] = useState<string>("");
   const [patients, setPatients] = useState<PatientLite[]>([]);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useState<"single" | "recurring">(isEdit ? "single" : defaultMode);
 
   const [form, setForm] = useState({
     type: (editing?.type || defaultType) as "income" | "expense",
@@ -132,10 +142,19 @@ export function SmartTransactionDialog({
     status: (editing?.status === "paid" ? "paid" : "pending") as "pending" | "paid",
   });
 
-  // hydrate form when editing target changes / dialog opens
+  // Recurring-plan-specific fields
+  const [planForm, setPlanForm] = useState({
+    billing_type: "monthly" as ActivePlan["billing_type"],
+    sessions_per_cycle: 4,
+    day_of_month: 5,
+    start_date: format(new Date(), "yyyy-MM-dd"),
+  });
+
+  // hydrate form when editing target changes
   useEffect(() => {
     if (!open) return;
     if (editing) {
+      setMode("single");
       setForm({
         type: editing.type,
         patient_id: editing.patient_id || "",
@@ -146,6 +165,8 @@ export function SmartTransactionDialog({
         payment_method: editing.payment_method || "pix",
         status: editing.status === "paid" ? "paid" : "pending",
       });
+    } else {
+      setMode(defaultMode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing?.id]);
@@ -188,7 +209,6 @@ export function SmartTransactionDialog({
       const plan = (data ? (data as unknown as ActivePlan) : null);
       setActivePlan(plan);
 
-      // In edit mode, only surface the plan (banner) — don't overwrite user values
       if (isEdit) return;
 
       const patient =
@@ -205,6 +225,12 @@ export function SmartTransactionDialog({
         amount = String(plan.amount);
         due_date = smartDueDateFromPlan(plan);
         category = plan.billing_type === "monthly" ? "Pacote mensal" : "Consulta psicológica";
+        // also seed plan form when user toggles recorrente
+        setPlanForm(pf => ({
+          ...pf,
+          billing_type: plan.billing_type,
+          day_of_month: plan.day_of_month || pf.day_of_month,
+        }));
       } else if (patient.default_session_value) {
         amount = String(patient.default_session_value);
         if (patient.payment_day) due_date = smartDueDateFromDay(patient.payment_day);
@@ -235,6 +261,32 @@ export function SmartTransactionDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ====== RECURRING MODE → create billing plan ======
+    if (mode === "recurring" && !isEdit) {
+      if (!form.patient_id) { toast.error("Selecione um paciente"); return; }
+      if (!form.amount) { toast.error("Informe o valor"); return; }
+      setSaving(true);
+      const { error } = await supabase.from("patient_billing_plans" as any).insert({
+        psychologist_id: userId,
+        patient_id: form.patient_id,
+        billing_type: planForm.billing_type,
+        amount: parseFloat(form.amount),
+        sessions_per_cycle: planForm.billing_type === "monthly" ? Number(planForm.sessions_per_cycle) || null : null,
+        day_of_month: planForm.billing_type === "monthly" ? Number(planForm.day_of_month) : null,
+        start_date: (planForm.billing_type === "weekly" || planForm.billing_type === "biweekly") ? planForm.start_date : null,
+        description: form.description || null,
+        active: true,
+      });
+      setSaving(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Plano de cobrança criado");
+      onOpenChange(false);
+      onCreated?.();
+      return;
+    }
+
+    // ====== SINGLE MODE → financial_transactions ======
     if (!form.amount || !form.due_date) {
       toast.error("Preencha valor e vencimento");
       return;
@@ -256,10 +308,7 @@ export function SmartTransactionDialog({
       if (form.status === "paid" && editing.status !== "paid") {
         updateData.paid_date = new Date().toISOString().slice(0, 10);
       }
-      const { error } = await supabase
-        .from("financial_transactions")
-        .update(updateData)
-        .eq("id", editing.id);
+      const { error } = await supabase.from("financial_transactions").update(updateData).eq("id", editing.id);
       setSaving(false);
       if (error) { toast.error(error.message); return; }
       toast.success("Transação atualizada");
@@ -277,38 +326,62 @@ export function SmartTransactionDialog({
     if (!isEdit) setForm(f => ({ ...f, amount: "", description: "" }));
   };
 
+  const isRecurring = mode === "recurring";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-xl w-[calc(100vw-1rem)] max-h-[92vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Sparkles className="h-4 w-4 text-primary" />
-            {isEdit ? "Editar Transação" : (lockedPatient ? "Registrar Pagamento" : "Nova Transação")}
+            {isEdit
+              ? "Editar Transação"
+              : isRecurring
+                ? "Novo Plano de Cobrança"
+                : (lockedPatient ? "Registrar Pagamento" : "Nova Transação")}
           </DialogTitle>
         </DialogHeader>
+
+        {/* MODE TOGGLE — unifies "Nova Cobrança" / "Nova Transação" / "Novo Plano" */}
+        {!isEdit && !lockMode && (
+          <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <Repeat className="h-4 w-4 text-primary shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold">Cobrança recorrente</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {isRecurring ? "Cria um plano que gera cobranças automáticas" : "Lançamento único de receita/despesa"}
+                </div>
+              </div>
+            </div>
+            <Switch checked={isRecurring} onCheckedChange={(v) => setMode(v ? "recurring" : "single")} />
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* DADOS PRINCIPAIS */}
           <div className="space-y-4">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados Principais</h4>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Select
-                  value={form.type}
-                  onValueChange={(v: "income" | "expense") => setForm({ ...form, type: v, category: "" })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">Receita</SelectItem>
-                    <SelectItem value="expense">Despesa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {!isRecurring && (
+                <div className="space-y-1.5">
+                  <Label>Tipo</Label>
+                  <Select
+                    value={form.type}
+                    onValueChange={(v: "income" | "expense") => setForm({ ...form, type: v, category: "" })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="income">Receita</SelectItem>
+                      <SelectItem value="expense">Despesa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-              <div className="space-y-1.5">
-                <Label>Paciente</Label>
+              <div className={`space-y-1.5 ${isRecurring ? "sm:col-span-2" : ""}`}>
+                <Label>Paciente {isRecurring && <span className="text-destructive">*</span>}</Label>
                 {lockedPatient ? (
                   <div className="h-10 px-3 rounded-md border bg-muted/30 flex items-center justify-between gap-2">
                     <span className="text-sm font-medium truncate">{lockedPatient.full_name}</span>
@@ -319,38 +392,109 @@ export function SmartTransactionDialog({
                     patients={patients}
                     value={form.patient_id}
                     onChange={(v) => setForm({ ...form, patient_id: v })}
-                    placeholder="Opcional"
+                    placeholder={isRecurring ? "Selecione o paciente" : "Opcional"}
                   />
                 )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Categoria</Label>
-                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Valor (R$)</Label>
-                <div className="relative">
-                  <Input
-                    type="number" step="0.01" placeholder="0.00" required
-                    value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  />
-                  {selectedPatient && form.amount && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                      auto
-                    </span>
-                  )}
+            {/* RECURRING: billing type + amount */}
+            {isRecurring ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Frequência</Label>
+                    <Select
+                      value={planForm.billing_type}
+                      onValueChange={(v: ActivePlan["billing_type"]) => setPlanForm({ ...planForm, billing_type: v })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="per_session">Por sessão</SelectItem>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="biweekly">Quinzenal</SelectItem>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Valor (R$)</Label>
+                    <Input
+                      type="number" step="0.01" placeholder="0.00" required
+                      value={form.amount}
+                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 rounded-md border bg-primary/5 p-2.5 text-xs text-muted-foreground">
+                  <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                  <span>{RECURRING_HELP[planForm.billing_type]}</span>
+                </div>
+
+                {planForm.billing_type === "monthly" && (
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Sessões/mês</Label>
+                      <Input
+                        type="number" min={1}
+                        value={planForm.sessions_per_cycle}
+                        onChange={(e) => setPlanForm({ ...planForm, sessions_per_cycle: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Dia do vencimento</Label>
+                      <Input
+                        type="number" min={1} max={31}
+                        value={planForm.day_of_month}
+                        onChange={(e) => setPlanForm({ ...planForm, day_of_month: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {(planForm.billing_type === "weekly" || planForm.billing_type === "biweekly") && (
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5"><CalendarIcon className="h-3.5 w-3.5" />Data da 1ª cobrança</Label>
+                    <Input
+                      type="date"
+                      value={planForm.start_date}
+                      onChange={(e) => setPlanForm({ ...planForm, start_date: e.target.value })}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Próximas cobranças geradas a cada {planForm.billing_type === "weekly" ? "7" : "15"} dias.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1.5">
+                  <Label>Categoria</Label>
+                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Valor (R$)</Label>
+                  <div className="relative">
+                    <Input
+                      type="number" step="0.01" placeholder="0.00" required
+                      value={form.amount}
+                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    />
+                    {selectedPatient && form.amount && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        auto
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Smart context banner */}
             <AnimatePresence>
@@ -373,7 +517,7 @@ export function SmartTransactionDialog({
                         </Badge>
                       )}
                     </div>
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground break-words">
                       {activePlan
                         ? `Cobrança ${PLAN_LABEL[activePlan.billing_type].toLowerCase()} · R$ ${Number(activePlan.amount).toFixed(2)}${activePlan.day_of_month ? ` · dia ${activePlan.day_of_month}` : ""}`
                         : <>
@@ -387,61 +531,65 @@ export function SmartTransactionDialog({
             </AnimatePresence>
 
             <div className="space-y-1.5">
-              <Label>Descrição</Label>
+              <Label>Descrição {isRecurring && <span className="text-muted-foreground text-xs">(opcional)</span>}</Label>
               <Input
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Sessão de psicoterapia"
-                required
+                placeholder={isRecurring ? "Ex.: Plano semanal de psicoterapia" : "Sessão de psicoterapia"}
+                required={!isRecurring}
               />
             </div>
           </div>
 
-          <Separator />
-
-          {/* PAGAMENTO */}
-          <div className="space-y-4">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pagamento</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Forma de Pagamento</Label>
-                <Select value={form.payment_method} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="credit_card">Cartão Crédito</SelectItem>
-                    <SelectItem value="debit_card">Cartão Débito</SelectItem>
-                    <SelectItem value="cash">Dinheiro</SelectItem>
-                    <SelectItem value="bank_transfer">Transferência</SelectItem>
-                  </SelectContent>
-                </Select>
+          {!isRecurring && (
+            <>
+              <Separator />
+              <div className="space-y-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pagamento</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Forma de Pagamento</Label>
+                    <Select value={form.payment_method} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="credit_card">Cartão Crédito</SelectItem>
+                        <SelectItem value="debit_card">Cartão Débito</SelectItem>
+                        <SelectItem value="cash">Dinheiro</SelectItem>
+                        <SelectItem value="bank_transfer">Transferência</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Status</Label>
+                    <Select value={form.status} onValueChange={(v: "pending" | "paid") => setForm({ ...form, status: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="paid">Pago</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5"><CalendarIcon className="h-3.5 w-3.5" />Vencimento</Label>
+                  <Input
+                    type="date"
+                    value={form.due_date}
+                    onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Status</Label>
-                <Select value={form.status} onValueChange={(v: "pending" | "paid") => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="paid">Pago</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5"><CalendarIcon className="h-3.5 w-3.5" />Vencimento</Label>
-              <Input
-                type="date"
-                value={form.due_date}
-                onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-                required
-              />
-            </div>
-          </div>
+            </>
+          )}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Salvando..." : "Registrar"}
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving} className="w-full sm:w-auto">
+              {saving ? "Salvando..." : isRecurring ? "Criar plano" : (isEdit ? "Salvar alterações" : "Registrar")}
             </Button>
           </div>
         </form>
