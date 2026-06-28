@@ -807,9 +807,8 @@ export default function Financeiro() {
       </div>
 
       <Tabs defaultValue="pagamentos" className="mb-6">
-        <TabsList className="bg-muted/50 mb-6">
-          <TabsTrigger value="pagamentos" className="gap-2"><Receipt className="h-4 w-4" />Pagamentos</TabsTrigger>
-          <TabsTrigger value="stripe" className="gap-2"><CreditCard className="h-4 w-4" />Cobranças Stripe</TabsTrigger>
+        <TabsList className="bg-muted/50 mb-6 flex flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="pagamentos" className="gap-2"><Receipt className="h-4 w-4" />Pagamentos & Cobranças</TabsTrigger>
           <TabsTrigger value="resumo" className="gap-2"><TrendingUp className="h-4 w-4" />Resumo</TabsTrigger>
           <TabsTrigger value="notas" className="gap-2"><FileText className="h-4 w-4" />Notas Fiscais</TabsTrigger>
           <TabsTrigger value="relatorios" className="gap-2"><BarChart3 className="h-4 w-4" />Relatórios</TabsTrigger>
