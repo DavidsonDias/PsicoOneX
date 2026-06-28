@@ -1205,50 +1205,25 @@ export default function Financeiro() {
             </div>
           </div>
           )}
-        </TabsContent>
 
-        {/* ========== STRIPE TAB ========== */}
-        <TabsContent value="stripe" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold">Cobranças & Recorrências</h3>
-              <p className="text-xs text-muted-foreground">
-                Use o mesmo motor inteligente: o vencimento e o valor são calculados pelo plano ativo do paciente.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-[220px]">
-                <PatientCombobox
-                  patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))}
-                  value={filterPatient === "all" ? "" : filterPatient}
-                  onChange={(v) => setFilterPatient(v || "all")}
-                  placeholder="Filtrar por paciente"
-                />
+          {/* ========== UNIFIED: Recurring plans & Stripe billings ========== */}
+          <div className="pt-6 mt-2 border-t border-border space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold flex items-center gap-2">
+                  <Repeat className="h-4 w-4 text-primary" />
+                  Planos & Cobranças recorrentes
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Mesmo motor inteligente: valor e vencimento calculados pelo plano ativo do paciente. Cobranças Stripe aparecem na lista acima com o selo <Badge variant="outline" className="ml-1 text-[10px] py-0 px-1.5 border-violet-400/40 text-violet-600 dark:text-violet-300">Stripe</Badge>.
+                </p>
               </div>
-              <Button className="gap-2" onClick={() => guardWrite(() => setDialogOpen(true))}>
-                <Plus className="h-4 w-4" />Nova Cobrança
-              </Button>
             </div>
+            <BillingPlansPanel patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))} />
+            <RecurringBillingsPanel />
           </div>
-
-          <OverdueSemaforo
-            transactions={(filterPatient === "all" ? transactions : transactions.filter(t => t.patient_id === filterPatient)) as any}
-            onSync={async () => {
-              const t = toast.loading("Sincronizando pagamentos Stripe...");
-              try {
-                const { data, error } = await supabase.functions.invoke("sync-patient-payments", { body: {} });
-                if (error) throw error;
-                toast.success(`${data?.updated || 0} pagamento(s) confirmado(s)`, { id: t });
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) loadTransactions(user.id);
-              } catch (e: any) {
-                toast.error(e.message || "Erro ao sincronizar", { id: t });
-              }
-            }}
-          />
-          <BillingPlansPanel patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))} />
-          <RecurringBillingsPanel />
         </TabsContent>
+
 
         {/* ========== RESUMO TAB ========== */}
         <TabsContent value="resumo" className="space-y-6">
