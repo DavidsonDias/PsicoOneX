@@ -18,7 +18,7 @@ import {
   Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter,
   Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText,
   Paperclip, Download, User, ExternalLink, CheckCircle2, Clock, XCircle,
-  CreditCard, Settings, Sparkles
+  CreditCard, Settings, Sparkles, Repeat
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
