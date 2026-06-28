@@ -18,7 +18,7 @@ import {
   Plus, DollarSign, TrendingUp, TrendingDown, Calendar, Search, Filter,
   Target, PieChart, Receipt, AlertTriangle, BarChart3, Upload, FileText,
   Paperclip, Download, User, ExternalLink, CheckCircle2, Clock, XCircle,
-  CreditCard, Settings, Sparkles
+  CreditCard, Settings, Sparkles, Repeat
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -65,6 +65,7 @@ interface Transaction {
   tax_rate?: number;
   tax_amount?: number;
   appointment_id?: string;
+  stripe_payment_link?: string | null;
 }
 
 interface PatientFull {
@@ -806,9 +807,8 @@ export default function Financeiro() {
       </div>
 
       <Tabs defaultValue="pagamentos" className="mb-6">
-        <TabsList className="bg-muted/50 mb-6">
-          <TabsTrigger value="pagamentos" className="gap-2"><Receipt className="h-4 w-4" />Pagamentos</TabsTrigger>
-          <TabsTrigger value="stripe" className="gap-2"><CreditCard className="h-4 w-4" />Cobranças Stripe</TabsTrigger>
+        <TabsList className="bg-muted/50 mb-6 flex flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="pagamentos" className="gap-2"><Receipt className="h-4 w-4" />Pagamentos & Cobranças</TabsTrigger>
           <TabsTrigger value="resumo" className="gap-2"><TrendingUp className="h-4 w-4" />Resumo</TabsTrigger>
           <TabsTrigger value="notas" className="gap-2"><FileText className="h-4 w-4" />Notas Fiscais</TabsTrigger>
           <TabsTrigger value="relatorios" className="gap-2"><BarChart3 className="h-4 w-4" />Relatórios</TabsTrigger>
@@ -1111,8 +1111,15 @@ export default function Financeiro() {
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <p className="text-sm font-medium truncate max-w-[200px]">{t.description}</p>
-                              {t.attachment_url && <Paperclip className="h-3 w-3 text-primary inline ml-1" />}
+                              <div className="flex items-center gap-1.5 max-w-[240px]">
+                                <p className="text-sm font-medium truncate">{t.description}</p>
+                                {t.stripe_payment_link && (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-violet-400/40 text-violet-600 dark:text-violet-300 shrink-0">
+                                    <CreditCard className="h-2.5 w-2.5 mr-0.5" />Stripe
+                                  </Badge>
+                                )}
+                                {t.attachment_url && <Paperclip className="h-3 w-3 text-primary shrink-0" />}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               {t.patient_id && t.patient_name ? (
@@ -1171,11 +1178,16 @@ export default function Financeiro() {
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
                             <p className="font-medium text-sm">{t.description}</p>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border", sc.bg, sc.color, sc.border)}>
                                 <StatusIcon className="h-3 w-3" />{sc.label}
                               </span>
                               <span className="text-xs text-muted-foreground">{getTypeLabel(t)}</span>
+                              {t.stripe_payment_link && (
+                                <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-violet-400/40 text-violet-600 dark:text-violet-300">
+                                  <CreditCard className="h-2.5 w-2.5 mr-0.5" />Stripe
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <span className={cn("text-sm font-bold", t.type === "income" ? "text-emerald-600" : "text-red-600")}>
@@ -1205,50 +1217,25 @@ export default function Financeiro() {
             </div>
           </div>
           )}
-        </TabsContent>
 
-        {/* ========== STRIPE TAB ========== */}
-        <TabsContent value="stripe" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold">Cobranças & Recorrências</h3>
-              <p className="text-xs text-muted-foreground">
-                Use o mesmo motor inteligente: o vencimento e o valor são calculados pelo plano ativo do paciente.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-[220px]">
-                <PatientCombobox
-                  patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))}
-                  value={filterPatient === "all" ? "" : filterPatient}
-                  onChange={(v) => setFilterPatient(v || "all")}
-                  placeholder="Filtrar por paciente"
-                />
+          {/* ========== UNIFIED: Recurring plans & Stripe billings ========== */}
+          <div className="pt-6 mt-2 border-t border-border space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold flex items-center gap-2">
+                  <Repeat className="h-4 w-4 text-primary" />
+                  Planos & Cobranças recorrentes
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Mesmo motor inteligente: valor e vencimento calculados pelo plano ativo do paciente. Cobranças Stripe aparecem na lista acima com o selo <Badge variant="outline" className="ml-1 text-[10px] py-0 px-1.5 border-violet-400/40 text-violet-600 dark:text-violet-300">Stripe</Badge>.
+                </p>
               </div>
-              <Button className="gap-2" onClick={() => guardWrite(() => setDialogOpen(true))}>
-                <Plus className="h-4 w-4" />Nova Cobrança
-              </Button>
             </div>
+            <BillingPlansPanel patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))} />
+            <RecurringBillingsPanel />
           </div>
-
-          <OverdueSemaforo
-            transactions={(filterPatient === "all" ? transactions : transactions.filter(t => t.patient_id === filterPatient)) as any}
-            onSync={async () => {
-              const t = toast.loading("Sincronizando pagamentos Stripe...");
-              try {
-                const { data, error } = await supabase.functions.invoke("sync-patient-payments", { body: {} });
-                if (error) throw error;
-                toast.success(`${data?.updated || 0} pagamento(s) confirmado(s)`, { id: t });
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) loadTransactions(user.id);
-              } catch (e: any) {
-                toast.error(e.message || "Erro ao sincronizar", { id: t });
-              }
-            }}
-          />
-          <BillingPlansPanel patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))} />
-          <RecurringBillingsPanel />
         </TabsContent>
+
 
         {/* ========== RESUMO TAB ========== */}
         <TabsContent value="resumo" className="space-y-6">

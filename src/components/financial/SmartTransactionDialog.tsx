@@ -274,7 +274,8 @@ export function SmartTransactionDialog({
         amount: parseFloat(form.amount),
         sessions_per_cycle: planForm.billing_type === "monthly" ? Number(planForm.sessions_per_cycle) || null : null,
         day_of_month: planForm.billing_type === "monthly" ? Number(planForm.day_of_month) : null,
-        start_date: (planForm.billing_type === "weekly" || planForm.billing_type === "biweekly") ? planForm.start_date : null,
+        // start_date is NOT NULL in DB — always send a value
+        start_date: planForm.start_date || format(new Date(), "yyyy-MM-dd"),
         description: form.description || null,
         active: true,
       });
