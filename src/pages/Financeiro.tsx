@@ -65,6 +65,7 @@ interface Transaction {
   tax_rate?: number;
   tax_amount?: number;
   appointment_id?: string;
+  stripe_payment_link?: string | null;
 }
 
 interface PatientFull {
