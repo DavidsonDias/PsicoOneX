@@ -1178,11 +1178,16 @@ export default function Financeiro() {
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
                             <p className="font-medium text-sm">{t.description}</p>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border", sc.bg, sc.color, sc.border)}>
                                 <StatusIcon className="h-3 w-3" />{sc.label}
                               </span>
                               <span className="text-xs text-muted-foreground">{getTypeLabel(t)}</span>
+                              {t.stripe_payment_link && (
+                                <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-violet-400/40 text-violet-600 dark:text-violet-300">
+                                  <CreditCard className="h-2.5 w-2.5 mr-0.5" />Stripe
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <span className={cn("text-sm font-bold", t.type === "income" ? "text-emerald-600" : "text-red-600")}>
