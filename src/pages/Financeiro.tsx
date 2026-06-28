@@ -1111,8 +1111,15 @@ export default function Financeiro() {
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <p className="text-sm font-medium truncate max-w-[200px]">{t.description}</p>
-                              {t.attachment_url && <Paperclip className="h-3 w-3 text-primary inline ml-1" />}
+                              <div className="flex items-center gap-1.5 max-w-[240px]">
+                                <p className="text-sm font-medium truncate">{t.description}</p>
+                                {t.stripe_payment_link && (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-violet-400/40 text-violet-600 dark:text-violet-300 shrink-0">
+                                    <CreditCard className="h-2.5 w-2.5 mr-0.5" />Stripe
+                                  </Badge>
+                                )}
+                                {t.attachment_url && <Paperclip className="h-3 w-3 text-primary shrink-0" />}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               {t.patient_id && t.patient_name ? (
