@@ -1138,10 +1138,10 @@ export default function Financeiro() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-end gap-1">
-                                {t.payment_status === "pending" && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                                    onClick={() => handleMarkAsPaid(t)} title="Marcar como pago">
-                                    <CheckCircle2 className="h-4 w-4" />
+                                {(t.payment_status === "pending" || t.payment_status === "overdue") && (
+                                  <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                                    onClick={() => handleMarkAsPaid(t)} title="Registrar pagamento">
+                                    <CheckCircle2 className="h-3.5 w-3.5" />Registrar pgto
                                   </Button>
                                 )}
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
