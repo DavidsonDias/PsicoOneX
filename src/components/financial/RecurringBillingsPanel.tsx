@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Repeat, Plus, Trash2, CalendarClock, Loader2 } from "lucide-react";
+import { Repeat, Plus, Trash2, CalendarClock, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 interface Patient { id: string; full_name: string; }
