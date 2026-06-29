@@ -34,7 +34,7 @@ function nextRun(day: number): string {
   return target.toISOString().slice(0, 10);
 }
 
-export function RecurringBillingsPanel() {
+export function RecurringBillingsPanel({ onChanged }: { onChanged?: () => void } = {}) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
