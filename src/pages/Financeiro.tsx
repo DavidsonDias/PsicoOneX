@@ -1200,9 +1200,9 @@ export default function Financeiro() {
                             <span>{t.due_date && format(new Date(t.due_date), "dd/MM/yyyy")}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            {t.payment_status === "pending" && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => handleMarkAsPaid(t)}>
-                                <CheckCircle2 className="h-3.5 w-3.5" />
+                            {(t.payment_status === "pending" || t.payment_status === "overdue") && (
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400" onClick={() => handleMarkAsPaid(t)}>
+                                <CheckCircle2 className="h-3 w-3" />Pago
                               </Button>
                             )}
                             <ActionMenu onEdit={() => openEditDialog(t)} onDelete={() => handleDeleteTransaction(t.id)}
