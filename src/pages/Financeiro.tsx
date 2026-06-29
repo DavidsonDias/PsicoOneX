@@ -1037,9 +1037,9 @@ export default function Financeiro() {
                                 <span className={cn("text-sm font-semibold", t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
                                   {t.type === "income" ? "+" : "-"}{fmtCurrency(Number(t.amount))}
                                 </span>
-                                {t.payment_status === "pending" && (
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => handleMarkAsPaid(t)} title="Marcar como pago">
-                                    <CheckCircle2 className="h-4 w-4" />
+                                {(t.payment_status === "pending" || t.payment_status === "overdue") && (
+                                  <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleMarkAsPaid(t)}>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />Pago
                                   </Button>
                                 )}
                                 <ActionMenu onEdit={() => openEditDialog(t)} onDelete={() => handleDeleteTransaction(t.id)}
@@ -1138,10 +1138,10 @@ export default function Financeiro() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-end gap-1">
-                                {t.payment_status === "pending" && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                                    onClick={() => handleMarkAsPaid(t)} title="Marcar como pago">
-                                    <CheckCircle2 className="h-4 w-4" />
+                                {(t.payment_status === "pending" || t.payment_status === "overdue") && (
+                                  <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                                    onClick={() => handleMarkAsPaid(t)} title="Registrar pagamento">
+                                    <CheckCircle2 className="h-3.5 w-3.5" />Registrar pgto
                                   </Button>
                                 )}
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
@@ -1200,9 +1200,9 @@ export default function Financeiro() {
                             <span>{t.due_date && format(new Date(t.due_date), "dd/MM/yyyy")}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            {t.payment_status === "pending" && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => handleMarkAsPaid(t)}>
-                                <CheckCircle2 className="h-3.5 w-3.5" />
+                            {(t.payment_status === "pending" || t.payment_status === "overdue") && (
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400" onClick={() => handleMarkAsPaid(t)}>
+                                <CheckCircle2 className="h-3 w-3" />Pago
                               </Button>
                             )}
                             <ActionMenu onEdit={() => openEditDialog(t)} onDelete={() => handleDeleteTransaction(t.id)}
@@ -1231,8 +1231,11 @@ export default function Financeiro() {
                 </p>
               </div>
             </div>
-            <BillingPlansPanel patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))} />
-            <RecurringBillingsPanel />
+            <BillingPlansPanel
+              patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))}
+              onChanged={() => { if (userId) loadTransactions(userId); }}
+            />
+            <RecurringBillingsPanel onChanged={() => { if (userId) loadTransactions(userId); }} />
           </div>
         </TabsContent>
 

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Repeat, Plus, Trash2, CalendarClock, Loader2 } from "lucide-react";
+import { Repeat, Plus, Trash2, CalendarClock, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 interface Patient { id: string; full_name: string; }
@@ -34,7 +34,7 @@ function nextRun(day: number): string {
   return target.toISOString().slice(0, 10);
 }
 
-export function RecurringBillingsPanel() {
+export function RecurringBillingsPanel({ onChanged }: { onChanged?: () => void } = {}) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +101,31 @@ export function RecurringBillingsPanel() {
     await supabase.from("recurring_billings" as any).delete().eq("id", id);
     toast.success("Removida");
     load();
+    onChanged?.();
+  }
+
+  async function generateNow(rule: Rule) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const t = toast.loading("Gerando cobrança...");
+    const { error } = await supabase.from("financial_transactions").insert({
+      psychologist_id: user.id,
+      patient_id: rule.patient_id,
+      type: "income",
+      status: "pending",
+      amount: Number(rule.amount),
+      due_date: rule.next_run_date || new Date().toISOString().slice(0, 10),
+      description: rule.description || `Cobrança recorrente — ${rule.patient_name || "Paciente"}`,
+      payment_method: "pix",
+      category: "Pacote mensal",
+    } as any);
+    if (error) { toast.error(error.message, { id: t }); return; }
+    await supabase.from("recurring_billings" as any)
+      .update({ last_run_date: new Date().toISOString().slice(0, 10) })
+      .eq("id", rule.id);
+    toast.success("Cobrança gerada", { id: t });
+    load();
+    onChanged?.();
   }
 
   return (
@@ -187,6 +212,9 @@ export function RecurringBillingsPanel() {
                     R$ {Number(r.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · dia {r.billing_day} · {r.channel}
                   </p>
                 </div>
+                <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => generateNow(r)} disabled={!r.is_active}>
+                  <Zap className="h-3.5 w-3.5" />Gerar
+                </Button>
                 <Switch checked={r.is_active} onCheckedChange={() => toggle(r)} />
                 <Button size="icon" variant="ghost" onClick={() => remove(r.id)} className="text-destructive">
                   <Trash2 className="h-4 w-4" />
