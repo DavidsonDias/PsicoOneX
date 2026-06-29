@@ -101,6 +101,31 @@ export function RecurringBillingsPanel({ onChanged }: { onChanged?: () => void }
     await supabase.from("recurring_billings" as any).delete().eq("id", id);
     toast.success("Removida");
     load();
+    onChanged?.();
+  }
+
+  async function generateNow(rule: Rule) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const t = toast.loading("Gerando cobrança...");
+    const { error } = await supabase.from("financial_transactions").insert({
+      psychologist_id: user.id,
+      patient_id: rule.patient_id,
+      type: "income",
+      status: "pending",
+      amount: Number(rule.amount),
+      due_date: rule.next_run_date || new Date().toISOString().slice(0, 10),
+      description: rule.description || `Cobrança recorrente — ${rule.patient_name || "Paciente"}`,
+      payment_method: "pix",
+      category: "Pacote mensal",
+    } as any);
+    if (error) { toast.error(error.message, { id: t }); return; }
+    await supabase.from("recurring_billings" as any)
+      .update({ last_run_date: new Date().toISOString().slice(0, 10) })
+      .eq("id", rule.id);
+    toast.success("Cobrança gerada", { id: t });
+    load();
+    onChanged?.();
   }
 
   return (
