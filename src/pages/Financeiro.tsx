@@ -1037,9 +1037,9 @@ export default function Financeiro() {
                                 <span className={cn("text-sm font-semibold", t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
                                   {t.type === "income" ? "+" : "-"}{fmtCurrency(Number(t.amount))}
                                 </span>
-                                {t.payment_status === "pending" && (
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => handleMarkAsPaid(t)} title="Marcar como pago">
-                                    <CheckCircle2 className="h-4 w-4" />
+                                {(t.payment_status === "pending" || t.payment_status === "overdue") && (
+                                  <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleMarkAsPaid(t)}>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />Pago
                                   </Button>
                                 )}
                                 <ActionMenu onEdit={() => openEditDialog(t)} onDelete={() => handleDeleteTransaction(t.id)}
