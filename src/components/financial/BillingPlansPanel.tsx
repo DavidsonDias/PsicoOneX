@@ -12,6 +12,7 @@ import { ptBR } from "date-fns/locale";
 
 type Plan = {
   id: string;
+  psychologist_id: string;
   patient_id: string;
   billing_type: "per_session" | "weekly" | "biweekly" | "monthly";
   amount: number;
