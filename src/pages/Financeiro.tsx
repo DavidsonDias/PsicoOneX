@@ -1231,8 +1231,11 @@ export default function Financeiro() {
                 </p>
               </div>
             </div>
-            <BillingPlansPanel patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))} />
-            <RecurringBillingsPanel />
+            <BillingPlansPanel
+              patients={patients.map(p => ({ id: p.id, full_name: p.full_name }))}
+              onChanged={() => { if (userId) loadTransactions(userId); }}
+            />
+            <RecurringBillingsPanel onChanged={() => { if (userId) loadTransactions(userId); }} />
           </div>
         </TabsContent>
 
