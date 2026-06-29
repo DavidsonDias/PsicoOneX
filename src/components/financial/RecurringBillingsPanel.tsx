@@ -212,6 +212,9 @@ export function RecurringBillingsPanel({ onChanged }: { onChanged?: () => void }
                     R$ {Number(r.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · dia {r.billing_day} · {r.channel}
                   </p>
                 </div>
+                <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => generateNow(r)} disabled={!r.is_active}>
+                  <Zap className="h-3.5 w-3.5" />Gerar
+                </Button>
                 <Switch checked={r.is_active} onCheckedChange={() => toggle(r)} />
                 <Button size="icon" variant="ghost" onClick={() => remove(r.id)} className="text-destructive">
                   <Trash2 className="h-4 w-4" />
