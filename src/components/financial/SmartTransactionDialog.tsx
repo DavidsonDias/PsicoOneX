@@ -344,12 +344,29 @@ export function SmartTransactionDialog({
       if (error) { toast.error(error.message); return; }
       toast.success("Transação atualizada");
     } else {
-      const payload: any = { ...basePayload, psychologist_id: userId };
-      if (form.status === "paid") payload.paid_date = new Date().toISOString().slice(0, 10);
-      const { error } = await supabase.from("financial_transactions").insert(payload);
-      setSaving(false);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Transação registrada");
+      // If there's a pending installment matching this entry, SETTLE it instead of creating a duplicate
+      const settling = !!(nextPending && form.type === "income" && form.status === "paid"
+        && Math.abs(Number(form.amount) - Number(nextPending.amount)) < 0.01);
+
+      if (settling && nextPending) {
+        const { error } = await supabase.from("financial_transactions").update({
+          status: "paid",
+          paid_date: new Date().toISOString().slice(0, 10),
+          payment_method: form.payment_method,
+          description: form.description || nextPending.description,
+        } as any).eq("id", nextPending.id);
+        setSaving(false);
+        if (error) { toast.error(error.message); return; }
+        toast.success("Parcela conciliada e marcada como paga");
+      } else {
+        const payload: any = { ...basePayload, psychologist_id: userId };
+        if (form.status === "paid") payload.paid_date = new Date().toISOString().slice(0, 10);
+        if (activePlan && form.type === "income") payload.billing_plan_id = activePlan.id;
+        const { error } = await supabase.from("financial_transactions").insert(payload);
+        setSaving(false);
+        if (error) { toast.error(error.message); return; }
+        toast.success("Transação registrada");
+      }
     }
 
     onOpenChange(false);
