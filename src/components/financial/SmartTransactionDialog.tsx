@@ -43,11 +43,21 @@ interface PatientLite {
 }
 
 interface ActivePlan {
+  id: string;
   billing_type: "per_session" | "weekly" | "biweekly" | "monthly";
   amount: number;
   day_of_month: number | null;
   start_date: string | null;
   description: string | null;
+}
+
+interface NextPendingInstallment {
+  id: string;
+  amount: number;
+  due_date: string;
+  description: string | null;
+  payment_method: string | null;
+  status: string;
 }
 
 export interface EditingTransaction {
