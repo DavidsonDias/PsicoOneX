@@ -36,6 +36,7 @@ import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
 import { FinancialGrowth } from "@/components/financial/FinancialGrowth";
 import { RecurringBillingsPanel } from "@/components/financial/RecurringBillingsPanel";
 import { BillingPlansPanel } from "@/components/financial/BillingPlansPanel";
+import { ReconciliationPanel } from "@/components/financial/ReconciliationPanel";
 import { OverdueSemaforo } from "@/components/financial/OverdueSemaforo";
 import { SmartTransactionDialog } from "@/components/financial/SmartTransactionDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
