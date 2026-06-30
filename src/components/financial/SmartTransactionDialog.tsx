@@ -138,6 +138,7 @@ export function SmartTransactionDialog({
   const [userId, setUserId] = useState<string>("");
   const [patients, setPatients] = useState<PatientLite[]>([]);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
+  const [nextPending, setNextPending] = useState<NextPendingInstallment | null>(null);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<"single" | "recurring">(isEdit ? "single" : defaultMode);
 
