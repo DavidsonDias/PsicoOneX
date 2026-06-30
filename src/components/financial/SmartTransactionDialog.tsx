@@ -203,13 +203,13 @@ export function SmartTransactionDialog({
     })();
   }, [open, lockedPatient]);
 
-  // when patient changes → load active plan + autofill
+  // when patient changes → load active plan + next pending installment + autofill
   useEffect(() => {
-    if (!form.patient_id) { setActivePlan(null); return; }
+    if (!form.patient_id) { setActivePlan(null); setNextPending(null); return; }
     (async () => {
       const { data } = await supabase
         .from("patient_billing_plans" as any)
-        .select("billing_type, amount, day_of_month, start_date, description")
+        .select("id, billing_type, amount, day_of_month, start_date, description")
         .eq("patient_id", form.patient_id)
         .eq("active", true)
         .is("deleted_at", null)
@@ -219,6 +219,23 @@ export function SmartTransactionDialog({
 
       const plan = (data ? (data as unknown as ActivePlan) : null);
       setActivePlan(plan);
+
+      // Lookup next pending/overdue installment tied to this plan (or patient)
+      let pending: NextPendingInstallment | null = null;
+      const baseQ = supabase
+        .from("financial_transactions")
+        .select("id, amount, due_date, description, payment_method, status")
+        .eq("patient_id", form.patient_id)
+        .eq("type", "income")
+        .in("status", ["pending"])
+        .is("deleted_at", null)
+        .order("due_date", { ascending: true })
+        .limit(1);
+      const { data: pendData } = plan
+        ? await baseQ.eq("billing_plan_id" as any, plan.id)
+        : await baseQ;
+      if (pendData && pendData[0]) pending = pendData[0] as any;
+      setNextPending(pending);
 
       if (isEdit) return;
 
@@ -231,12 +248,19 @@ export function SmartTransactionDialog({
       let amount = form.amount;
       let due_date = form.due_date;
       let category = form.category;
+      let description = form.description;
 
-      if (plan) {
+      if (pending) {
+        // Priority: settle the next pending installment first
+        amount = String(pending.amount);
+        due_date = pending.due_date;
+        description = pending.description || suggestDescription(patient.full_name, plan?.billing_type);
+        category = plan?.billing_type === "monthly" ? "Pacote mensal" : "Consulta psicológica";
+      } else if (plan) {
         amount = String(plan.amount);
         due_date = smartDueDateFromPlan(plan);
         category = plan.billing_type === "monthly" ? "Pacote mensal" : "Consulta psicológica";
-        // also seed plan form when user toggles recorrente
+        description = suggestDescription(patient.full_name, plan.billing_type, category);
         setPlanForm(pf => ({
           ...pf,
           billing_type: plan.billing_type,
@@ -245,18 +269,16 @@ export function SmartTransactionDialog({
       } else if (patient.default_session_value) {
         amount = String(patient.default_session_value);
         if (patient.payment_day) due_date = smartDueDateFromDay(patient.payment_day);
+        description = suggestDescription(patient.full_name, undefined, category);
       } else if (patient.monthly_plan_value) {
         amount = String(patient.monthly_plan_value);
         category = "Pacote mensal";
+        description = suggestDescription(patient.full_name, undefined, category);
+      } else {
+        description = suggestDescription(patient.full_name, undefined, category);
       }
 
-      setForm(f => ({
-        ...f,
-        amount,
-        due_date,
-        category,
-        description: suggestDescription(patient.full_name, plan?.billing_type, category),
-      }));
+      setForm(f => ({ ...f, amount, due_date, category, description }));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.patient_id]);
