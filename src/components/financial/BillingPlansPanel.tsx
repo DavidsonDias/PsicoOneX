@@ -120,10 +120,10 @@ export function BillingPlansPanel({
 
     if (list.length > 0) {
       const ids = list.map(p => p.id);
-      const { data: tx } = await supabase
+      const { data: tx } = await (supabase as any)
         .from("financial_transactions")
         .select("id, amount, due_date, paid_date, status, description, billing_plan_id")
-        .in("billing_plan_id" as any, ids)
+        .in("billing_plan_id", ids)
         .is("deleted_at", null)
         .order("due_date", { ascending: false });
       const grouped: Record<string, Installment[]> = {};
