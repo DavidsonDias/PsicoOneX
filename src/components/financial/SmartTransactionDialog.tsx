@@ -220,21 +220,18 @@ export function SmartTransactionDialog({
       const plan = (data ? (data as unknown as ActivePlan) : null);
       setActivePlan(plan);
 
-      // Lookup next pending/overdue installment tied to this plan (or patient)
+      // Lookup next pending installment tied to this plan (or patient)
       let pending: NextPendingInstallment | null = null;
-      const baseQ = supabase
+      let q: any = supabase
         .from("financial_transactions")
         .select("id, amount, due_date, description, payment_method, status")
         .eq("patient_id", form.patient_id)
         .eq("type", "income")
-        .in("status", ["pending"])
-        .is("deleted_at", null)
-        .order("due_date", { ascending: true })
-        .limit(1);
-      const { data: pendData } = plan
-        ? await baseQ.eq("billing_plan_id" as any, plan.id)
-        : await baseQ;
-      if (pendData && pendData[0]) pending = pendData[0] as any;
+        .eq("status", "pending")
+        .is("deleted_at", null);
+      if (plan) q = q.eq("billing_plan_id", plan.id);
+      const { data: pendData } = await q.order("due_date", { ascending: true }).limit(1);
+      if (pendData && pendData[0]) pending = pendData[0] as NextPendingInstallment;
       setNextPending(pending);
 
       if (isEdit) return;
