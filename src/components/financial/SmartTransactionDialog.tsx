@@ -578,6 +578,28 @@ export function SmartTransactionDialog({
               )}
             </AnimatePresence>
 
+            {!isRecurring && nextPending && !isEdit && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 flex items-start gap-3"
+              >
+                <div className="h-8 w-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <CalendarIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0 text-xs space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold">Parcela em aberto detectada</span>
+                    <Badge variant="outline" className="text-[10px] border-emerald-500/40">Conciliação automática</Badge>
+                  </div>
+                  <p className="text-muted-foreground break-words">
+                    R$ {Number(nextPending.amount).toFixed(2)} · vence {format(new Date(nextPending.due_date + "T00:00:00"), "dd/MM/yyyy")}.
+                    Marcar como <strong>Pago</strong> vai conciliar esta parcela ao invés de criar um novo lançamento.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+
             <div className="space-y-1.5">
               <Label>Descrição {isRecurring && <span className="text-muted-foreground text-xs">(opcional)</span>}</Label>
               <Input
