@@ -36,6 +36,7 @@ import { CategoryAnalysis } from "@/components/financial/CategoryAnalysis";
 import { FinancialGrowth } from "@/components/financial/FinancialGrowth";
 import { RecurringBillingsPanel } from "@/components/financial/RecurringBillingsPanel";
 import { BillingPlansPanel } from "@/components/financial/BillingPlansPanel";
+import { ReconciliationPanel } from "@/components/financial/ReconciliationPanel";
 import { OverdueSemaforo } from "@/components/financial/OverdueSemaforo";
 import { SmartTransactionDialog } from "@/components/financial/SmartTransactionDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -809,10 +810,19 @@ export default function Financeiro() {
       <Tabs defaultValue="pagamentos" className="mb-6">
         <TabsList className="bg-muted/50 mb-6 flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="pagamentos" className="gap-2"><Receipt className="h-4 w-4" />Pagamentos & Cobranças</TabsTrigger>
+          <TabsTrigger value="reconciliacao" className="gap-2"><CheckCircle2 className="h-4 w-4" />Reconciliação</TabsTrigger>
           <TabsTrigger value="resumo" className="gap-2"><TrendingUp className="h-4 w-4" />Resumo</TabsTrigger>
           <TabsTrigger value="notas" className="gap-2"><FileText className="h-4 w-4" />Notas Fiscais</TabsTrigger>
           <TabsTrigger value="relatorios" className="gap-2"><BarChart3 className="h-4 w-4" />Relatórios</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="reconciliacao" className="space-y-6">
+          <ReconciliationPanel
+            patients={patients as any}
+            onChanged={() => { if (userId) loadTransactions(userId); }}
+          />
+        </TabsContent>
+
 
         {/* ========== PAGAMENTOS TAB ========== */}
         <TabsContent value="pagamentos" className="space-y-6">

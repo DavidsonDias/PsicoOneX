@@ -380,6 +380,7 @@ export type Database = {
           amount: number
           appointment_id: string | null
           attachment_url: string | null
+          billing_plan_id: string | null
           category: string | null
           cost_center: string | null
           created_at: string | null
@@ -415,6 +416,7 @@ export type Database = {
           amount: number
           appointment_id?: string | null
           attachment_url?: string | null
+          billing_plan_id?: string | null
           category?: string | null
           cost_center?: string | null
           created_at?: string | null
@@ -450,6 +452,7 @@ export type Database = {
           amount?: number
           appointment_id?: string | null
           attachment_url?: string | null
+          billing_plan_id?: string | null
           category?: string | null
           cost_center?: string | null
           created_at?: string | null
@@ -487,6 +490,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_billing_plan_id_fkey"
+            columns: ["billing_plan_id"]
+            isOneToOne: false
+            referencedRelation: "patient_billing_plans"
             referencedColumns: ["id"]
           },
           {

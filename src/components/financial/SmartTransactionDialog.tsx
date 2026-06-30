@@ -43,11 +43,21 @@ interface PatientLite {
 }
 
 interface ActivePlan {
+  id: string;
   billing_type: "per_session" | "weekly" | "biweekly" | "monthly";
   amount: number;
   day_of_month: number | null;
   start_date: string | null;
   description: string | null;
+}
+
+interface NextPendingInstallment {
+  id: string;
+  amount: number;
+  due_date: string;
+  description: string | null;
+  payment_method: string | null;
+  status: string;
 }
 
 export interface EditingTransaction {
@@ -128,6 +138,7 @@ export function SmartTransactionDialog({
   const [userId, setUserId] = useState<string>("");
   const [patients, setPatients] = useState<PatientLite[]>([]);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
+  const [nextPending, setNextPending] = useState<NextPendingInstallment | null>(null);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<"single" | "recurring">(isEdit ? "single" : defaultMode);
 
@@ -192,13 +203,13 @@ export function SmartTransactionDialog({
     })();
   }, [open, lockedPatient]);
 
-  // when patient changes → load active plan + autofill
+  // when patient changes → load active plan + next pending installment + autofill
   useEffect(() => {
-    if (!form.patient_id) { setActivePlan(null); return; }
+    if (!form.patient_id) { setActivePlan(null); setNextPending(null); return; }
     (async () => {
       const { data } = await supabase
         .from("patient_billing_plans" as any)
-        .select("billing_type, amount, day_of_month, start_date, description")
+        .select("id, billing_type, amount, day_of_month, start_date, description")
         .eq("patient_id", form.patient_id)
         .eq("active", true)
         .is("deleted_at", null)
@@ -208,6 +219,20 @@ export function SmartTransactionDialog({
 
       const plan = (data ? (data as unknown as ActivePlan) : null);
       setActivePlan(plan);
+
+      // Lookup next pending installment tied to this plan (or patient)
+      let pending: NextPendingInstallment | null = null;
+      let q: any = supabase
+        .from("financial_transactions")
+        .select("id, amount, due_date, description, payment_method, status")
+        .eq("patient_id", form.patient_id)
+        .eq("type", "income")
+        .eq("status", "pending")
+        .is("deleted_at", null);
+      if (plan) q = q.eq("billing_plan_id", plan.id);
+      const { data: pendData } = await q.order("due_date", { ascending: true }).limit(1);
+      if (pendData && pendData[0]) pending = pendData[0] as NextPendingInstallment;
+      setNextPending(pending);
 
       if (isEdit) return;
 
@@ -220,12 +245,19 @@ export function SmartTransactionDialog({
       let amount = form.amount;
       let due_date = form.due_date;
       let category = form.category;
+      let description = form.description;
 
-      if (plan) {
+      if (pending) {
+        // Priority: settle the next pending installment first
+        amount = String(pending.amount);
+        due_date = pending.due_date;
+        description = pending.description || suggestDescription(patient.full_name, plan?.billing_type);
+        category = plan?.billing_type === "monthly" ? "Pacote mensal" : "Consulta psicológica";
+      } else if (plan) {
         amount = String(plan.amount);
         due_date = smartDueDateFromPlan(plan);
         category = plan.billing_type === "monthly" ? "Pacote mensal" : "Consulta psicológica";
-        // also seed plan form when user toggles recorrente
+        description = suggestDescription(patient.full_name, plan.billing_type, category);
         setPlanForm(pf => ({
           ...pf,
           billing_type: plan.billing_type,
@@ -234,18 +266,16 @@ export function SmartTransactionDialog({
       } else if (patient.default_session_value) {
         amount = String(patient.default_session_value);
         if (patient.payment_day) due_date = smartDueDateFromDay(patient.payment_day);
+        description = suggestDescription(patient.full_name, undefined, category);
       } else if (patient.monthly_plan_value) {
         amount = String(patient.monthly_plan_value);
         category = "Pacote mensal";
+        description = suggestDescription(patient.full_name, undefined, category);
+      } else {
+        description = suggestDescription(patient.full_name, undefined, category);
       }
 
-      setForm(f => ({
-        ...f,
-        amount,
-        due_date,
-        category,
-        description: suggestDescription(patient.full_name, plan?.billing_type, category),
-      }));
+      setForm(f => ({ ...f, amount, due_date, category, description }));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.patient_id]);
@@ -314,12 +344,29 @@ export function SmartTransactionDialog({
       if (error) { toast.error(error.message); return; }
       toast.success("Transação atualizada");
     } else {
-      const payload: any = { ...basePayload, psychologist_id: userId };
-      if (form.status === "paid") payload.paid_date = new Date().toISOString().slice(0, 10);
-      const { error } = await supabase.from("financial_transactions").insert(payload);
-      setSaving(false);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Transação registrada");
+      // If there's a pending installment matching this entry, SETTLE it instead of creating a duplicate
+      const settling = !!(nextPending && form.type === "income" && form.status === "paid"
+        && Math.abs(Number(form.amount) - Number(nextPending.amount)) < 0.01);
+
+      if (settling && nextPending) {
+        const { error } = await supabase.from("financial_transactions").update({
+          status: "paid",
+          paid_date: new Date().toISOString().slice(0, 10),
+          payment_method: form.payment_method,
+          description: form.description || nextPending.description,
+        } as any).eq("id", nextPending.id);
+        setSaving(false);
+        if (error) { toast.error(error.message); return; }
+        toast.success("Parcela conciliada e marcada como paga");
+      } else {
+        const payload: any = { ...basePayload, psychologist_id: userId };
+        if (form.status === "paid") payload.paid_date = new Date().toISOString().slice(0, 10);
+        if (activePlan && form.type === "income") payload.billing_plan_id = activePlan.id;
+        const { error } = await supabase.from("financial_transactions").insert(payload);
+        setSaving(false);
+        if (error) { toast.error(error.message); return; }
+        toast.success("Transação registrada");
+      }
     }
 
     onOpenChange(false);
@@ -530,6 +577,28 @@ export function SmartTransactionDialog({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {!isRecurring && nextPending && !isEdit && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 flex items-start gap-3"
+              >
+                <div className="h-8 w-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <CalendarIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0 text-xs space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold">Parcela em aberto detectada</span>
+                    <Badge variant="outline" className="text-[10px] border-emerald-500/40">Conciliação automática</Badge>
+                  </div>
+                  <p className="text-muted-foreground break-words">
+                    R$ {Number(nextPending.amount).toFixed(2)} · vence {format(new Date(nextPending.due_date + "T00:00:00"), "dd/MM/yyyy")}.
+                    Marcar como <strong>Pago</strong> vai conciliar esta parcela ao invés de criar um novo lançamento.
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
             <div className="space-y-1.5">
               <Label>Descrição {isRecurring && <span className="text-muted-foreground text-xs">(opcional)</span>}</Label>
