@@ -97,10 +97,28 @@ Deno.serve(async (req) => {
         || req.headers.get("x-real-ip")
         || null;
 
+      // SECURITY: allowlist fields the patient may set via onboarding.
+      // Never trust arbitrary body keys — service_role bypasses RLS.
+      const ALLOWED_FIELDS = new Set([
+        "full_name","social_name","preferred_name","birth_date","gender","gender_identity",
+        "cpf","rg","phone","whatsapp_phone","email","address","address_number","address_complement",
+        "neighborhood","city","state","zip_code","country","nationality","marital_status",
+        "occupation","education","emergency_contact_name","emergency_contact_phone",
+        "emergency_contact_relationship","health_insurance","health_insurance_number",
+        "referred_by","medical_conditions","current_medications","allergies","previous_therapy",
+        "chief_complaint","treatment_goals","family_history","personal_history","observations",
+        "lgpd_accepted","lgpd_accepted_at","terms_accepted","terms_accepted_at",
+        "signature_data","signature_name","preferred_notification_channel"
+      ]);
+      const safeData: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(patientData || {})) {
+        if (ALLOWED_FIELDS.has(k)) safeData[k] = val;
+      }
+
       const { error: upErr } = await supabase
         .from("patients")
         .update({
-          ...patientData,
+          ...safeData,
           signature_ip: ip,
           uploaded_documents: documents || [],
           onboarding_status: "review",
@@ -108,6 +126,7 @@ Deno.serve(async (req) => {
         })
         .eq("id", v.row.patient_id);
       if (upErr) throw upErr;
+
 
       await supabase
         .from("patient_onboarding_tokens")
