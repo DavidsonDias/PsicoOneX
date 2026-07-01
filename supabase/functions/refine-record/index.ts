@@ -35,6 +35,8 @@ Omita seções sem conteúdo correspondente.`,
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const auth = await requireUser(req, corsHeaders); if ('error' in auth) return auth.error;
+
 
   try {
     const body = await req.json();

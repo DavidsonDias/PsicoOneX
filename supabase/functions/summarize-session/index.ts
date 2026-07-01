@@ -56,6 +56,8 @@ const refineInstructions: Record<string, string> = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const auth = await requireUser(req, corsHeaders); if ('error' in auth) return auth.error;
+
 
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
