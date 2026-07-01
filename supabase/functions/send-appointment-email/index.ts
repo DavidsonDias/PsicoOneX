@@ -1,13 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
+import { requireUser } from "../_shared/require-auth.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Require caller authentication — prevents unsolicited emails from anon callers.
+  const auth = await requireUser(req, corsHeaders);
+  if ('error' in auth) return auth.error;
+
   try {
     const { appointmentId, patientId, token } = await req.json();
+
 
     if (!appointmentId || !patientId || !token) {
       return new Response(JSON.stringify({ error: "Dados obrigatórios: appointmentId, patientId, token" }), {
@@ -15,6 +21,14 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    // Validate token format (alnum/underscore/hyphen, reasonable length) to prevent HTML injection
+    if (typeof token !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(token)) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
