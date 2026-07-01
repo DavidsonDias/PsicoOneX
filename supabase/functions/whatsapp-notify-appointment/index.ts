@@ -39,7 +39,45 @@ serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Accept internal secret (DB trigger / cron) OR authenticated caller who
+  // owns the appointment. Never allow arbitrary authenticated users.
+  const rawToken = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "")
+    || req.headers.get("x-internal-secret");
+  const internalAllowed = new Set(
+    [
+      SERVICE_KEY,
+      Deno.env.get("INTERNAL_FUNCTION_SECRET"),
+      Deno.env.get("CRON_SECRET"),
+    ].filter(Boolean) as string[],
+  );
+  const isInternal = !!rawToken && internalAllowed.has(rawToken);
+
+  let callerUserId: string | null = null;
+  if (!isInternal) {
+    if (!rawToken) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    try {
+      const authClient = createClient(
+        SUPABASE_URL,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: `Bearer ${rawToken}` } } },
+      );
+      const { data: u } = await authClient.auth.getUser();
+      if (!u?.user) throw new Error("unauth");
+      callerUserId = u.user.id;
+    } catch {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
 
   const { data: cfg } = await supabase.from("whatsapp_config").select("phone_number_id, access_token, is_active").maybeSingle();
   const PHONE_NUMBER_ID = (cfg?.phone_number_id || Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || "").trim();
