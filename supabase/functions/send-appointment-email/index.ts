@@ -62,6 +62,29 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Ownership check: caller must own the appointment.
+    if (apt.psychologist_id !== auth.user.id) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate token exists in patient_access_links for this appointment/patient.
+    const { data: linkRow } = await supabase
+      .from("patient_access_links")
+      .select("id")
+      .eq("token", token)
+      .eq("patient_id", patientId)
+      .maybeSingle();
+    if (!linkRow) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+
     // Fetch psychologist name
     const { data: prof } = await supabase
       .from("profiles")
