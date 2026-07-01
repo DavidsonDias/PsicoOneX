@@ -25,6 +25,23 @@ webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Accept internal callers only (service role / cron / internal secret).
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "")
+    || req.headers.get("x-internal-secret");
+  const allowed = new Set(
+    [
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      Deno.env.get("INTERNAL_FUNCTION_SECRET"),
+      Deno.env.get("CRON_SECRET"),
+    ].filter(Boolean) as string[],
+  );
+  if (!token || !allowed.has(token)) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const payload = (await req.json()) as PushPayload;
     if (!payload?.title) {
@@ -35,11 +52,20 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-    let query = supabase.from("push_subscriptions").select("*");
     const userIds = payload.user_ids?.length ? payload.user_ids : payload.user_id ? [payload.user_id] : [];
-    if (userIds.length) query = query.in("user_id", userIds);
-    const { data: subs, error } = await query;
+    // Require an explicit user scope — never broadcast to every subscriber.
+    if (!userIds.length) {
+      return new Response(JSON.stringify({ error: "user_id or user_ids is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: subs, error } = await supabase
+      .from("push_subscriptions")
+      .select("*")
+      .in("user_id", userIds);
     if (error) throw error;
+
 
     const notification = {
       title: payload.title,

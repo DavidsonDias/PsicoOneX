@@ -104,9 +104,18 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Build invite URL — use Origin header for proper environment
-    const origin = req.headers.get('origin') || 'https://psicoone.vercel.app'
+    // Build invite URL — always use a trusted, server-controlled base URL.
+    // Never trust the caller-supplied Origin/Referer header.
+    const ALLOWED_ORIGINS = new Set([
+      'https://psicoone.lovable.app',
+      'https://psicoone.vercel.app',
+    ]);
+    const envBase = Deno.env.get('APP_BASE_URL') || Deno.env.get('SITE_URL');
+    const requestOrigin = req.headers.get('origin') || '';
+    const origin = envBase
+      || (ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : 'https://psicoone.lovable.app');
     const inviteUrl = `${origin}/portal/aceitar-convite/${invite.token}`
+
 
     // Send email via send-transactional-email
     const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
