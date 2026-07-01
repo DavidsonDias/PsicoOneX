@@ -122,6 +122,14 @@ serve(async (req) => {
     });
   }
 
+  // Ownership: non-internal callers must own this appointment.
+  if (!isInternal && callerUserId && apt.psychologist_id !== callerUserId) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+
   const patient: any = apt.patients;
   if (!patient) {
     return new Response(JSON.stringify({ skipped: "no patient" }), { status: 200, headers: corsHeaders });
