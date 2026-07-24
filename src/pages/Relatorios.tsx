@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
  import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from "recharts";
  import { Download, TrendingUp, Users, DollarSign, Calendar, FileText, Clock, Target, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { BrandHeader } from "@/components/shared/BrandHeader";
+import { useClinicBranding } from "@/hooks/useClinicBranding";
  import { StatsOverview } from "@/components/ui/stats-overview";
  import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
  import { ptBR } from "date-fns/locale";
