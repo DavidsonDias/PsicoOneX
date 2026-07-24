@@ -16,6 +16,7 @@ import { useClinicBranding } from "@/hooks/useClinicBranding";
  import { toast } from "sonner";
 
 export default function Relatorios() {
+   const branding = useClinicBranding();
    const [loading, setLoading] = useState(true);
    const [period, setPeriod] = useState("6m");
    const [patients, setPatients] = useState<any[]>([]);
