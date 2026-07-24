@@ -457,7 +457,6 @@ All colors MUST be HSL.
   .document-paper *,
   .document-ink,
   .document-ink * {
-    color: #0f172a !important;
     color: hsl(222 47% 11%) !important;
     -webkit-text-fill-color: hsl(222 47% 11%) !important;
     text-shadow: none !important;
