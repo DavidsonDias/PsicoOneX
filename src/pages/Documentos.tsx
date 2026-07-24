@@ -137,45 +137,86 @@ export default function Documentos() {
     return true;
   };
 
-  const handlePrint = () => {
-    if (!validateDocument()) return;
-
+  const openPrintFrame = () => {
     const printContent = document.getElementById("document-preview");
     if (!printContent) return;
 
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      toast.error("Não foi possível abrir a janela de impressão");
+    // Pull page-level styles (Tailwind, fonts) so the printed doc matches preview.
+    const styleTags = Array.from(
+      document.querySelectorAll('link[rel="stylesheet"], style')
+    )
+      .map((el) => el.outerHTML)
+      .join("\n");
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Documento - PsicoOne</title>
+    ${styleTags}
+    <style>
+      @page { size: A4; margin: 20mm; }
+      html, body { background: #ffffff !important; color: #0f172a !important; font-family: 'Times New Roman', Georgia, serif; }
+      body { padding: 0; margin: 0; }
+      .print-shell { max-width: 800px; margin: 0 auto; padding: 24px; }
+      #document-preview { box-shadow: none !important; border: none !important; }
+      img { max-height: 120px; }
+    </style>
+  </head>
+  <body>
+    <div class="print-shell">${printContent.innerHTML}</div>
+  </body>
+</html>`;
+
+    // Use a hidden iframe (avoids popup blockers that break window.open).
+    const existing = document.getElementById("__print_frame__") as HTMLIFrameElement | null;
+    if (existing) existing.remove();
+
+    const iframe = document.createElement("iframe");
+    iframe.id = "__print_frame__";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      toast.error("Não foi possível preparar a impressão");
       return;
     }
+    doc.open();
+    doc.write(html);
+    doc.close();
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Documento - PsicoOne</title>
-          <style>
-            body { font-family: 'Times New Roman', serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #1a1a2e; }
-            h2 { text-align: center; text-transform: uppercase; letter-spacing: 2px; border-bottom: 2px solid #1a1a2e; padding-bottom: 16px; margin-bottom: 32px; }
-            p { line-height: 1.8; text-align: justify; }
-            .signature-area { margin-top: 60px; text-align: center; }
-            .signature-line { width: 300px; border-bottom: 1px solid #1a1a2e; margin: 0 auto 8px; }
-            img { max-height: 80px; }
-          </style>
-        </head>
-        <body>${printContent.innerHTML}</body>
-      </html>
-    `);
+    // Wait for the iframe to render (fonts + images) before printing.
+    const trigger = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("print error", err);
+        toast.error("Falha ao imprimir. Tente novamente.");
+      }
+    };
+    if (iframe.contentWindow?.document.readyState === "complete") {
+      setTimeout(trigger, 400);
+    } else {
+      iframe.onload = () => setTimeout(trigger, 400);
+    }
+  };
 
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 250);
+  const handlePrint = () => {
+    if (!validateDocument()) return;
+    openPrintFrame();
   };
 
   const handleDownloadPDF = () => {
     if (!validateDocument()) return;
-    handlePrint();
-    toast.info("Use 'Salvar como PDF' na janela de impressão");
+    openPrintFrame();
+    toast.info("Escolha 'Salvar como PDF' na janela de impressão");
   };
 
   const handleSelectTemplate = (template: any) => {
