@@ -71,7 +71,7 @@ export default function Documentos() {
 
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("id, full_name, crp, clinic_name")
+      .select("id, full_name, crp, clinic_name, logo_url")
       .eq("id", user.id)
       .single();
 
