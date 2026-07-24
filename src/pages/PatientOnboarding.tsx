@@ -220,6 +220,15 @@ export default function PatientOnboarding() {
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4 sm:p-6">
         <div className="max-w-2xl mx-auto">
           <div className="mb-6 text-center">
+            {(psychologist?.logo_url || psychologist?.clinic_name) && (
+              <BrandHeader
+                logoUrl={psychologist?.logo_url}
+                clinicName={psychologist?.clinic_name}
+                subtitle={psychologist?.full_name ? `Psicólogo(a): ${psychologist.full_name}` : undefined}
+                size="lg"
+                className="mb-4"
+              />
+            )}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-3">
               <ShieldCheck className="h-3.5 w-3.5" /> Conexão segura · LGPD
             </div>
