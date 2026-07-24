@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { Calendar, User, Sparkles, Paperclip, Info, Hash, UserPlus, Loader2 } from "lucide-react";
 import { FreeFormEditor } from "./FreeFormEditor";
 import { AttachmentUploader } from "./AttachmentUploader";
+import { BrandHeader } from "@/components/shared/BrandHeader";
+import { useClinicBranding } from "@/hooks/useClinicBranding";
 
 interface PendingFile {
   id: string;
