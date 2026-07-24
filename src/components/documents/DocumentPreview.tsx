@@ -75,11 +75,12 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
     return resultado;
   };
 
-  // Explicit dark text on white paper — never rely on theme tokens here so the
-  // document stays legible both on-screen (light preview) and when printed.
-  const ink = "text-slate-900";
-  const inkMuted = "text-slate-600";
-  const rule = "border-slate-300";
+  // Printed/legal documents must be isolated from the app theme. The global
+  // CSS class below forces dark ink on white paper with !important so custom
+  // dark themes cannot leak into the preview, print, or PDF export.
+  const ink = "document-ink";
+  const inkMuted = "document-muted";
+  const rule = "document-rule";
 
   const Signature = () => (
     <div className={`mt-12 pt-8 border-t ${rule}`}>
@@ -87,7 +88,7 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
         {data.signature ? (
           <img src={data.signature} alt="Assinatura" className="h-16 mb-2" />
         ) : (
-          <div className="w-64 border-b border-slate-900 mb-2" />
+          <div className="w-64 border-b document-rule-strong mb-2" />
         )}
         <p className={`font-medium ${ink}`}>{data.professionalName}</p>
         <p className={`text-sm ${inkMuted}`}>Psicólogo(a) - CRP {data.professionalCrp}</p>
@@ -161,7 +162,7 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
         </p>
 
         {data.content && (
-          <div className="bg-slate-100 p-4 rounded-lg">
+          <div className="document-soft p-4 rounded-lg">
             <p>{data.content}</p>
           </div>
         )}
@@ -195,7 +196,7 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
         {data.content && (
           <div className="mt-4">
             <p className="font-medium mb-2">Conteúdo:</p>
-            <div className="bg-slate-100 p-4 rounded-lg whitespace-pre-wrap">
+            <div className="document-soft p-4 rounded-lg whitespace-pre-wrap">
               {data.content}
             </div>
           </div>
@@ -208,7 +209,7 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
 
   return (
     <div
-      className="bg-white p-8 rounded-lg border shadow-sm min-h-[500px] text-slate-900"
+      className="document-paper p-8 rounded-lg border shadow-sm min-h-[500px]"
       id="document-preview"
     >
       {type === "receipt" && renderReceipt()}
