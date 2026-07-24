@@ -65,7 +65,12 @@ Deno.serve(async (req) => {
         .select("id, full_name, email, phone, onboarding_status")
         .eq("id", v.row.patient_id)
         .maybeSingle();
-      return json({ patient, expires_at: v.row.expires_at });
+      const { data: psy } = await supabase
+        .from("profiles")
+        .select("full_name, clinic_name, logo_url, crp")
+        .eq("id", v.row.psychologist_id)
+        .maybeSingle();
+      return json({ patient, psychologist: psy, expires_at: v.row.expires_at });
     }
 
     // Upload de documento via base64 (contorna RLS do storage de forma segura — só com token válido)
