@@ -185,6 +185,7 @@ export default function Configuracoes() {
       clinic_name: clinicName,
       preferred_clinical_style: (formData.get("preferred_clinical_style") as string) || "neutral",
       notification_emails: notifEmails,
+      logo_url: logoUrl,
     };
 
     const { error } = await supabase.from("profiles").update(profilePatch).eq("id", user.id);
