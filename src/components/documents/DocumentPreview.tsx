@@ -187,11 +187,9 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
 
   const renderReport = () => (
     <div className="space-y-6">
+      <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
       <div className="text-center border-b pb-4">
         <h2 className="text-xl font-bold uppercase tracking-wide">Relatório Psicológico</h2>
-        {data.clinicName && (
-          <p className="text-muted-foreground mt-1">{data.clinicName}</p>
-        )}
       </div>
 
       <div className="space-y-4 text-sm">
