@@ -53,6 +53,7 @@ export default function PatientOnboarding() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [patient, setPatient] = useState<{ id: string; full_name: string } | null>(null);
+  const [psychologist, setPsychologist] = useState<{ full_name?: string; clinic_name?: string; logo_url?: string | null } | null>(null);
   const [docs, setDocs] = useState<UploadedDoc[]>([]);
   const [signature, setSignature] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, any>>({
