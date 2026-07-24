@@ -113,6 +113,7 @@ export default function Configuracoes() {
     if (profileData) {
       setProfile(profileData);
       setNotifEmails(Array.isArray((profileData as any).notification_emails) ? (profileData as any).notification_emails : []);
+      setLogoUrl((profileData as any).logo_url || null);
       setSettings(prev => ({
         ...prev,
         clinic_name: profileData.clinic_name || "",
