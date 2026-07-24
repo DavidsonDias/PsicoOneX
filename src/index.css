@@ -448,9 +448,9 @@ All colors MUST be HSL.
   }
 
   .document-paper {
-    background: #ffffff !important;
-    color: #0f172a !important;
-    -webkit-text-fill-color: #0f172a !important;
+    background: hsl(0 0% 100%) !important;
+    color: hsl(222 47% 11%) !important;
+    -webkit-text-fill-color: hsl(222 47% 11%) !important;
     color-scheme: light !important;
   }
 
@@ -458,33 +458,34 @@ All colors MUST be HSL.
   .document-ink,
   .document-ink * {
     color: #0f172a !important;
-    -webkit-text-fill-color: #0f172a !important;
+    color: hsl(222 47% 11%) !important;
+    -webkit-text-fill-color: hsl(222 47% 11%) !important;
     text-shadow: none !important;
   }
 
   .document-paper .document-muted,
   .document-paper .document-muted * {
-    color: #475569 !important;
-    -webkit-text-fill-color: #475569 !important;
+    color: hsl(215 16% 47%) !important;
+    -webkit-text-fill-color: hsl(215 16% 47%) !important;
   }
 
   .document-soft {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-    -webkit-text-fill-color: #0f172a !important;
+    background: hsl(210 40% 96%) !important;
+    color: hsl(222 47% 11%) !important;
+    -webkit-text-fill-color: hsl(222 47% 11%) !important;
   }
 
   .document-rule {
-    border-color: #cbd5e1 !important;
+    border-color: hsl(214 32% 91%) !important;
   }
 
   .document-rule-strong {
-    border-color: #0f172a !important;
+    border-color: hsl(222 47% 11%) !important;
   }
 
   .document-exporting {
     box-shadow: none !important;
-    border-color: #e2e8f0 !important;
+    border-color: hsl(214 32% 91%) !important;
   }
 
   @media print {
@@ -494,7 +495,7 @@ All colors MUST be HSL.
     }
 
     body.print-document-only {
-      background: #ffffff !important;
+      background: hsl(0 0% 100%) !important;
     }
 
     body.print-document-only * {
@@ -516,7 +517,7 @@ All colors MUST be HSL.
       border: 0 !important;
       border-radius: 0 !important;
       box-shadow: none !important;
-      background: #ffffff !important;
+      background: hsl(0 0% 100%) !important;
     }
 
     body.print-document-only #document-preview img {
