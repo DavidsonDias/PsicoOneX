@@ -447,6 +447,84 @@ All colors MUST be HSL.
     overscroll-behavior: none;
   }
 
+  .document-paper {
+    background: hsl(0 0% 100%) !important;
+    color: hsl(222 47% 11%) !important;
+    -webkit-text-fill-color: hsl(222 47% 11%) !important;
+    color-scheme: light !important;
+  }
+
+  .document-paper *,
+  .document-ink,
+  .document-ink * {
+    color: hsl(222 47% 11%) !important;
+    -webkit-text-fill-color: hsl(222 47% 11%) !important;
+    text-shadow: none !important;
+  }
+
+  .document-paper .document-muted,
+  .document-paper .document-muted * {
+    color: hsl(215 16% 47%) !important;
+    -webkit-text-fill-color: hsl(215 16% 47%) !important;
+  }
+
+  .document-soft {
+    background: hsl(210 40% 96%) !important;
+    color: hsl(222 47% 11%) !important;
+    -webkit-text-fill-color: hsl(222 47% 11%) !important;
+  }
+
+  .document-rule {
+    border-color: hsl(214 32% 91%) !important;
+  }
+
+  .document-rule-strong {
+    border-color: hsl(222 47% 11%) !important;
+  }
+
+  .document-exporting {
+    box-shadow: none !important;
+    border-color: hsl(214 32% 91%) !important;
+  }
+
+  @media print {
+    @page {
+      size: A4;
+      margin: 16mm;
+    }
+
+    body.print-document-only {
+      background: hsl(0 0% 100%) !important;
+    }
+
+    body.print-document-only * {
+      visibility: hidden !important;
+    }
+
+    body.print-document-only #document-preview,
+    body.print-document-only #document-preview * {
+      visibility: visible !important;
+    }
+
+    body.print-document-only #document-preview {
+      position: absolute !important;
+      inset: 0 auto auto 0 !important;
+      width: 100% !important;
+      min-height: auto !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      background: hsl(0 0% 100%) !important;
+    }
+
+    body.print-document-only #document-preview img {
+      max-height: 28mm !important;
+      object-fit: contain !important;
+    }
+  }
+
   /* Better touch targets for mobile */
   button, a, input, textarea, select {
     touch-action: manipulation;

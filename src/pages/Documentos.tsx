@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { FileText, Receipt, FileCheck, ClipboardList, Download, Printer, Save, AlertCircle, Sparkles, History, Layers } from "lucide-react";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import { SignaturePad } from "@/components/documents/SignaturePad";
 import { DocumentPreview } from "@/components/documents/DocumentPreview";
 import { DocumentTemplates } from "@/components/documents/DocumentTemplates";
@@ -137,86 +139,72 @@ export default function Documentos() {
     return true;
   };
 
-  const openPrintFrame = () => {
-    const printContent = document.getElementById("document-preview");
-    if (!printContent) return;
-
-    // Pull page-level styles (Tailwind, fonts) so the printed doc matches preview.
-    const styleTags = Array.from(
-      document.querySelectorAll('link[rel="stylesheet"], style')
-    )
-      .map((el) => el.outerHTML)
-      .join("\n");
-
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="utf-8" />
-    <title>Documento - PsicoOne</title>
-    ${styleTags}
-    <style>
-      @page { size: A4; margin: 20mm; }
-      html, body { background: #ffffff !important; color: #0f172a !important; font-family: 'Times New Roman', Georgia, serif; }
-      body { padding: 0; margin: 0; }
-      .print-shell { max-width: 800px; margin: 0 auto; padding: 24px; }
-      #document-preview { box-shadow: none !important; border: none !important; }
-      img { max-height: 120px; }
-    </style>
-  </head>
-  <body>
-    <div class="print-shell">${printContent.innerHTML}</div>
-  </body>
-</html>`;
-
-    // Use a hidden iframe (avoids popup blockers that break window.open).
-    const existing = document.getElementById("__print_frame__") as HTMLIFrameElement | null;
-    if (existing) existing.remove();
-
-    const iframe = document.createElement("iframe");
-    iframe.id = "__print_frame__";
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      toast.error("Não foi possível preparar a impressão");
-      return;
-    }
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    // Wait for the iframe to render (fonts + images) before printing.
-    const trigger = () => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (err) {
-        console.error("print error", err);
-        toast.error("Falha ao imprimir. Tente novamente.");
-      }
-    };
-    if (iframe.contentWindow?.document.readyState === "complete") {
-      setTimeout(trigger, 400);
-    } else {
-      iframe.onload = () => setTimeout(trigger, 400);
-    }
-  };
-
   const handlePrint = () => {
     if (!validateDocument()) return;
-    openPrintFrame();
+    document.body.classList.add("print-document-only");
+    const cleanup = () => document.body.classList.remove("print-document-only");
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.setTimeout(() => {
+      window.print();
+      window.setTimeout(cleanup, 1000);
+    }, 80);
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!validateDocument()) return;
-    openPrintFrame();
-    toast.info("Escolha 'Salvar como PDF' na janela de impressão");
+    const printContent = document.getElementById("document-preview");
+    if (!printContent) {
+      toast.error("Não foi possível localizar a pré-visualização");
+      return;
+    }
+
+    toast.loading("Gerando PDF...", { id: "document-pdf" });
+    try {
+      const canvas = await html2canvas(printContent, {
+        backgroundColor: "#ffffff",
+        scale: Math.min(window.devicePixelRatio || 2, 2),
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDocument) => {
+          const clonedPreview = clonedDocument.getElementById("document-preview");
+          clonedPreview?.classList.add("document-exporting");
+        },
+      });
+
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const imgData = canvas.toDataURL("image/png");
+
+      if (imgHeight <= pageHeight - margin * 2) {
+        pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
+      } else {
+        let remainingHeight = imgHeight;
+        let y = margin;
+        while (remainingHeight > 0) {
+          pdf.addImage(imgData, "PNG", margin, y, imgWidth, imgHeight);
+          remainingHeight -= pageHeight - margin * 2;
+          y -= pageHeight - margin * 2;
+          if (remainingHeight > 0) pdf.addPage();
+        }
+      }
+
+      const patient = getSelectedPatient();
+      const filename = `${documentType}-${patient?.full_name || "documento"}`
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9_-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase();
+      pdf.save(`${filename || "documento"}.pdf`);
+      toast.success("PDF baixado com sucesso", { id: "document-pdf" });
+    } catch (err) {
+      console.error("pdf error", err);
+      toast.error("Falha ao gerar PDF. Tente imprimir e escolher Salvar como PDF.", { id: "document-pdf" });
+    }
   };
 
   const handleSelectTemplate = (template: any) => {
