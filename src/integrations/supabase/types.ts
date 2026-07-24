@@ -1348,6 +1348,7 @@ export type Database = {
           crp: string | null
           full_name: string
           id: string
+          logo_url: string | null
           notification_emails: string[]
           onboarding_completed: boolean
           phone: string | null
@@ -1365,6 +1366,7 @@ export type Database = {
           crp?: string | null
           full_name: string
           id: string
+          logo_url?: string | null
           notification_emails?: string[]
           onboarding_completed?: boolean
           phone?: string | null
@@ -1382,6 +1384,7 @@ export type Database = {
           crp?: string | null
           full_name?: string
           id?: string
+          logo_url?: string | null
           notification_emails?: string[]
           onboarding_completed?: boolean
           phone?: string | null
