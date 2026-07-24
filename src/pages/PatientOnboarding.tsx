@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { CheckCircle2, Loader2, ShieldCheck, Upload, X, ArrowRight, ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SignaturePad } from "@/components/documents/SignaturePad";
+import { BrandHeader } from "@/components/shared/BrandHeader";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/patient-onboarding`;
 
