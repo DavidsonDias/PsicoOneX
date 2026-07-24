@@ -52,6 +52,8 @@ export default function Configuracoes() {
   const [userEmail, setUserEmail] = useState<string>("");
   const [notifEmails, setNotifEmails] = useState<string[]>([]);
   const [newNotifEmail, setNewNotifEmail] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
