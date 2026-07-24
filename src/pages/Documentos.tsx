@@ -29,6 +29,7 @@ interface Profile {
   full_name: string | null;
   crp: string | null;
   clinic_name: string | null;
+  logo_url: string | null;
 }
 
 type DocumentType = "receipt" | "declaration" | "certificate" | "report";
