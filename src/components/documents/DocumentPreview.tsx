@@ -75,18 +75,42 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
     return resultado;
   };
 
-  const renderReceipt = () => (
-    <div className="space-y-6">
-      <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
-      <div className="text-center border-b pb-4">
-        <h2 className="text-xl font-bold uppercase tracking-wide">Recibo de Pagamento</h2>
+  // Explicit dark text on white paper — never rely on theme tokens here so the
+  // document stays legible both on-screen (light preview) and when printed.
+  const ink = "text-slate-900";
+  const inkMuted = "text-slate-600";
+  const rule = "border-slate-300";
+
+  const Signature = () => (
+    <div className={`mt-12 pt-8 border-t ${rule}`}>
+      <div className="flex flex-col items-center">
+        {data.signature ? (
+          <img src={data.signature} alt="Assinatura" className="h-16 mb-2" />
+        ) : (
+          <div className="w-64 border-b border-slate-900 mb-2" />
+        )}
+        <p className={`font-medium ${ink}`}>{data.professionalName}</p>
+        <p className={`text-sm ${inkMuted}`}>Psicólogo(a) - CRP {data.professionalCrp}</p>
       </div>
+    </div>
+  );
+
+  const Title = ({ children }: { children: React.ReactNode }) => (
+    <div className={`text-center border-b pb-4 ${rule}`}>
+      <h2 className={`text-xl font-bold uppercase tracking-wide ${ink}`}>{children}</h2>
+    </div>
+  );
+
+  const renderReceipt = () => (
+    <div className={`space-y-6 ${ink}`}>
+      <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
+      <Title>Recibo de Pagamento</Title>
 
       <div className="space-y-4 text-sm leading-relaxed">
         <p>
           Recebi de <strong>{data.patientName}</strong>
-          {data.patientCpf && <span> (CPF: {data.patientCpf})</span>}, 
-          a quantia de <strong>{formatCurrency(data.value || 0)}</strong> ({extenso(data.value || 0)}), 
+          {data.patientCpf && <span> (CPF: {data.patientCpf})</span>},
+          a quantia de <strong>{formatCurrency(data.value || 0)}</strong> ({extenso(data.value || 0)}),
           referente a {data.sessionCount || 1} sessão(ões) de atendimento psicológico.
         </p>
 
@@ -95,31 +119,19 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
         </p>
       </div>
 
-      <div className="mt-12 pt-8 border-t">
-        <div className="flex flex-col items-center">
-          {data.signature ? (
-            <img src={data.signature} alt="Assinatura" className="h-16 mb-2" />
-          ) : (
-            <div className="w-64 border-b border-foreground mb-2" />
-          )}
-          <p className="font-medium">{data.professionalName}</p>
-          <p className="text-sm text-muted-foreground">Psicólogo(a) - CRP {data.professionalCrp}</p>
-        </div>
-      </div>
+      <Signature />
     </div>
   );
 
   const renderDeclaration = () => (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${ink}`}>
       <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
-      <div className="text-center border-b pb-4">
-        <h2 className="text-xl font-bold uppercase tracking-wide">Declaração de Comparecimento</h2>
-      </div>
+      <Title>Declaração de Comparecimento</Title>
 
       <div className="space-y-4 text-sm leading-relaxed">
         <p>
           Declaro, para os devidos fins, que <strong>{data.patientName}</strong>
-          {data.patientCpf && <span> (CPF: {data.patientCpf})</span>} compareceu a 
+          {data.patientCpf && <span> (CPF: {data.patientCpf})</span>} compareceu a
           sessão de atendimento psicológico nesta data.
         </p>
 
@@ -132,36 +144,24 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
         </p>
       </div>
 
-      <div className="mt-12 pt-8 border-t">
-        <div className="flex flex-col items-center">
-          {data.signature ? (
-            <img src={data.signature} alt="Assinatura" className="h-16 mb-2" />
-          ) : (
-            <div className="w-64 border-b border-foreground mb-2" />
-          )}
-          <p className="font-medium">{data.professionalName}</p>
-          <p className="text-sm text-muted-foreground">Psicólogo(a) - CRP {data.professionalCrp}</p>
-        </div>
-      </div>
+      <Signature />
     </div>
   );
 
   const renderCertificate = () => (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${ink}`}>
       <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
-      <div className="text-center border-b pb-4">
-        <h2 className="text-xl font-bold uppercase tracking-wide">Atestado Psicológico</h2>
-      </div>
+      <Title>Atestado Psicológico</Title>
 
       <div className="space-y-4 text-sm leading-relaxed">
         <p>
           Atesto, para os devidos fins, que <strong>{data.patientName}</strong>
-          {data.patientCpf && <span> (CPF: {data.patientCpf})</span>} encontra-se 
+          {data.patientCpf && <span> (CPF: {data.patientCpf})</span>} encontra-se
           em acompanhamento psicológico desde {format(data.date, "dd/MM/yyyy", { locale: ptBR })}.
         </p>
 
         {data.content && (
-          <div className="bg-muted/50 p-4 rounded-lg">
+          <div className="bg-slate-100 p-4 rounded-lg">
             <p>{data.content}</p>
           </div>
         )}
@@ -171,32 +171,20 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
         </p>
       </div>
 
-      <div className="mt-12 pt-8 border-t">
-        <div className="flex flex-col items-center">
-          {data.signature ? (
-            <img src={data.signature} alt="Assinatura" className="h-16 mb-2" />
-          ) : (
-            <div className="w-64 border-b border-foreground mb-2" />
-          )}
-          <p className="font-medium">{data.professionalName}</p>
-          <p className="text-sm text-muted-foreground">Psicólogo(a) - CRP {data.professionalCrp}</p>
-        </div>
-      </div>
+      <Signature />
     </div>
   );
 
   const renderReport = () => (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${ink}`}>
       <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
-      <div className="text-center border-b pb-4">
-        <h2 className="text-xl font-bold uppercase tracking-wide">Relatório Psicológico</h2>
-      </div>
+      <Title>Relatório Psicológico</Title>
 
       <div className="space-y-4 text-sm">
         <div>
           <p className="font-medium">Paciente:</p>
           <p>{data.patientName}</p>
-          {data.patientCpf && <p className="text-muted-foreground">CPF: {data.patientCpf}</p>}
+          {data.patientCpf && <p className={inkMuted}>CPF: {data.patientCpf}</p>}
         </div>
 
         <div>
@@ -207,29 +195,22 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
         {data.content && (
           <div className="mt-4">
             <p className="font-medium mb-2">Conteúdo:</p>
-            <div className="bg-muted/50 p-4 rounded-lg whitespace-pre-wrap">
+            <div className="bg-slate-100 p-4 rounded-lg whitespace-pre-wrap">
               {data.content}
             </div>
           </div>
         )}
       </div>
 
-      <div className="mt-12 pt-8 border-t">
-        <div className="flex flex-col items-center">
-          {data.signature ? (
-            <img src={data.signature} alt="Assinatura" className="h-16 mb-2" />
-          ) : (
-            <div className="w-64 border-b border-foreground mb-2" />
-          )}
-          <p className="font-medium">{data.professionalName}</p>
-          <p className="text-sm text-muted-foreground">Psicólogo(a) - CRP {data.professionalCrp}</p>
-        </div>
-      </div>
+      <Signature />
     </div>
   );
 
   return (
-    <div className="bg-white text-foreground p-8 rounded-lg border shadow-sm min-h-[500px]" id="document-preview">
+    <div
+      className="bg-white p-8 rounded-lg border shadow-sm min-h-[500px] text-slate-900"
+      id="document-preview"
+    >
       {type === "receipt" && renderReceipt()}
       {type === "declaration" && renderDeclaration()}
       {type === "certificate" && renderCertificate()}
