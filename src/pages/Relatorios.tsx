@@ -8,12 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
  import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from "recharts";
  import { Download, TrendingUp, Users, DollarSign, Calendar, FileText, Clock, Target, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { BrandHeader } from "@/components/shared/BrandHeader";
+import { useClinicBranding } from "@/hooks/useClinicBranding";
  import { StatsOverview } from "@/components/ui/stats-overview";
  import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
  import { ptBR } from "date-fns/locale";
  import { toast } from "sonner";
 
 export default function Relatorios() {
+   const branding = useClinicBranding();
    const [loading, setLoading] = useState(true);
    const [period, setPeriod] = useState("6m");
    const [patients, setPatients] = useState<any[]>([]);
@@ -140,7 +143,17 @@ export default function Relatorios() {
    }
 
   return (
-     <AppLayout title="Relatórios e Análises" description="Acompanhe o desempenho do seu consultório com dados em tempo real">
+      <AppLayout title="Relatórios e Análises" description="Acompanhe o desempenho do seu consultório com dados em tempo real">
+        {(branding.logoUrl || branding.clinicName) && (
+          <div className="mb-6 rounded-lg border border-border bg-card/50 p-4">
+            <BrandHeader
+              logoUrl={branding.logoUrl}
+              clinicName={branding.clinicName}
+              subtitle={branding.professionalName ? `${branding.professionalName}${branding.crp ? ` · CRP ${branding.crp}` : ""}` : undefined}
+              size="md"
+            />
+          </div>
+        )}
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
          <Select value={period} onValueChange={setPeriod}>
            <SelectTrigger className="w-[180px]">

@@ -52,6 +52,8 @@ export default function Configuracoes() {
   const [userEmail, setUserEmail] = useState<string>("");
   const [notifEmails, setNotifEmails] = useState<string[]>([]);
   const [newNotifEmail, setNewNotifEmail] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -111,6 +113,7 @@ export default function Configuracoes() {
     if (profileData) {
       setProfile(profileData);
       setNotifEmails(Array.isArray((profileData as any).notification_emails) ? (profileData as any).notification_emails : []);
+      setLogoUrl((profileData as any).logo_url || null);
       setSettings(prev => ({
         ...prev,
         clinic_name: profileData.clinic_name || "",
@@ -182,6 +185,7 @@ export default function Configuracoes() {
       clinic_name: clinicName,
       preferred_clinical_style: (formData.get("preferred_clinical_style") as string) || "neutral",
       notification_emails: notifEmails,
+      logo_url: logoUrl,
     };
 
     const { error } = await supabase.from("profiles").update(profilePatch).eq("id", user.id);
@@ -714,6 +718,76 @@ export default function Configuracoes() {
                     <Label htmlFor="clinic_name">Nome da Clínica</Label>
                     <Input id="clinic_name" name="clinic_name" defaultValue={profile?.clinic_name || ""} placeholder="Nome do consultório ou clínica" />
                   </div>
+
+                  <div className="col-span-1 sm:col-span-2 space-y-2">
+                    <Label>Logo do Psicólogo / Clínica</Label>
+                    <div className="rounded-lg border border-border p-4 flex flex-col sm:flex-row items-center gap-4">
+                      <div className="w-24 h-24 rounded-lg bg-muted/40 border border-dashed border-border flex items-center justify-center overflow-hidden shrink-0">
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                        ) : (
+                          <Upload className="h-6 w-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-2 text-center sm:text-left">
+                        <p className="text-sm text-muted-foreground">
+                          Aparece no topo de documentos, prontuários, relatórios e no formulário enviado ao paciente. PNG ou JPG, até 1MB.
+                        </p>
+                        <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                          <label className="inline-flex">
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                              className="hidden"
+                              disabled={uploadingLogo}
+                              onChange={async (ev) => {
+                                const file = ev.target.files?.[0];
+                                ev.target.value = "";
+                                if (!file) return;
+                                if (file.size > 1024 * 1024) {
+                                  toast.error("Arquivo excede 1MB");
+                                  return;
+                                }
+                                setUploadingLogo(true);
+                                try {
+                                  const dataUrl: string = await new Promise((resolve, reject) => {
+                                    const r = new FileReader();
+                                    r.onload = () => resolve(r.result as string);
+                                    r.onerror = () => reject(r.error);
+                                    r.readAsDataURL(file);
+                                  });
+                                  setLogoUrl(dataUrl);
+                                  toast.success("Logo carregada. Clique em Salvar para aplicar.");
+                                } catch {
+                                  toast.error("Falha ao ler arquivo");
+                                } finally {
+                                  setUploadingLogo(false);
+                                }
+                              }}
+                            />
+                            <Button type="button" variant="outline" size="sm" asChild disabled={uploadingLogo}>
+                              <span>
+                                <Upload className="h-4 w-4 mr-2" />
+                                {logoUrl ? "Trocar logo" : "Enviar logo"}
+                              </span>
+                            </Button>
+                          </label>
+                          {logoUrl && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setLogoUrl(null)}
+                            >
+                              Remover
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="col-span-1 sm:col-span-2 space-y-2">
                     <Label htmlFor="preferred_clinical_style">Abordagem Clínica</Label>
                     <Select name="preferred_clinical_style" defaultValue={profile?.preferred_clinical_style || "neutral"}>

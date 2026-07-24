@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BrandHeader } from "@/components/shared/BrandHeader";
 
 interface DocumentPreviewProps {
   type: "receipt" | "declaration" | "certificate" | "report";
@@ -9,6 +10,7 @@ interface DocumentPreviewProps {
     professionalName: string;
     professionalCrp: string;
     clinicName?: string;
+    logoUrl?: string | null;
     value?: number;
     date: Date;
     sessionCount?: number;
@@ -75,11 +77,9 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
 
   const renderReceipt = () => (
     <div className="space-y-6">
+      <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
       <div className="text-center border-b pb-4">
         <h2 className="text-xl font-bold uppercase tracking-wide">Recibo de Pagamento</h2>
-        {data.clinicName && (
-          <p className="text-muted-foreground mt-1">{data.clinicName}</p>
-        )}
       </div>
 
       <div className="space-y-4 text-sm leading-relaxed">
@@ -111,11 +111,9 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
 
   const renderDeclaration = () => (
     <div className="space-y-6">
+      <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
       <div className="text-center border-b pb-4">
         <h2 className="text-xl font-bold uppercase tracking-wide">Declaração de Comparecimento</h2>
-        {data.clinicName && (
-          <p className="text-muted-foreground mt-1">{data.clinicName}</p>
-        )}
       </div>
 
       <div className="space-y-4 text-sm leading-relaxed">
@@ -150,11 +148,9 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
 
   const renderCertificate = () => (
     <div className="space-y-6">
+      <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
       <div className="text-center border-b pb-4">
         <h2 className="text-xl font-bold uppercase tracking-wide">Atestado Psicológico</h2>
-        {data.clinicName && (
-          <p className="text-muted-foreground mt-1">{data.clinicName}</p>
-        )}
       </div>
 
       <div className="space-y-4 text-sm leading-relaxed">
@@ -191,11 +187,9 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
 
   const renderReport = () => (
     <div className="space-y-6">
+      <BrandHeader logoUrl={data.logoUrl} clinicName={data.clinicName} className="mb-2" />
       <div className="text-center border-b pb-4">
         <h2 className="text-xl font-bold uppercase tracking-wide">Relatório Psicológico</h2>
-        {data.clinicName && (
-          <p className="text-muted-foreground mt-1">{data.clinicName}</p>
-        )}
       </div>
 
       <div className="space-y-4 text-sm">

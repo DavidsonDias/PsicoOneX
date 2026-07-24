@@ -29,6 +29,7 @@ interface Profile {
   full_name: string | null;
   crp: string | null;
   clinic_name: string | null;
+  logo_url: string | null;
 }
 
 type DocumentType = "receipt" | "declaration" | "certificate" | "report";
@@ -70,7 +71,7 @@ export default function Documentos() {
 
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("id, full_name, crp, clinic_name")
+      .select("id, full_name, crp, clinic_name, logo_url")
       .eq("id", user.id)
       .single();
 
@@ -117,6 +118,7 @@ export default function Documentos() {
       professionalName: profile?.full_name || "Nome do Profissional",
       professionalCrp: profile?.crp || "00/00000",
       clinicName: formData.clinicName || undefined,
+      logoUrl: profile?.logo_url || null,
       value: formData.value,
       date: new Date(formData.date),
       sessionCount: formData.sessionCount,

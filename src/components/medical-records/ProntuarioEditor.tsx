@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { Calendar, User, Sparkles, Paperclip, Info, Hash, UserPlus, Loader2 } from "lucide-react";
 import { FreeFormEditor } from "./FreeFormEditor";
 import { AttachmentUploader } from "./AttachmentUploader";
+import { BrandHeader } from "@/components/shared/BrandHeader";
+import { useClinicBranding } from "@/hooks/useClinicBranding";
 
 interface PendingFile {
   id: string;
@@ -74,9 +76,19 @@ export const ProntuarioEditor = memo(function ProntuarioEditor({
   const handleStructuredChange = useCallback((field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, [setFormData]);
+  const branding = useClinicBranding();
 
   return (
     <div className="space-y-6">
+      {(branding.logoUrl || branding.clinicName) && (
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <BrandHeader
+            logoUrl={branding.logoUrl}
+            clinicName={branding.clinicName}
+            subtitle={branding.professionalName ? `${branding.professionalName}${branding.crp ? ` · CRP ${branding.crp}` : ""}` : undefined}
+          />
+        </div>
+      )}
       {/* Session Info Header */}
       <div className="bg-muted/30 rounded-lg p-4 space-y-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

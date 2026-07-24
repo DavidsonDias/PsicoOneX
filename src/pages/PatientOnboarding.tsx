@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { CheckCircle2, Loader2, ShieldCheck, Upload, X, ArrowRight, ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SignaturePad } from "@/components/documents/SignaturePad";
+import { BrandHeader } from "@/components/shared/BrandHeader";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/patient-onboarding`;
 
@@ -52,6 +53,7 @@ export default function PatientOnboarding() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [patient, setPatient] = useState<{ id: string; full_name: string } | null>(null);
+  const [psychologist, setPsychologist] = useState<{ full_name?: string; clinic_name?: string; logo_url?: string | null } | null>(null);
   const [docs, setDocs] = useState<UploadedDoc[]>([]);
   const [signature, setSignature] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, any>>({
@@ -74,6 +76,7 @@ export default function PatientOnboarding() {
         const j = await res.json();
         if (!res.ok) throw new Error(j.error);
         setPatient(j.patient);
+        setPsychologist(j.psychologist || null);
         setForm((f) => ({ ...f, full_name: j.patient?.full_name || "" }));
       } catch (e: any) {
         setError(e.message || "Link inválido");
@@ -217,6 +220,15 @@ export default function PatientOnboarding() {
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4 sm:p-6">
         <div className="max-w-2xl mx-auto">
           <div className="mb-6 text-center">
+            {(psychologist?.logo_url || psychologist?.clinic_name) && (
+              <BrandHeader
+                logoUrl={psychologist?.logo_url}
+                clinicName={psychologist?.clinic_name}
+                subtitle={psychologist?.full_name ? `Psicólogo(a): ${psychologist.full_name}` : undefined}
+                size="lg"
+                className="mb-4"
+              />
+            )}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-3">
               <ShieldCheck className="h-3.5 w-3.5" /> Conexão segura · LGPD
             </div>
