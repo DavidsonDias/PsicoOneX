@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BrandHeader } from "@/components/shared/BrandHeader";
 
 interface DocumentPreviewProps {
   type: "receipt" | "declaration" | "certificate" | "report";
@@ -9,6 +10,7 @@ interface DocumentPreviewProps {
     professionalName: string;
     professionalCrp: string;
     clinicName?: string;
+    logoUrl?: string | null;
     value?: number;
     date: Date;
     sessionCount?: number;
