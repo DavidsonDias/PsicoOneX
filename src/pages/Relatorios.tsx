@@ -143,7 +143,17 @@ export default function Relatorios() {
    }
 
   return (
-     <AppLayout title="Relatórios e Análises" description="Acompanhe o desempenho do seu consultório com dados em tempo real">
+      <AppLayout title="Relatórios e Análises" description="Acompanhe o desempenho do seu consultório com dados em tempo real">
+        {(branding.logoUrl || branding.clinicName) && (
+          <div className="mb-6 rounded-lg border border-border bg-card/50 p-4">
+            <BrandHeader
+              logoUrl={branding.logoUrl}
+              clinicName={branding.clinicName}
+              subtitle={branding.professionalName ? `${branding.professionalName}${branding.crp ? ` · CRP ${branding.crp}` : ""}` : undefined}
+              size="md"
+            />
+          </div>
+        )}
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
          <Select value={period} onValueChange={setPeriod}>
            <SelectTrigger className="w-[180px]">
