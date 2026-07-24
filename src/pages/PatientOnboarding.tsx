@@ -76,6 +76,7 @@ export default function PatientOnboarding() {
         const j = await res.json();
         if (!res.ok) throw new Error(j.error);
         setPatient(j.patient);
+        setPsychologist(j.psychologist || null);
         setForm((f) => ({ ...f, full_name: j.patient?.full_name || "" }));
       } catch (e: any) {
         setError(e.message || "Link inválido");
