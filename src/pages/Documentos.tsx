@@ -118,6 +118,7 @@ export default function Documentos() {
       professionalName: profile?.full_name || "Nome do Profissional",
       professionalCrp: profile?.crp || "00/00000",
       clinicName: formData.clinicName || undefined,
+      logoUrl: profile?.logo_url || null,
       value: formData.value,
       date: new Date(formData.date),
       sessionCount: formData.sessionCount,
