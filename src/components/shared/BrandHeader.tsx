@@ -34,12 +34,12 @@ export function BrandHeader({
         />
       )}
       {clinicName && (
-        <p className="font-semibold text-sm tracking-wide text-foreground">
+        <p className="document-ink font-semibold text-sm tracking-wide text-foreground">
           {clinicName}
         </p>
       )}
       {subtitle && (
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
+        <p className="document-muted text-xs text-muted-foreground">{subtitle}</p>
       )}
     </div>
   );

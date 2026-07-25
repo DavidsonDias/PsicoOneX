@@ -447,44 +447,69 @@ All colors MUST be HSL.
     overscroll-behavior: none;
   }
 
-  .document-paper {
-    background: hsl(0 0% 100%) !important;
-    color: hsl(222 47% 11%) !important;
-    -webkit-text-fill-color: hsl(222 47% 11%) !important;
+  html body .document-paper,
+  html body #document-preview.document-paper {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
     color-scheme: light !important;
+    opacity: 1 !important;
+    filter: none !important;
+    mix-blend-mode: normal !important;
+    isolation: isolate !important;
   }
 
-  .document-paper *,
-  .document-ink,
-  .document-ink * {
-    color: hsl(222 47% 11%) !important;
-    -webkit-text-fill-color: hsl(222 47% 11%) !important;
+  html body .document-paper *,
+  html body .document-paper .document-ink,
+  html body .document-paper .document-ink *,
+  html body .document-paper strong,
+  html body .document-paper p,
+  html body .document-paper h1,
+  html body .document-paper h2,
+  html body .document-paper h3,
+  html body .document-paper span,
+  html body .document-paper div {
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
     text-shadow: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+    mix-blend-mode: normal !important;
+    background-clip: border-box !important;
   }
 
-  .document-paper .document-muted,
-  .document-paper .document-muted * {
-    color: hsl(215 16% 47%) !important;
-    -webkit-text-fill-color: hsl(215 16% 47%) !important;
+  html body .document-paper .document-muted,
+  html body .document-paper .document-muted *,
+  html body .document-paper .text-muted-foreground {
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
   }
 
-  .document-soft {
-    background: hsl(210 40% 96%) !important;
-    color: hsl(222 47% 11%) !important;
-    -webkit-text-fill-color: hsl(222 47% 11%) !important;
+  html body .document-paper .document-soft {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
   }
 
-  .document-rule {
-    border-color: hsl(214 32% 91%) !important;
+  html body .document-paper .document-rule,
+  html body .document-paper.document-rule {
+    border-color: #cbd5e1 !important;
   }
 
-  .document-rule-strong {
-    border-color: hsl(222 47% 11%) !important;
+  html body .document-paper .document-rule-strong {
+    border-color: #0f172a !important;
   }
 
-  .document-exporting {
+  html body .document-paper img {
+    opacity: 1 !important;
+    filter: none !important;
+    mix-blend-mode: normal !important;
+    -webkit-text-fill-color: initial !important;
+  }
+
+  html body .document-exporting {
     box-shadow: none !important;
-    border-color: hsl(214 32% 91%) !important;
+    border-color: #cbd5e1 !important;
   }
 
   @media print {
