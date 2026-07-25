@@ -286,10 +286,9 @@ export default function Documentos() {
     document.body.classList.add("print-document-only");
     const cleanup = () => document.body.classList.remove("print-document-only");
     window.addEventListener("afterprint", cleanup, { once: true });
-    window.setTimeout(() => {
-      window.print();
-      window.setTimeout(cleanup, 1000);
-    }, 80);
+    document.body.getBoundingClientRect();
+    window.print();
+    window.setTimeout(cleanup, 1000);
   };
 
   const handleDownloadPDF = async () => {
