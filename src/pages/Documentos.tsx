@@ -165,6 +165,19 @@ const loadPdfImage = async (src?: string | null): Promise<PdfImage | null> => {
   }
 };
 
+const downloadPdf = (pdf: jsPDF, filename: string) => {
+  const blob = pdf.output("blob");
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+};
+
 export default function Documentos() {
   const [loading, setLoading] = useState(true);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -431,7 +444,7 @@ export default function Documentos() {
         .replace(/[^a-zA-Z0-9_-]+/g, "-")
         .replace(/^-+|-+$/g, "")
         .toLowerCase();
-      pdf.save(`${filename || "documento"}.pdf`);
+      downloadPdf(pdf, `${filename || "documento"}.pdf`);
       toast.success("PDF baixado com sucesso", { id: "document-pdf" });
     } catch (err) {
       console.error("pdf error", err);
