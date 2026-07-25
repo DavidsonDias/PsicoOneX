@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { FileText, Receipt, FileCheck, ClipboardList, Download, Printer, Save, AlertCircle, Sparkles, History, Layers } from "lucide-react";
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
 import { SignaturePad } from "@/components/documents/SignaturePad";
 import { DocumentPreview } from "@/components/documents/DocumentPreview";
 import { DocumentTemplates } from "@/components/documents/DocumentTemplates";
@@ -35,6 +34,149 @@ interface Profile {
 }
 
 type DocumentType = "receipt" | "declaration" | "certificate" | "report";
+
+type PdfImage = {
+  dataUrl: string;
+  width: number;
+  height: number;
+};
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+};
+
+const formatLongDate = (date: Date) => {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+};
+
+const formatShortDate = (date: Date) => {
+  return new Intl.DateTimeFormat("pt-BR").format(date);
+};
+
+const extenso = (valor: number) => {
+  const unidades = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+  const teens = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+  const dezenas = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+  const centenas = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+
+  if (valor === 0) return "zero reais";
+  if (valor === 100) return "cem reais";
+
+  const inteiro = Math.floor(valor);
+  const centavos = Math.round((valor - inteiro) * 100);
+  let resultado = "";
+
+  if (inteiro >= 100) {
+    resultado += centenas[Math.floor(inteiro / 100)] || "";
+    const restoCentena = inteiro % 100;
+    if (restoCentena > 0) resultado += " e ";
+  }
+
+  const resto = inteiro % 100;
+  if (resto >= 10 && resto <= 19) {
+    resultado += teens[resto - 10];
+  } else if (resto >= 20) {
+    resultado += dezenas[Math.floor(resto / 10)];
+    if (resto % 10 > 0) resultado += ` e ${unidades[resto % 10]}`;
+  } else if (resto > 0) {
+    resultado += unidades[resto];
+  }
+
+  resultado += inteiro === 1 ? " real" : " reais";
+
+  if (centavos > 0) {
+    resultado += " e ";
+    if (centavos >= 10 && centavos <= 19) {
+      resultado += teens[centavos - 10];
+    } else if (centavos >= 20) {
+      resultado += dezenas[Math.floor(centavos / 10)];
+      if (centavos % 10 > 0) resultado += ` e ${unidades[centavos % 10]}`;
+    } else {
+      resultado += unidades[centavos];
+    }
+    resultado += centavos === 1 ? " centavo" : " centavos";
+  }
+
+  return resultado;
+};
+
+const blobToDataUrl = (blob: Blob) => {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Imagem inválida"));
+    };
+    reader.onerror = () => reject(new Error("Falha ao ler imagem"));
+    reader.readAsDataURL(blob);
+  });
+};
+
+const loadImageElement = (src: string) => {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Falha ao carregar imagem"));
+    image.src = src;
+  });
+};
+
+const loadPdfImage = async (src?: string | null): Promise<PdfImage | null> => {
+  if (!src) return null;
+
+  try {
+    let dataUrl = src;
+    if (!src.startsWith("data:")) {
+      const response = await fetch(src, { mode: "cors", credentials: "omit" });
+      if (!response.ok) return null;
+      dataUrl = await blobToDataUrl(await response.blob());
+    }
+
+    const image = await loadImageElement(dataUrl);
+    const width = image.naturalWidth || image.width || 1;
+    const height = image.naturalHeight || image.height || 1;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    return {
+      dataUrl: canvas.toDataURL("image/png"),
+      width,
+      height,
+    };
+  } catch (error) {
+    console.warn("Não foi possível embutir a imagem no PDF", error);
+    return null;
+  }
+};
+
+const downloadPdf = (pdf: jsPDF, filename: string) => {
+  const blob = pdf.output("blob");
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+};
 
 export default function Documentos() {
   const [loading, setLoading] = useState(true);
@@ -144,53 +286,155 @@ export default function Documentos() {
     document.body.classList.add("print-document-only");
     const cleanup = () => document.body.classList.remove("print-document-only");
     window.addEventListener("afterprint", cleanup, { once: true });
-    window.setTimeout(() => {
-      window.print();
-      window.setTimeout(cleanup, 1000);
-    }, 80);
+    document.body.getBoundingClientRect();
+    window.print();
+    window.setTimeout(cleanup, 1000);
   };
 
   const handleDownloadPDF = async () => {
     if (!validateDocument()) return;
-    const printContent = document.getElementById("document-preview");
-    if (!printContent) {
-      toast.error("Não foi possível localizar a pré-visualização");
-      return;
-    }
 
     toast.loading("Gerando PDF...", { id: "document-pdf" });
     try {
-      const canvas = await html2canvas(printContent, {
-        backgroundColor: "#ffffff",
-        scale: Math.min(window.devicePixelRatio || 2, 2),
-        useCORS: true,
-        logging: false,
-        onclone: (clonedDocument) => {
-          const clonedPreview = clonedDocument.getElementById("document-preview");
-          clonedPreview?.classList.add("document-exporting");
-        },
-      });
-
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const imgData = canvas.toDataURL("image/png");
+      const margin = 22;
+      const contentWidth = pageWidth - margin * 2;
+      const documentData = getDocumentData();
+      const logo = await loadPdfImage(documentData.logoUrl);
+      const signatureImage = await loadPdfImage(documentData.signature);
+      let cursorY = 18;
 
-      if (imgHeight <= pageHeight - margin * 2) {
-        pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
+      const addPageIfNeeded = (requiredHeight = 12) => {
+        if (cursorY + requiredHeight <= pageHeight - margin) return;
+        pdf.addPage();
+        cursorY = margin;
+      };
+
+      const drawCenteredText = (text: string, y: number, size = 10, bold = false) => {
+        pdf.setFont("helvetica", bold ? "bold" : "normal");
+        pdf.setFontSize(size);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(text, pageWidth / 2, y, { align: "center" });
+      };
+
+      const drawParagraph = (text: string, options?: { fontSize?: number; lineHeight?: number; indent?: number }) => {
+        const fontSize = options?.fontSize || 11;
+        const lineHeight = options?.lineHeight || 7;
+        const indent = options?.indent || 0;
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(15, 23, 42);
+        const lines = pdf.splitTextToSize(text, contentWidth - indent) as string[];
+        lines.forEach((line) => {
+          addPageIfNeeded(lineHeight);
+          pdf.text(line, margin + indent, cursorY);
+          cursorY += lineHeight;
+        });
+      };
+
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+      if (logo) {
+        const maxLogoWidth = 34;
+        const maxLogoHeight = 26;
+        const ratio = Math.min(maxLogoWidth / logo.width, maxLogoHeight / logo.height);
+        const logoWidth = logo.width * ratio;
+        const logoHeight = logo.height * ratio;
+        pdf.addImage(logo.dataUrl, "PNG", (pageWidth - logoWidth) / 2, cursorY, logoWidth, logoHeight);
+        cursorY += logoHeight + 4;
+      }
+
+      if (documentData.clinicName) {
+        drawCenteredText(documentData.clinicName, cursorY + 3, 10, true);
+        cursorY += 10;
+      }
+
+      const titleByType: Record<DocumentType, string> = {
+        receipt: "RECIBO DE PAGAMENTO",
+        declaration: "DECLARAÇÃO DE COMPARECIMENTO",
+        certificate: "ATESTADO PSICOLÓGICO",
+        report: "RELATÓRIO PSICOLÓGICO",
+      };
+
+      cursorY += 3;
+      pdf.setDrawColor(148, 163, 184);
+      pdf.line(margin, cursorY, pageWidth - margin, cursorY);
+      cursorY += 11;
+      drawCenteredText(titleByType[documentType], cursorY, 13, true);
+      cursorY += 12;
+
+      if (documentType === "receipt") {
+        drawParagraph(
+          `Recebi de ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""}, a quantia de ${formatCurrency(documentData.value || 0)} (${extenso(documentData.value || 0)}), referente a ${documentData.sessionCount || 1} sessão(ões) de atendimento psicológico.`
+        );
+        cursorY += 13;
+        pdf.text(`Local, ${formatLongDate(documentData.date)}`, pageWidth - margin, cursorY, { align: "right" });
+      } else if (documentType === "declaration") {
+        drawParagraph(
+          `Declaro, para os devidos fins, que ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""} compareceu à sessão de atendimento psicológico nesta data.`
+        );
+        cursorY += 4;
+        drawParagraph(`Data do atendimento: ${formatShortDate(documentData.date)}`);
+        cursorY += 10;
+        pdf.text(`Local, ${formatLongDate(new Date())}`, pageWidth - margin, cursorY, { align: "right" });
+      } else if (documentType === "certificate") {
+        drawParagraph(
+          `Atesto, para os devidos fins, que ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""} encontra-se em acompanhamento psicológico desde ${formatShortDate(documentData.date)}.`
+        );
+        if (documentData.content) {
+          cursorY += 6;
+          drawParagraph(documentData.content);
+        }
+        cursorY += 10;
+        pdf.text(`Local, ${formatLongDate(new Date())}`, pageWidth - margin, cursorY, { align: "right" });
       } else {
-        let remainingHeight = imgHeight;
-        let y = margin;
-        while (remainingHeight > 0) {
-          pdf.addImage(imgData, "PNG", margin, y, imgWidth, imgHeight);
-          remainingHeight -= pageHeight - margin * 2;
-          y -= pageHeight - margin * 2;
-          if (remainingHeight > 0) pdf.addPage();
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Paciente:", margin, cursorY);
+        cursorY += 6;
+        pdf.setFont("helvetica", "normal");
+        pdf.text(documentData.patientName, margin, cursorY);
+        cursorY += 6;
+        if (documentData.patientCpf) {
+          pdf.setTextColor(71, 85, 105);
+          pdf.text(`CPF: ${documentData.patientCpf}`, margin, cursorY);
+          pdf.setTextColor(15, 23, 42);
+          cursorY += 8;
+        }
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Data de Emissão:", margin, cursorY);
+        cursorY += 6;
+        pdf.setFont("helvetica", "normal");
+        pdf.text(formatShortDate(new Date()), margin, cursorY);
+        cursorY += 10;
+        if (documentData.content) {
+          pdf.setFont("helvetica", "bold");
+          pdf.text("Conteúdo:", margin, cursorY);
+          cursorY += 7;
+          drawParagraph(documentData.content);
         }
       }
+
+      cursorY = Math.max(cursorY + 25, pageHeight - 72);
+      addPageIfNeeded(44);
+      pdf.setDrawColor(148, 163, 184);
+      pdf.line(margin + 35, cursorY, pageWidth - margin - 35, cursorY);
+      cursorY += 8;
+
+      if (signatureImage) {
+        const maxSignatureWidth = 42;
+        const maxSignatureHeight = 16;
+        const ratio = Math.min(maxSignatureWidth / signatureImage.width, maxSignatureHeight / signatureImage.height);
+        const signatureWidth = signatureImage.width * ratio;
+        const signatureHeight = signatureImage.height * ratio;
+        pdf.addImage(signatureImage.dataUrl, "PNG", (pageWidth - signatureWidth) / 2, cursorY - signatureHeight - 4, signatureWidth, signatureHeight);
+      }
+
+      drawCenteredText(documentData.professionalName, cursorY, 10, true);
+      cursorY += 6;
+      drawCenteredText(`Psicólogo(a) - CRP ${documentData.professionalCrp}`, cursorY, 9);
 
       const patient = getSelectedPatient();
       const filename = `${documentType}-${patient?.full_name || "documento"}`
@@ -199,7 +443,7 @@ export default function Documentos() {
         .replace(/[^a-zA-Z0-9_-]+/g, "-")
         .replace(/^-+|-+$/g, "")
         .toLowerCase();
-      pdf.save(`${filename || "documento"}.pdf`);
+      downloadPdf(pdf, `${filename || "documento"}.pdf`);
       toast.success("PDF baixado com sucesso", { id: "document-pdf" });
     } catch (err) {
       console.error("pdf error", err);
