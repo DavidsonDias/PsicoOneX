@@ -9,8 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { FileText, Receipt, FileCheck, ClipboardList, Download, Printer, Save, AlertCircle, Sparkles, History, Layers } from "lucide-react";
+import { FileText, Receipt, FileCheck, ClipboardList, Download, Printer, Save, AlertCircle, Sparkles, History, Layers, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import { SignaturePad } from "@/components/documents/SignaturePad";
 import { DocumentPreview } from "@/components/documents/DocumentPreview";
 import { DocumentTemplates } from "@/components/documents/DocumentTemplates";
