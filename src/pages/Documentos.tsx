@@ -9,8 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { FileText, Receipt, FileCheck, ClipboardList, Download, Printer, Save, AlertCircle, Sparkles, History, Layers } from "lucide-react";
+import { FileText, Receipt, FileCheck, ClipboardList, Download, Printer, Save, AlertCircle, Sparkles, History, Layers, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import { SignaturePad } from "@/components/documents/SignaturePad";
 import { DocumentPreview } from "@/components/documents/DocumentPreview";
 import { DocumentTemplates } from "@/components/documents/DocumentTemplates";
@@ -180,6 +181,9 @@ const downloadPdf = (pdf: jsPDF, filename: string) => {
 
 export default function Documentos() {
   const [loading, setLoading] = useState(true);
+  const [pdfStatus, setPdfStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [pdfMethod, setPdfMethod] = useState<"native" | "fallback" | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<string>("");
@@ -291,164 +295,267 @@ export default function Documentos() {
     window.setTimeout(cleanup, 1000);
   };
 
+  const buildFilename = () => {
+    const patient = getSelectedPatient();
+    const filename = `${documentType}-${patient?.full_name || "documento"}`
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase();
+    return `${filename || "documento"}.pdf`;
+  };
+
+  const generateNativePdf = async (): Promise<jsPDF> => {
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 22;
+    const contentWidth = pageWidth - margin * 2;
+    const documentData = getDocumentData();
+    const logo = await loadPdfImage(documentData.logoUrl);
+    const signatureImage = await loadPdfImage(documentData.signature);
+    let cursorY = 18;
+
+    const addPageIfNeeded = (requiredHeight = 12) => {
+      if (cursorY + requiredHeight <= pageHeight - margin) return;
+      pdf.addPage();
+      cursorY = margin;
+    };
+
+    const drawCenteredText = (text: string, y: number, size = 10, bold = false) => {
+      pdf.setFont("helvetica", bold ? "bold" : "normal");
+      pdf.setFontSize(size);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(text, pageWidth / 2, y, { align: "center" });
+    };
+
+    const drawParagraph = (text: string, options?: { fontSize?: number; lineHeight?: number; indent?: number }) => {
+      const fontSize = options?.fontSize || 11;
+      const lineHeight = options?.lineHeight || 7;
+      const indent = options?.indent || 0;
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(fontSize);
+      pdf.setTextColor(15, 23, 42);
+      const lines = pdf.splitTextToSize(text, contentWidth - indent) as string[];
+      lines.forEach((line) => {
+        addPageIfNeeded(lineHeight);
+        pdf.text(line, margin + indent, cursorY);
+        cursorY += lineHeight;
+      });
+    };
+
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+    if (logo) {
+      const maxLogoWidth = 34;
+      const maxLogoHeight = 26;
+      const ratio = Math.min(maxLogoWidth / logo.width, maxLogoHeight / logo.height);
+      const logoWidth = logo.width * ratio;
+      const logoHeight = logo.height * ratio;
+      pdf.addImage(logo.dataUrl, "PNG", (pageWidth - logoWidth) / 2, cursorY, logoWidth, logoHeight);
+      cursorY += logoHeight + 4;
+    }
+
+    if (documentData.clinicName) {
+      drawCenteredText(documentData.clinicName, cursorY + 3, 10, true);
+      cursorY += 10;
+    }
+
+    const titleByType: Record<DocumentType, string> = {
+      receipt: "RECIBO DE PAGAMENTO",
+      declaration: "DECLARAÇÃO DE COMPARECIMENTO",
+      certificate: "ATESTADO PSICOLÓGICO",
+      report: "RELATÓRIO PSICOLÓGICO",
+    };
+
+    cursorY += 3;
+    pdf.setDrawColor(148, 163, 184);
+    pdf.line(margin, cursorY, pageWidth - margin, cursorY);
+    cursorY += 11;
+    drawCenteredText(titleByType[documentType], cursorY, 13, true);
+    cursorY += 12;
+
+    if (documentType === "receipt") {
+      drawParagraph(
+        `Recebi de ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""}, a quantia de ${formatCurrency(documentData.value || 0)} (${extenso(documentData.value || 0)}), referente a ${documentData.sessionCount || 1} sessão(ões) de atendimento psicológico.`
+      );
+      cursorY += 13;
+      pdf.text(`Local, ${formatLongDate(documentData.date)}`, pageWidth - margin, cursorY, { align: "right" });
+    } else if (documentType === "declaration") {
+      drawParagraph(
+        `Declaro, para os devidos fins, que ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""} compareceu à sessão de atendimento psicológico nesta data.`
+      );
+      cursorY += 4;
+      drawParagraph(`Data do atendimento: ${formatShortDate(documentData.date)}`);
+      cursorY += 10;
+      pdf.text(`Local, ${formatLongDate(new Date())}`, pageWidth - margin, cursorY, { align: "right" });
+    } else if (documentType === "certificate") {
+      drawParagraph(
+        `Atesto, para os devidos fins, que ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""} encontra-se em acompanhamento psicológico desde ${formatShortDate(documentData.date)}.`
+      );
+      if (documentData.content) {
+        cursorY += 6;
+        drawParagraph(documentData.content);
+      }
+      cursorY += 10;
+      pdf.text(`Local, ${formatLongDate(new Date())}`, pageWidth - margin, cursorY, { align: "right" });
+    } else {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Paciente:", margin, cursorY);
+      cursorY += 6;
+      pdf.setFont("helvetica", "normal");
+      pdf.text(documentData.patientName, margin, cursorY);
+      cursorY += 6;
+      if (documentData.patientCpf) {
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(`CPF: ${documentData.patientCpf}`, margin, cursorY);
+        pdf.setTextColor(15, 23, 42);
+        cursorY += 8;
+      }
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Data de Emissão:", margin, cursorY);
+      cursorY += 6;
+      pdf.setFont("helvetica", "normal");
+      pdf.text(formatShortDate(new Date()), margin, cursorY);
+      cursorY += 10;
+      if (documentData.content) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Conteúdo:", margin, cursorY);
+        cursorY += 7;
+        drawParagraph(documentData.content);
+      }
+    }
+
+    cursorY = Math.max(cursorY + 25, pageHeight - 72);
+    addPageIfNeeded(44);
+    pdf.setDrawColor(148, 163, 184);
+    pdf.line(margin + 35, cursorY, pageWidth - margin - 35, cursorY);
+    cursorY += 8;
+
+    if (signatureImage) {
+      const maxSignatureWidth = 42;
+      const maxSignatureHeight = 16;
+      const ratio = Math.min(maxSignatureWidth / signatureImage.width, maxSignatureHeight / signatureImage.height);
+      const signatureWidth = signatureImage.width * ratio;
+      const signatureHeight = signatureImage.height * ratio;
+      pdf.addImage(signatureImage.dataUrl, "PNG", (pageWidth - signatureWidth) / 2, cursorY - signatureHeight - 4, signatureWidth, signatureHeight);
+    }
+
+    drawCenteredText(documentData.professionalName, cursorY, 10, true);
+    cursorY += 6;
+    drawCenteredText(`Psicólogo(a) - CRP ${documentData.professionalCrp}`, cursorY, 9);
+
+    return pdf;
+  };
+
+  const generateFallbackPdf = async (): Promise<jsPDF> => {
+    const node = document.getElementById("document-preview");
+    if (!node) throw new Error("Elemento de pré-visualização não encontrado no DOM.");
+
+    const canvas = await html2canvas(node, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const usableWidth = pageWidth - margin * 2;
+    const imgHeight = (canvas.height * usableWidth) / canvas.width;
+
+    if (imgHeight <= pageHeight - margin * 2) {
+      pdf.addImage(imgData, "PNG", margin, margin, usableWidth, imgHeight);
+    } else {
+      // Multi-page slicing
+      const pageContentHeight = pageHeight - margin * 2;
+      const pxPerMm = canvas.width / usableWidth;
+      const sliceHeightPx = pageContentHeight * pxPerMm;
+      let renderedPx = 0;
+      let firstPage = true;
+      while (renderedPx < canvas.height) {
+        const currentSlice = Math.min(sliceHeightPx, canvas.height - renderedPx);
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = currentSlice;
+        const ctx = sliceCanvas.getContext("2d");
+        if (!ctx) throw new Error("Não foi possível criar canvas de fatia para o PDF.");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        ctx.drawImage(canvas, 0, renderedPx, canvas.width, currentSlice, 0, 0, canvas.width, currentSlice);
+        const sliceData = sliceCanvas.toDataURL("image/png");
+        const sliceHeightMm = currentSlice / pxPerMm;
+        if (!firstPage) pdf.addPage();
+        pdf.addImage(sliceData, "PNG", margin, margin, usableWidth, sliceHeightMm);
+        renderedPx += currentSlice;
+        firstPage = false;
+      }
+    }
+
+    return pdf;
+  };
+
   const handleDownloadPDF = async () => {
     if (!validateDocument()) return;
 
-    toast.loading("Gerando PDF...", { id: "document-pdf" });
+    setPdfStatus("loading");
+    setPdfMethod(null);
+    setPdfError(null);
+    toast.loading("Gerando PDF...", { id: "document-pdf", description: "Método nativo (texto vetorial)" });
+
+    const filename = buildFilename();
+    let method: "native" | "fallback" = "native";
+    let nativeError: unknown = null;
+
     try {
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 22;
-      const contentWidth = pageWidth - margin * 2;
-      const documentData = getDocumentData();
-      const logo = await loadPdfImage(documentData.logoUrl);
-      const signatureImage = await loadPdfImage(documentData.signature);
-      let cursorY = 18;
-
-      const addPageIfNeeded = (requiredHeight = 12) => {
-        if (cursorY + requiredHeight <= pageHeight - margin) return;
-        pdf.addPage();
-        cursorY = margin;
-      };
-
-      const drawCenteredText = (text: string, y: number, size = 10, bold = false) => {
-        pdf.setFont("helvetica", bold ? "bold" : "normal");
-        pdf.setFontSize(size);
-        pdf.setTextColor(15, 23, 42);
-        pdf.text(text, pageWidth / 2, y, { align: "center" });
-      };
-
-      const drawParagraph = (text: string, options?: { fontSize?: number; lineHeight?: number; indent?: number }) => {
-        const fontSize = options?.fontSize || 11;
-        const lineHeight = options?.lineHeight || 7;
-        const indent = options?.indent || 0;
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(fontSize);
-        pdf.setTextColor(15, 23, 42);
-        const lines = pdf.splitTextToSize(text, contentWidth - indent) as string[];
-        lines.forEach((line) => {
-          addPageIfNeeded(lineHeight);
-          pdf.text(line, margin + indent, cursorY);
-          cursorY += lineHeight;
-        });
-      };
-
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, pageWidth, pageHeight, "F");
-
-      if (logo) {
-        const maxLogoWidth = 34;
-        const maxLogoHeight = 26;
-        const ratio = Math.min(maxLogoWidth / logo.width, maxLogoHeight / logo.height);
-        const logoWidth = logo.width * ratio;
-        const logoHeight = logo.height * ratio;
-        pdf.addImage(logo.dataUrl, "PNG", (pageWidth - logoWidth) / 2, cursorY, logoWidth, logoHeight);
-        cursorY += logoHeight + 4;
-      }
-
-      if (documentData.clinicName) {
-        drawCenteredText(documentData.clinicName, cursorY + 3, 10, true);
-        cursorY += 10;
-      }
-
-      const titleByType: Record<DocumentType, string> = {
-        receipt: "RECIBO DE PAGAMENTO",
-        declaration: "DECLARAÇÃO DE COMPARECIMENTO",
-        certificate: "ATESTADO PSICOLÓGICO",
-        report: "RELATÓRIO PSICOLÓGICO",
-      };
-
-      cursorY += 3;
-      pdf.setDrawColor(148, 163, 184);
-      pdf.line(margin, cursorY, pageWidth - margin, cursorY);
-      cursorY += 11;
-      drawCenteredText(titleByType[documentType], cursorY, 13, true);
-      cursorY += 12;
-
-      if (documentType === "receipt") {
-        drawParagraph(
-          `Recebi de ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""}, a quantia de ${formatCurrency(documentData.value || 0)} (${extenso(documentData.value || 0)}), referente a ${documentData.sessionCount || 1} sessão(ões) de atendimento psicológico.`
-        );
-        cursorY += 13;
-        pdf.text(`Local, ${formatLongDate(documentData.date)}`, pageWidth - margin, cursorY, { align: "right" });
-      } else if (documentType === "declaration") {
-        drawParagraph(
-          `Declaro, para os devidos fins, que ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""} compareceu à sessão de atendimento psicológico nesta data.`
-        );
-        cursorY += 4;
-        drawParagraph(`Data do atendimento: ${formatShortDate(documentData.date)}`);
-        cursorY += 10;
-        pdf.text(`Local, ${formatLongDate(new Date())}`, pageWidth - margin, cursorY, { align: "right" });
-      } else if (documentType === "certificate") {
-        drawParagraph(
-          `Atesto, para os devidos fins, que ${documentData.patientName}${documentData.patientCpf ? ` (CPF: ${documentData.patientCpf})` : ""} encontra-se em acompanhamento psicológico desde ${formatShortDate(documentData.date)}.`
-        );
-        if (documentData.content) {
-          cursorY += 6;
-          drawParagraph(documentData.content);
-        }
-        cursorY += 10;
-        pdf.text(`Local, ${formatLongDate(new Date())}`, pageWidth - margin, cursorY, { align: "right" });
-      } else {
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Paciente:", margin, cursorY);
-        cursorY += 6;
-        pdf.setFont("helvetica", "normal");
-        pdf.text(documentData.patientName, margin, cursorY);
-        cursorY += 6;
-        if (documentData.patientCpf) {
-          pdf.setTextColor(71, 85, 105);
-          pdf.text(`CPF: ${documentData.patientCpf}`, margin, cursorY);
-          pdf.setTextColor(15, 23, 42);
-          cursorY += 8;
-        }
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Data de Emissão:", margin, cursorY);
-        cursorY += 6;
-        pdf.setFont("helvetica", "normal");
-        pdf.text(formatShortDate(new Date()), margin, cursorY);
-        cursorY += 10;
-        if (documentData.content) {
-          pdf.setFont("helvetica", "bold");
-          pdf.text("Conteúdo:", margin, cursorY);
-          cursorY += 7;
-          drawParagraph(documentData.content);
-        }
-      }
-
-      cursorY = Math.max(cursorY + 25, pageHeight - 72);
-      addPageIfNeeded(44);
-      pdf.setDrawColor(148, 163, 184);
-      pdf.line(margin + 35, cursorY, pageWidth - margin - 35, cursorY);
-      cursorY += 8;
-
-      if (signatureImage) {
-        const maxSignatureWidth = 42;
-        const maxSignatureHeight = 16;
-        const ratio = Math.min(maxSignatureWidth / signatureImage.width, maxSignatureHeight / signatureImage.height);
-        const signatureWidth = signatureImage.width * ratio;
-        const signatureHeight = signatureImage.height * ratio;
-        pdf.addImage(signatureImage.dataUrl, "PNG", (pageWidth - signatureWidth) / 2, cursorY - signatureHeight - 4, signatureWidth, signatureHeight);
-      }
-
-      drawCenteredText(documentData.professionalName, cursorY, 10, true);
-      cursorY += 6;
-      drawCenteredText(`Psicólogo(a) - CRP ${documentData.professionalCrp}`, cursorY, 9);
-
-      const patient = getSelectedPatient();
-      const filename = `${documentType}-${patient?.full_name || "documento"}`
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-zA-Z0-9_-]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .toLowerCase();
-      downloadPdf(pdf, `${filename || "documento"}.pdf`);
-      toast.success("PDF baixado com sucesso", { id: "document-pdf" });
+      const pdf = await generateNativePdf();
+      downloadPdf(pdf, filename);
     } catch (err) {
-      console.error("pdf error", err);
-      toast.error("Falha ao gerar PDF. Tente imprimir e escolher Salvar como PDF.", { id: "document-pdf" });
+      nativeError = err;
+      console.warn("[pdf] native failed, tentando fallback…", err);
+      method = "fallback";
+      toast.loading("Método nativo falhou. Tentando fallback (captura visual)…", {
+        id: "document-pdf",
+      });
+      try {
+        const pdf = await generateFallbackPdf();
+        downloadPdf(pdf, filename);
+      } catch (fallbackErr) {
+        console.error("[pdf] fallback também falhou", fallbackErr);
+        const nativeMsg = nativeError instanceof Error ? nativeError.message : String(nativeError);
+        const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        const detail = `Nativo: ${nativeMsg} • Fallback: ${fallbackMsg}`;
+        setPdfStatus("error");
+        setPdfMethod(null);
+        setPdfError(detail);
+        toast.error("Não foi possível gerar o PDF", {
+          id: "document-pdf",
+          description: `${detail}. Use "Imprimir" e escolha “Salvar como PDF”.`,
+          duration: 10000,
+        });
+        return;
+      }
     }
+
+    setPdfStatus("success");
+    setPdfMethod(method);
+    setPdfError(null);
+    toast.success(
+      method === "native" ? "PDF baixado (método nativo)" : "PDF baixado (fallback visual)",
+      {
+        id: "document-pdf",
+        description:
+          method === "native"
+            ? "Texto vetorial, alta qualidade."
+            : "Gerado a partir da pré-visualização porque o método nativo falhou.",
+      }
+    );
+    window.setTimeout(() => setPdfStatus("idle"), 4000);
   };
 
   const handleSelectTemplate = (template: any) => {
@@ -681,12 +788,45 @@ export default function Documentos() {
                   <Printer className="h-4 w-4" />
                   Imprimir
                 </Button>
-                <Button size="sm" onClick={handleDownloadPDF} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Baixar PDF
+                <Button
+                  size="sm"
+                  onClick={handleDownloadPDF}
+                  disabled={pdfStatus === "loading"}
+                  variant={pdfStatus === "error" ? "destructive" : "default"}
+                  className="gap-2"
+                  title={pdfError ?? undefined}
+                >
+                  {pdfStatus === "loading" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : pdfStatus === "success" ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : pdfStatus === "error" ? (
+                    <XCircle className="h-4 w-4" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  {pdfStatus === "loading"
+                    ? "Gerando..."
+                    : pdfStatus === "success"
+                      ? pdfMethod === "fallback"
+                        ? "Baixado (fallback)"
+                        : "Baixado"
+                      : pdfStatus === "error"
+                        ? "Falhou — tentar de novo"
+                        : "Baixar PDF"}
                 </Button>
               </div>
             </div>
+            {pdfStatus === "error" && pdfError && (
+              <p className="text-xs text-destructive">
+                Detalhes: {pdfError}. Use “Imprimir” e escolha “Salvar como PDF” como alternativa.
+              </p>
+            )}
+            {pdfStatus === "success" && pdfMethod === "fallback" && (
+              <p className="text-xs text-muted-foreground">
+                O método nativo falhou; o PDF foi gerado a partir da captura visual da pré-visualização.
+              </p>
+            )}
 
             <DocumentPreview type={documentType} data={getDocumentData()} />
           </div>
