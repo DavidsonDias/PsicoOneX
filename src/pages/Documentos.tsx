@@ -788,12 +788,45 @@ export default function Documentos() {
                   <Printer className="h-4 w-4" />
                   Imprimir
                 </Button>
-                <Button size="sm" onClick={handleDownloadPDF} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Baixar PDF
+                <Button
+                  size="sm"
+                  onClick={handleDownloadPDF}
+                  disabled={pdfStatus === "loading"}
+                  variant={pdfStatus === "error" ? "destructive" : "default"}
+                  className="gap-2"
+                  title={pdfError ?? undefined}
+                >
+                  {pdfStatus === "loading" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : pdfStatus === "success" ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : pdfStatus === "error" ? (
+                    <XCircle className="h-4 w-4" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  {pdfStatus === "loading"
+                    ? "Gerando..."
+                    : pdfStatus === "success"
+                      ? pdfMethod === "fallback"
+                        ? "Baixado (fallback)"
+                        : "Baixado"
+                      : pdfStatus === "error"
+                        ? "Falhou — tentar de novo"
+                        : "Baixar PDF"}
                 </Button>
               </div>
             </div>
+            {pdfStatus === "error" && pdfError && (
+              <p className="text-xs text-destructive">
+                Detalhes: {pdfError}. Use “Imprimir” e escolha “Salvar como PDF” como alternativa.
+              </p>
+            )}
+            {pdfStatus === "success" && pdfMethod === "fallback" && (
+              <p className="text-xs text-muted-foreground">
+                O método nativo falhou; o PDF foi gerado a partir da captura visual da pré-visualização.
+              </p>
+            )}
 
             <DocumentPreview type={documentType} data={getDocumentData()} />
           </div>
