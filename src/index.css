@@ -13,6 +13,76 @@ body { overflow-x: clip; }
   h2 { font-size: clamp(1.125rem, 4.5vw, 1.5rem); }
 }
 
+/*
+  Document previews/exports are legal-clinical artifacts, not themed app UI.
+  Keep this block OUTSIDE Tailwind layers and at EOF so it wins over every
+  theme utility, custom appearance class, and Safari text-fill inheritance.
+*/
+html body #document-preview.document-paper,
+html body .document-paper,
+html body [data-document-surface="true"] {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  color-scheme: light !important;
+  opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  isolation: isolate !important;
+}
+
+html body #document-preview.document-paper *,
+html body .document-paper *,
+html body [data-document-surface="true"] * {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+}
+
+html body #document-preview.document-paper .document-muted,
+html body #document-preview.document-paper .document-muted *,
+html body .document-paper .document-muted,
+html body .document-paper .document-muted *,
+html body [data-document-surface="true"] .document-muted,
+html body [data-document-surface="true"] .document-muted * {
+  color: #475569 !important;
+  -webkit-text-fill-color: #475569 !important;
+}
+
+html body #document-preview.document-paper .document-soft,
+html body .document-paper .document-soft,
+html body [data-document-surface="true"] .document-soft {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+html body #document-preview.document-paper .document-rule,
+html body .document-paper .document-rule,
+html body [data-document-surface="true"] .document-rule {
+  border-color: #cbd5e1 !important;
+}
+
+html body #document-preview.document-paper .document-rule-strong,
+html body .document-paper .document-rule-strong,
+html body [data-document-surface="true"] .document-rule-strong {
+  border-color: #0f172a !important;
+}
+
+html body #document-preview.document-paper img,
+html body .document-paper img,
+html body [data-document-surface="true"] img {
+  opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  -webkit-text-fill-color: initial !important;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
