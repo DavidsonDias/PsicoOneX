@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BrandHeader } from "@/components/shared/BrandHeader";
+import type { CSSProperties } from "react";
 
 interface DocumentPreviewProps {
   type: "receipt" | "declaration" | "certificate" | "report";
@@ -84,11 +85,11 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
   const documentInkStyle = {
     color: "#0f172a",
     WebkitTextFillColor: "#0f172a",
-  } as React.CSSProperties;
+  } as CSSProperties;
   const documentMutedStyle = {
     color: "#475569",
     WebkitTextFillColor: "#475569",
-  } as React.CSSProperties;
+  } as CSSProperties;
 
   const Signature = () => (
     <div className={`mt-12 pt-8 border-t ${rule}`}>
