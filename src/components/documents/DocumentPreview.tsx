@@ -81,6 +81,14 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
   const ink = "document-ink";
   const inkMuted = "document-muted";
   const rule = "document-rule";
+  const documentInkStyle = {
+    color: "#0f172a",
+    WebkitTextFillColor: "#0f172a",
+  } as React.CSSProperties;
+  const documentMutedStyle = {
+    color: "#475569",
+    WebkitTextFillColor: "#475569",
+  } as React.CSSProperties;
 
   const Signature = () => (
     <div className={`mt-12 pt-8 border-t ${rule}`}>
@@ -90,15 +98,15 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
         ) : (
           <div className="w-64 border-b document-rule-strong mb-2" />
         )}
-        <p className={`font-medium ${ink}`}>{data.professionalName}</p>
-        <p className={`text-sm ${inkMuted}`}>Psicólogo(a) - CRP {data.professionalCrp}</p>
+        <p className={`font-medium ${ink}`} style={documentInkStyle}>{data.professionalName}</p>
+        <p className={`text-sm ${inkMuted}`} style={documentMutedStyle}>Psicólogo(a) - CRP {data.professionalCrp}</p>
       </div>
     </div>
   );
 
   const Title = ({ children }: { children: React.ReactNode }) => (
     <div className={`text-center border-b pb-4 ${rule}`}>
-      <h2 className={`text-xl font-bold uppercase tracking-wide ${ink}`}>{children}</h2>
+      <h2 className={`text-xl font-bold uppercase tracking-wide ${ink}`} style={documentInkStyle}>{children}</h2>
     </div>
   );
 
@@ -211,6 +219,16 @@ export function DocumentPreview({ type, data }: DocumentPreviewProps) {
     <div
       className="document-paper p-8 rounded-lg border shadow-sm min-h-[500px]"
       id="document-preview"
+      data-document-surface="true"
+      style={{
+        backgroundColor: "#ffffff",
+        color: "#0f172a",
+        WebkitTextFillColor: "#0f172a",
+        opacity: 1,
+        filter: "none",
+        mixBlendMode: "normal",
+        colorScheme: "light",
+      }}
     >
       {type === "receipt" && renderReceipt()}
       {type === "declaration" && renderDeclaration()}
