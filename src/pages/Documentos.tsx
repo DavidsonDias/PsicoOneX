@@ -181,6 +181,9 @@ const downloadPdf = (pdf: jsPDF, filename: string) => {
 
 export default function Documentos() {
   const [loading, setLoading] = useState(true);
+  const [pdfStatus, setPdfStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [pdfMethod, setPdfMethod] = useState<"native" | "fallback" | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<string>("");
