@@ -84,7 +84,9 @@ export default function PortalLogin() {
               Use a senha cadastrada ou receba um link mágico no seu e-mail
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <GoogleAuthButton redirectPath="/portal/dashboard" disabled={loading} />
+
             <Tabs defaultValue="password">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="password" className="gap-2">
@@ -94,6 +96,7 @@ export default function PortalLogin() {
                   <Mail className="h-3.5 w-3.5" /> Link mágico
                 </TabsTrigger>
               </TabsList>
+
 
               <TabsContent value="password">
                 <form onSubmit={handlePassword} className="space-y-4">

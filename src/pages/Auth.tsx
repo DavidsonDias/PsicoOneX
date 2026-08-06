@@ -33,7 +33,7 @@ async function resolveEmail(identifier: string): Promise<string> {
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  
   const [remember, setRemember] = useState(true);
   const [lastIdentifier, setLastIdentifier] = useState("");
   const navigate = useNavigate();
