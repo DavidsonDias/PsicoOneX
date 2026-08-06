@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,14 @@ import GoogleAuthButton from "@/components/auth/GoogleAuthButton";
 export default function PortalLogin() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) navigate("/portal/dashboard", { replace: true });
+    })();
+  }, [navigate]);
+
 
   const handlePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
