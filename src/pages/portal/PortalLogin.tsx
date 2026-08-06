@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,19 @@ import { Brain, Loader2, Mail, KeyRound } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
+import GoogleAuthButton from "@/components/auth/GoogleAuthButton";
 
 export default function PortalLogin() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) navigate("/portal/dashboard", { replace: true });
+    })();
+  }, [navigate]);
+
 
   const handlePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -84,7 +93,9 @@ export default function PortalLogin() {
               Use a senha cadastrada ou receba um link mágico no seu e-mail
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <GoogleAuthButton redirectPath="/portal/dashboard" disabled={loading} />
+
             <Tabs defaultValue="password">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="password" className="gap-2">
@@ -94,6 +105,7 @@ export default function PortalLogin() {
                   <Mail className="h-3.5 w-3.5" /> Link mágico
                 </TabsTrigger>
               </TabsList>
+
 
               <TabsContent value="password">
                 <form onSubmit={handlePassword} className="space-y-4">
