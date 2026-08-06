@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
     // Check sync preferences
     const { data: prefs } = await serviceClient
       .from("google_calendar_tokens")
-      .select("sync_enabled, auto_create, auto_update, calendar_id")
+      .select("sync_enabled, auto_create, auto_update, sync_new_only, calendar_id")
       .eq("user_id", userId)
       .single();
 
