@@ -18,6 +18,15 @@ interface GoogleCalendarPrefs {
   sync_new_only?: boolean;
 }
 
+interface CalendarSyncResult {
+  synced?: number;
+  created?: number;
+  updated?: number;
+  recreated?: number;
+  failed?: number;
+  error?: string;
+}
+
 export function GoogleCalendarSettings() {
   const [prefs, setPrefs] = useState<GoogleCalendarPrefs>({ connected: false });
   const [loading, setLoading] = useState(true);
@@ -156,12 +165,27 @@ export function GoogleCalendarSettings() {
         body: { action: "sync_all" },
       });
 
-      if (error) {
-        toast.error("Erro ao sincronizar agenda");
+      const result = data as CalendarSyncResult | null;
+      if (error || result?.error) {
+        toast.error(result?.error || "Erro ao sincronizar agenda. Reconecte sua conta e tente novamente.");
         return;
       }
 
-      toast.success(`${data?.synced || 0} agendamento(s) sincronizado(s) com Google Calendar`);
+      const synced = result?.synced || 0;
+      const failed = result?.failed || 0;
+      const details = [
+        `${result?.created || 0} criados`,
+        `${result?.updated || 0} atualizados`,
+        `${result?.recreated || 0} recriados`,
+      ].join(" · ");
+
+      if (failed > 0) {
+        toast.warning(`${synced} sincronizados · ${failed} falharam`, { description: details });
+      } else if (synced === 0) {
+        toast.info("Agenda já está sincronizada", { description: "Nenhuma alteração pendente foi encontrada." });
+      } else {
+        toast.success(`${synced} agendamento(s) sincronizado(s)`, { description: details });
+      }
     } catch (err) {
       toast.error("Erro ao sincronizar");
     } finally {
