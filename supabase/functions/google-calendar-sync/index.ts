@@ -5,12 +5,46 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
-const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
+const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+type CalendarAppointment = {
+  id: string;
+  scheduled_at: string;
+  duration_minutes: number | null;
+  type: string | null;
+  notes: string | null;
+  google_event_id: string | null;
+  patients: { full_name?: string | null } | null;
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function buildEvent(appointment: CalendarAppointment, patientName: string) {
+  const startTime = new Date(appointment.scheduled_at);
+  const duration = appointment.duration_minutes || 50;
+  const endTime = new Date(startTime.getTime() + duration * 60000);
+
+  return {
+    summary: `Consulta — ${patientName}`,
+    description: `Sessão agendada pelo sistema PsicoOne.\n\nTipo: ${appointment.type === "online" ? "Online" : "Presencial"}\nDuração: ${duration} minutos${appointment.notes ? `\nObservações: ${appointment.notes}` : ""}`,
+    start: { dateTime: startTime.toISOString(), timeZone: "America/Sao_Paulo" },
+    end: { dateTime: endTime.toISOString(), timeZone: "America/Sao_Paulo" },
+    reminders: { useDefault: true },
+    extendedProperties: { private: { psicooneAppointmentId: appointment.id } },
+  };
+}
 
 async function getValidAccessToken(serviceClient: any, userId: string): Promise<string | null> {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return null;
   const { data: tokenData } = await serviceClient
     .from("google_calendar_tokens")
     .select("*")
@@ -62,6 +96,10 @@ Deno.serve(async (req) => {
   }
 
   try {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+      return json({ error: "Configuração interna do calendário incompleta" }, 500);
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
@@ -77,7 +115,7 @@ Deno.serve(async (req) => {
     }
     const userId = user.id;
 
-    const serviceClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Check sync preferences
     const { data: prefs } = await serviceClient
@@ -113,16 +151,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      const startTime = new Date(appointment.scheduled_at);
-      const endTime = new Date(startTime.getTime() + (appointment.duration_minutes || 50) * 60000);
-
-      const event = {
-        summary: `Consulta — ${appointment.patient_name}`,
-        description: `Sessão agendada pelo sistema PsicoOne.\n\nTipo: ${appointment.type === "online" ? "Online" : "Presencial"}\nDuração: ${appointment.duration_minutes || 50} minutos${appointment.notes ? `\nObservações: ${appointment.notes}` : ""}`,
-        start: { dateTime: startTime.toISOString(), timeZone: "America/Sao_Paulo" },
-        end: { dateTime: endTime.toISOString(), timeZone: "America/Sao_Paulo" },
-        reminders: { useDefault: true },
-      };
+      const event = buildEvent(appointment, appointment.patient_name || "Paciente");
 
       const res = await fetch(CALENDAR_API, {
         method: "POST",
@@ -136,9 +165,7 @@ Deno.serve(async (req) => {
       const eventData = await res.json();
       if (!res.ok) {
         console.error("Google Calendar create failed:", eventData);
-        return new Response(JSON.stringify({ error: "Falha ao criar evento no Google Calendar" }), {
-          status: 500, headers: corsHeaders,
-        });
+        return json({ error: "Falha ao criar evento no Google Calendar", details: eventData }, res.status);
       }
 
       // Save google_event_id
@@ -160,15 +187,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      const startTime = new Date(appointment.scheduled_at);
-      const endTime = new Date(startTime.getTime() + (appointment.duration_minutes || 50) * 60000);
-
-      const event = {
-        summary: `Consulta — ${appointment.patient_name}`,
-        description: `Sessão agendada pelo sistema PsicoOne.\n\nTipo: ${appointment.type === "online" ? "Online" : "Presencial"}\nDuração: ${appointment.duration_minutes || 50} minutos${appointment.notes ? `\nObservações: ${appointment.notes}` : ""}`,
-        start: { dateTime: startTime.toISOString(), timeZone: "America/Sao_Paulo" },
-        end: { dateTime: endTime.toISOString(), timeZone: "America/Sao_Paulo" },
-      };
+      const event = buildEvent(appointment, appointment.patient_name || "Paciente");
 
       const res = await fetch(`${CALENDAR_API}/${appointment.google_event_id}`, {
         method: "PUT",
@@ -182,7 +201,7 @@ Deno.serve(async (req) => {
       if (!res.ok) {
         const errData = await res.json();
         console.error("Google Calendar update failed:", errData);
-        return new Response(JSON.stringify({ error: "Falha ao atualizar evento" }), { status: 500, headers: corsHeaders });
+        return json({ error: "Falha ao atualizar evento", details: errData }, res.status);
       }
 
       return new Response(JSON.stringify({ success: true }), {
@@ -212,57 +231,104 @@ Deno.serve(async (req) => {
       });
     }
 
-    // SYNC ALL - bulk sync existing appointments
+    // SYNC ALL - reconcile every eligible appointment with Google Calendar.
+    // Existing links are updated, missing Google events are recreated, and new
+    // appointments are created. This makes the manual action deterministic.
     if (action === "sync_all") {
-      const { data: appointments } = await serviceClient
+      let query = serviceClient
         .from("appointments")
         .select("id, scheduled_at, duration_minutes, type, notes, status, google_event_id, patient_id, patients(full_name)")
         .eq("psychologist_id", userId)
         .is("deleted_at", null)
         .neq("status", "cancelled")
-        .is("google_event_id", null)
         .order("scheduled_at", { ascending: true });
 
-      if (!appointments || appointments.length === 0) {
-        return new Response(JSON.stringify({ success: true, synced: 0 }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (prefs.sync_new_only) {
+        query = query.gte("scheduled_at", new Date().toISOString());
       }
 
-      let synced = 0;
-      for (const apt of appointments) {
-        const startTime = new Date(apt.scheduled_at);
-        const endTime = new Date(startTime.getTime() + (apt.duration_minutes || 50) * 60000);
-        const patientName = (apt as any).patients?.full_name || "Paciente";
+      const { data: appointments, error: appointmentsError } = await query;
 
-        const event = {
-          summary: `Consulta — ${patientName}`,
-          description: `Sessão agendada pelo sistema PsicoOne.\nTipo: ${apt.type === "online" ? "Online" : "Presencial"}`,
-          start: { dateTime: startTime.toISOString(), timeZone: "America/Sao_Paulo" },
-          end: { dateTime: endTime.toISOString(), timeZone: "America/Sao_Paulo" },
-        };
+      if (appointmentsError) {
+        return json({ error: "Falha ao carregar agendamentos", details: appointmentsError.message }, 500);
+      }
 
-        const res = await fetch(CALENDAR_API, {
+      if (!appointments || appointments.length === 0) {
+        return json({ success: true, synced: 0, created: 0, updated: 0, recreated: 0, failed: 0 });
+      }
+
+      const result = { created: 0, updated: 0, recreated: 0, failed: 0 };
+      const failures: Array<{ appointment_id: string; status: number; message: string }> = [];
+
+      for (const rawAppointment of appointments) {
+        const apt = rawAppointment as CalendarAppointment;
+        const patientName = apt.patients?.full_name || "Paciente";
+        const event = buildEvent(apt, patientName);
+        let eventId = apt.google_event_id;
+        let wasMissing = false;
+
+        if (eventId) {
+          const updateRes = await fetch(`${CALENDAR_API}/${encodeURIComponent(eventId)}`, {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify(event),
+          });
+
+          if (updateRes.ok) {
+            result.updated++;
+            continue;
+          }
+
+          if (updateRes.status !== 404 && updateRes.status !== 410) {
+            const details = await updateRes.text();
+            result.failed++;
+            failures.push({ appointment_id: apt.id, status: updateRes.status, message: details.slice(0, 300) });
+            continue;
+          }
+
+          eventId = null;
+          wasMissing = true;
+        }
+
+        const createRes = await fetch(CALENDAR_API, {
           method: "POST",
           headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
           body: JSON.stringify(event),
         });
 
-        if (res.ok) {
-          const eventData = await res.json();
-          await serviceClient.from("appointments").update({ google_event_id: eventData.id }).eq("id", apt.id);
-          synced++;
+        if (!createRes.ok) {
+          const details = await createRes.text();
+          result.failed++;
+          failures.push({ appointment_id: apt.id, status: createRes.status, message: details.slice(0, 300) });
+          continue;
         }
+
+        const eventData = await createRes.json();
+        const { error: linkError } = await serviceClient
+          .from("appointments")
+          .update({ google_event_id: eventData.id })
+          .eq("id", apt.id)
+          .eq("psychologist_id", userId);
+
+        if (linkError) {
+          result.failed++;
+          failures.push({ appointment_id: apt.id, status: 500, message: linkError.message });
+          continue;
+        }
+
+        if (wasMissing) result.recreated++;
+        else result.created++;
       }
 
-      return new Response(JSON.stringify({ success: true, synced }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const synced = result.created + result.updated + result.recreated;
+      console.log("Google Calendar reconciliation completed", { userId, synced, ...result });
+      return json({ success: result.failed === 0, synced, ...result, failures });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400, headers: corsHeaders });
   } catch (err) {
     console.error("Sync error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+    const message = err instanceof Error ? err.message : "Erro inesperado de sincronização";
+    return json({ error: message }, 500);
   }
 });
