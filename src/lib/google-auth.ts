@@ -58,14 +58,9 @@ export function signInWithGoogleGisPopup(): Promise<void> {
     try {
       await loadGis();
       const google = (window as any).google;
-      if (!google?.accounts?.oauth2) throw new Error("Google Identity Services indisponível");
+      if (!google?.accounts?.id) throw new Error("Google Identity Services indisponível");
 
-      const client = google.accounts.oauth2.initCodeClient
-        ? null
-        : null;
-      void client;
-
-      // Popup implícito com id_token (fluxo sem redirect).
+      // Popup com id_token (fluxo sem redirect).
       google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         ux_mode: "popup",

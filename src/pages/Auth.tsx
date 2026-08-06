@@ -51,24 +51,6 @@ export default function Auth() {
     })();
   }, [navigate]);
 
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    try {
-      if (isLovablePreview) {
-        const { error } = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo: window.location.origin },
-        });
-        if (error) throw error;
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao entrar com Google");
-      setGoogleLoading(false);
-    }
-  };
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
