@@ -9,6 +9,7 @@ import { Brain, Loader2, Mail, KeyRound } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
+import GoogleAuthButton from "@/components/auth/GoogleAuthButton";
 
 export default function PortalLogin() {
   const [loading, setLoading] = useState(false);
