@@ -12,6 +12,7 @@ import { SmartTransactionDialog } from "@/components/financial/SmartTransactionD
 import { toast } from "sonner";
 import { format, addDays, isBefore, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { fromYMD, nextChargeDates, toYMD } from "@/lib/billing-rules-engine";
 
 type Plan = {
   id: string;
