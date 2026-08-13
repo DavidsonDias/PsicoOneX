@@ -304,7 +304,11 @@ export function PatientForm({
       emergency_phone: emergencyPhone,
       notes: (fd.get("notes") as string) || "",
       default_session_value: sessionValue,
-      payment_day: (fd.get("payment_day") as string) || "",
+      // Apenas cobrança mensal possui "dia de vencimento"
+      payment_day:
+        billing.billing_type === "monthly" && billing.day_of_month
+          ? String(billing.day_of_month)
+          : "",
       monthly_plan_value: monthlyPlan,
       frequency,
       social_name: opt("social_name"),
