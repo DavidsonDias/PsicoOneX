@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ArrowLeft, User, FileText, DollarSign, Calendar, File, Edit, Brain, Activity, Paperclip } from "lucide-react";
-import { PatientForm, PatientFormData } from "@/components/patients/PatientForm";
+import { PatientForm, PatientFormData, type PatientDraftApi } from "@/components/patients/PatientForm";
 import { differenceInYears } from "date-fns";
 import { PatientOverviewTab } from "@/components/patient-profile/PatientOverviewTab";
 import { PatientRecordsTab } from "@/components/patient-profile/PatientRecordsTab";
@@ -329,6 +329,8 @@ export default function PatientProfile() {
               <DialogTitle>Editar Cadastro — {patient.full_name}</DialogTitle>
             </DialogHeader>
             <PatientForm
+              draft={{ mode: "edit", entityId: patient.id, userId: (patient as any).psychologist_id, savedAt: (patient as any).updated_at || null, label: patient.full_name }}
+              draftApiRef={profileDraftApi}
               initialData={patientToFormData()}
               onSubmit={handleEditSubmit}
               submitLabel="Salvar Alterações"
