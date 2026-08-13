@@ -387,7 +387,7 @@ const MedicalRecords = () => {
 
   // Procura rascunho pendente ao abrir criação
   useEffect(() => {
-    if (!dialogOpen || editingRecord) return;
+    if (!dialogOpen && !editingRecord) return;
     void checkForDraft();
   }, [dialogOpen, editingRecord, checkForDraft]);
 
@@ -1377,23 +1377,34 @@ const MedicalRecords = () => {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Editar Prontuário</DialogTitle>
-              <div className="flex flex-col items-end">
+              <div className="flex flex-col items-end gap-1">
                 <AutosaveIndicator status={autosaveEditStatus} lastSavedAt={editSavedAt || lastLocalDraftSavedAt} />
-                <span className="text-[11px] text-muted-foreground">
-                  {autosaveEditStatus === "saved"
-                    ? "Sincronizado com servidor"
-                    : autosaveEditStatus === "saving"
-                      ? "Sincronizando..."
-                      : autosaveEditStatus === "error"
-                        ? "Erro de sincronização"
-                        : "Rascunho"}
-                </span>
+                <DraftStatusIndicator
+                  status={draftStatus}
+                  isOnline={draftOnline}
+                  lastLocalAt={draftLocalAt}
+                  lastSyncedAt={draftSyncedAt}
+                />
               </div>
             </div>
           </DialogHeader>
+          {pendingDraft && (
+            <DraftRecoveryBanner
+              draft={pendingDraft}
+              savedData={{ formData, freeFormNotes }}
+              onRestore={() =>
+                restoreDraft((payload) => {
+                  if (payload?.formData) setFormData(payload.formData);
+                  setFreeFormNotes(payload?.freeFormNotes || "");
+                })
+              }
+              onDiscard={() => void discardDraft()}
+            />
+          )}
           <form
             onSubmit={handleEditRecord}
             onBlurCapture={() => {
+              void saveDraftNow();
               void triggerAutosaveEdit();
             }}
           >
