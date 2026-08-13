@@ -288,6 +288,51 @@ export type Database = {
         }
         Relationships: []
       }
+      drafts: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          draft_key: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          last_synced_at: string | null
+          payload: Json
+          status: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          draft_key: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          last_synced_at?: string | null
+          payload?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          draft_key?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          last_synced_at?: string | null
+          payload?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
