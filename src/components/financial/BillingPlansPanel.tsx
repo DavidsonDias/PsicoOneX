@@ -52,22 +52,22 @@ const TYPE_TONE: Record<string, string> = {
 };
 
 function nextDueDate(plan: Plan): Date {
-  const today = new Date();
-  if (plan.billing_type === "monthly" && plan.day_of_month) {
-    const y = today.getFullYear(), m = today.getMonth();
-    const candidate = new Date(y, m, plan.day_of_month);
-    if (candidate < today) return new Date(y, m + 1, plan.day_of_month);
-    return candidate;
-  }
-  if (plan.billing_type === "weekly") {
-    const base = plan.last_generated_at ? new Date(plan.last_generated_at) : today;
-    return addDays(base, 7);
-  }
-  if (plan.billing_type === "biweekly") {
-    const base = plan.last_generated_at ? new Date(plan.last_generated_at) : today;
-    return addDays(base, 15);
-  }
-  return today;
+  // Motor único de regras de cobrança (BillingRulesEngine)
+  const base = plan.last_generated_at
+    ? new Date(plan.last_generated_at)
+    : plan.start_date
+      ? fromYMD(plan.start_date.slice(0, 10))
+      : new Date();
+  const [next] = nextChargeDates(
+    {
+      billing_type: plan.billing_type,
+      day_of_month: plan.day_of_month,
+      first_charge_date: toYMD(base),
+      biweekly_mode: "every_14_days",
+    },
+    { count: 1 },
+  );
+  return next ? fromYMD(next) : new Date();
 }
 
 function effectiveStatus(i: Installment): "paid" | "overdue" | "pending" {
