@@ -570,31 +570,31 @@ export function PatientForm({
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="default_session_value">Valor da Sessão (R$)</Label>
-            <Input id="default_session_value" name="default_session_value" type="number" step="0.01" placeholder="200.00" value={sessionValue} onChange={(e) => { setSessionValue(e.target.value); setMonthlyPlanManual(false); }} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="payment_day">Dia de Pagamento</Label>
-            <Select name="payment_day" defaultValue={initialData?.payment_day || ""}>
-              <SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 31 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input id="default_session_value" name="default_session_value" type="number" step="0.01" inputMode="decimal" className="min-h-11" placeholder="200.00" value={sessionValue} onChange={(e) => { setSessionValue(e.target.value); setMonthlyPlanManual(false); }} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="monthly_plan_value">Plano Mensal (R$)</Label>
             <div className="relative">
-              <Input id="monthly_plan_value" name="monthly_plan_value" type="number" step="0.01" placeholder="0.00" value={monthlyPlan} onChange={(e) => { setMonthlyPlanManual(true); setMonthlyPlan(e.target.value); }} />
+              <Input id="monthly_plan_value" name="monthly_plan_value" type="number" step="0.01" inputMode="decimal" className="min-h-11" placeholder="0.00" value={monthlyPlan} onChange={(e) => { setMonthlyPlanManual(true); setMonthlyPlan(e.target.value); }} />
               {!monthlyPlanManual && monthlyPlan && (
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">auto</span>
               )}
             </div>
           </div>
+        </div>
+
+        {/* Configuração de Cobrança — motor único de regras */}
+        <div className="rounded-xl border p-3 sm:p-4 space-y-3">
+          <h4 className="text-sm font-medium">Configuração de Cobrança</h4>
+          <BillingConfiguration
+            value={billing}
+            onChange={(next) => { setBilling(next); setMonthlyPlanManual(false); }}
+            sessionFrequency={frequency as BillingSessionFrequency}
+            hideSessionValue
+          />
         </div>
       </div>
 
