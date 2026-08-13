@@ -339,7 +339,7 @@ export default function PatientOnboarding() {
               <ShieldCheck className="h-3.5 w-3.5" /> Conexão segura · LGPD
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold">Olá, {patient?.full_name?.split(" ")[0]}</h1>
-            <p className="text-muted-foreground text-sm mt-1">Complete sua ficha de cadastro com calma. Você pode voltar e avançar entre as etapas.</p>
+            <p className="text-muted-foreground text-sm mt-1">Complete sua ficha de cadastro com calma. Apenas nome e celular são obrigatórios — o resto pode ficar para depois, e tudo é salvo automaticamente.</p>
           </div>
 
           {pendingDraft && (
@@ -585,7 +585,7 @@ export default function PatientOnboarding() {
 
               {step === 4 && (
                 <>
-                  <Field label="Qual o motivo da procura por atendimento psicológico? *">
+                  <Field label="Qual o motivo da procura por atendimento psicológico? (opcional)">
                     <Textarea rows={5} value={form.initial_demand || ""} onChange={(e) => u("initial_demand")(e.target.value)} placeholder="Conte com suas palavras o que te trouxe até aqui..." />
                   </Field>
                   <div className="space-y-3">
@@ -655,7 +655,7 @@ export default function PatientOnboarding() {
                   </Button>
                 )}
                 {step < STEPS.length - 1 ? (
-                  <Button onClick={() => setStep((s) => s + 1)} className="ml-auto gap-2">
+                  <Button onClick={nextStep} className="ml-auto gap-2">
                     Próximo <ArrowRight className="h-4 w-4" />
                   </Button>
                 ) : (
