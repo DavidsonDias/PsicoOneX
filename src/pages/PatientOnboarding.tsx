@@ -252,6 +252,14 @@ export default function PatientOnboarding() {
   }
 
   async function submit() {
+    for (const s of [0, 1]) {
+      const msg = validateStep(s);
+      if (msg) {
+        toast({ title: "Campo obrigatório", description: msg, variant: "destructive" });
+        setStep(s);
+        return;
+      }
+    }
     if (!signature) {
       toast({ title: "Assinatura necessária", description: "Por favor assine para concluir.", variant: "destructive" });
       return;
@@ -265,7 +273,7 @@ export default function PatientOnboarding() {
     try {
       const res = await fetch(`${FUNCTION_URL}?token=${token}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        headers: { "Content-Type": "application/json", apikey: API_KEY },
         body: JSON.stringify({
           ...form,
           lgpd_signature_data: signature,
@@ -277,6 +285,8 @@ export default function PatientOnboarding() {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error);
+      // Limpa o rascunho local só após confirmação do servidor
+      clearLocalDraft(patient?.id);
       setDone(true);
     } catch (e: any) {
       toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
@@ -284,6 +294,7 @@ export default function PatientOnboarding() {
       setSubmitting(false);
     }
   }
+
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (error) return (
