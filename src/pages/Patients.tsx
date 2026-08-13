@@ -36,7 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LIFECYCLE_STATUSES } from "@/lib/patient-lifecycle";
+import { LIFECYCLE_STATUSES, type LifecycleStatus } from "@/lib/patient-lifecycle";
 
 
 interface Patient {
@@ -830,6 +830,7 @@ export default function Patients() {
         totalCount={filteredPatients.length}
         onDelete={handleBulkDelete}
         onInactivate={handleBulkInactivate}
+        onChangeLifecycle={handleBulkLifecycle}
         onExportCSV={handleExportCSV}
         onExportExcel={handleExportExcel}
         onExportPDF={handleExportPDF}
