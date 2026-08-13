@@ -342,18 +342,72 @@ export default function PatientOnboarding() {
             <p className="text-muted-foreground text-sm mt-1">Complete sua ficha de cadastro com calma. Você pode voltar e avançar entre as etapas.</p>
           </div>
 
+          {pendingDraft && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3"
+            >
+              <div className="flex items-start gap-3">
+                <History className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-medium">Você tem um cadastro em andamento</p>
+                  <p className="text-xs text-muted-foreground">
+                    Salvo em {format(new Date(pendingDraft.updatedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                    {pendingDraft.remote ? " · outro dispositivo" : " · este dispositivo"} ·{" "}
+                    {pendingDraft.completion_percentage}% preenchido
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={restoreDraft} className="gap-1.5">
+                  <RotateCcw className="h-3.5 w-3.5" /> Continuar de onde parei
+                </Button>
+                <Button size="sm" variant="ghost" onClick={discardDraft} className="text-muted-foreground">
+                  Começar do zero
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           <Card className="shadow-xl border-border/50">
             <CardHeader>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between gap-2 mb-2">
                 <CardTitle className="text-base">{STEPS[step]}</CardTitle>
-                <span className="text-xs text-muted-foreground">Etapa {step + 1} de {STEPS.length} · {Math.round(pct)}%</span>
+                <span className="text-xs text-muted-foreground shrink-0">Etapa {step + 1} de {STEPS.length} · {Math.round(pct)}%</span>
               </div>
               <Progress value={pct} />
+              <div className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+                {draft.status === "saving" ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                    <span className="text-primary">Salvando rascunho...</span>
+                  </>
+                ) : draft.status === "synced" ? (
+                  <>
+                    <CloudUpload className="h-3 w-3 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      Rascunho salvo{draft.lastSyncedAt ? ` · ${format(draft.lastSyncedAt, "HH:mm")}` : ""}
+                    </span>
+                  </>
+                ) : draft.status === "offline" || draft.status === "local" ? (
+                  <>
+                    <CloudOff className="h-3 w-3 text-amber-500" />
+                    <span className="text-amber-600 dark:text-amber-400">Salvo neste dispositivo · sincroniza ao reconectar</span>
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="h-3 w-3" />
+                    <span>Salvamento automático ativo{draftRestored ? " · rascunho restaurado" : ""}</span>
+                  </>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {step === 0 && (
                 <>
                   <Field label="Nome completo *"><Input value={form.full_name || ""} onChange={(e) => u("full_name")(e.target.value)} /></Field>
+
                   <Field label="Nome social (opcional)"><Input value={form.social_name || ""} onChange={(e) => u("social_name")(e.target.value)} /></Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Data de nascimento"><Input type="date" value={form.birth_date || ""} onChange={(e) => u("birth_date")(e.target.value)} /></Field>
