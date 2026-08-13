@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DollarSign, CheckCircle2, Info, Repeat, ChevronDown, FileHeart, MapPin, Users, Stethoscope } from "lucide-react";
 import { useConsistencyCheck } from "@/hooks/useConsistencyCheck";
 import { ConsistencyDialog } from "@/components/shared/ConsistencyDialog";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
+import { draftKeys } from "@/lib/draft-engine";
+import { DraftStatusIndicator } from "@/components/drafts/DraftStatusIndicator";
+import { DraftRecoveryBanner } from "@/components/drafts/DraftRecoveryBanner";
+
 
 export type SessionFrequency = "semanal" | "quinzenal" | "mensal" | "avulso";
 
