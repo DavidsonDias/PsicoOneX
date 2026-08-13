@@ -70,8 +70,54 @@ Deno.serve(async (req) => {
         .select("full_name, clinic_name, logo_url, crp")
         .eq("id", v.row.psychologist_id)
         .maybeSingle();
-      return json({ patient, psychologist: psy, expires_at: v.row.expires_at });
+      // Draft vinculado ao paciente (não ao token) — sobrevive a reenvio de link
+      const { data: draft } = await supabase
+        .from("patient_onboarding_drafts")
+        .select("payload, completion_percentage, current_step, version, status, updated_at")
+        .eq("patient_id", v.row.patient_id)
+        .maybeSingle();
+      return json({
+        patient,
+        psychologist: psy,
+        expires_at: v.row.expires_at,
+        draft: draft && draft.status !== "completed" ? draft : null,
+      });
     }
+
+    // Autosave do rascunho (silencioso, sem notificações)
+    if (req.method === "POST" && action === "draft") {
+      const body = await req.json().catch(() => ({}));
+      const payload = body?.payload ?? {};
+      if (typeof payload !== "object" || Array.isArray(payload)) {
+        return json({ error: "payload inválido" }, 400);
+      }
+      const size = new TextEncoder().encode(JSON.stringify(payload)).byteLength;
+      if (size > 1_000_000) return json({ error: "rascunho muito grande" }, 413);
+
+      const { data: existing } = await supabase
+        .from("patient_onboarding_drafts")
+        .select("id, version")
+        .eq("patient_id", v.row.patient_id)
+        .maybeSingle();
+
+      const row = {
+        patient_id: v.row.patient_id,
+        psychologist_id: v.row.psychologist_id,
+        payload,
+        completion_percentage: Math.max(0, Math.min(100, Number(body?.completion_percentage) || 0)),
+        current_step: Math.max(0, Number(body?.current_step) || 0),
+        status: "in_progress",
+        last_synced_at: new Date().toISOString(),
+        version: (existing?.version ?? 0) + 1,
+      };
+
+      const { error: dErr } = existing
+        ? await supabase.from("patient_onboarding_drafts").update(row).eq("id", existing.id)
+        : await supabase.from("patient_onboarding_drafts").insert(row);
+      if (dErr) return json({ error: dErr.message }, 500);
+      return json({ ok: true, version: row.version, synced_at: row.last_synced_at });
+    }
+
 
     // Upload de documento via base64 (contorna RLS do storage de forma segura — só com token válido)
     if (req.method === "POST" && action === "upload") {
