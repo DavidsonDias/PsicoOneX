@@ -1044,7 +1044,7 @@ const MedicalRecords = () => {
                 const leaveAnyway = window.confirm("⚠️ Você possui alterações não salvas.\n\nSair mesmo assim?");
                 if (!leaveAnyway) return;
               }
-              void triggerAutosaveNew();
+              void saveDraftNow();
               setDialogOpen(false);
               resetForm();
             }
@@ -1059,24 +1059,31 @@ const MedicalRecords = () => {
               <DialogHeader>
                 <div className="flex items-center justify-between">
                   <DialogTitle>Novo Registro de Sessão</DialogTitle>
-                  <div className="flex flex-col items-end">
-                    <AutosaveIndicator status={autosaveNewStatus} lastSavedAt={newSavedAt || lastLocalDraftSavedAt} />
-                    <span className="text-[11px] text-muted-foreground">
-                      {autosaveNewStatus === "saved"
-                        ? "Salvo localmente"
-                        : autosaveNewStatus === "saving"
-                          ? "Salvando rascunho..."
-                          : autosaveNewStatus === "error"
-                            ? "Erro ao salvar rascunho"
-                            : "Rascunho"}
-                    </span>
-                  </div>
+                  <DraftStatusIndicator
+                    status={draftStatus}
+                    isOnline={draftOnline}
+                    lastLocalAt={draftLocalAt}
+                    lastSyncedAt={draftSyncedAt}
+                  />
                 </div>
               </DialogHeader>
+              {pendingDraft && (
+                <DraftRecoveryBanner
+                  draft={pendingDraft}
+                  savedData={{ formData, freeFormNotes }}
+                  onRestore={() =>
+                    restoreDraft((payload) => {
+                      if (payload?.formData) setFormData(payload.formData);
+                      setFreeFormNotes(payload?.freeFormNotes || "");
+                    })
+                  }
+                  onDiscard={() => void discardDraft()}
+                />
+              )}
               <form
                 onSubmit={handleCreateRecord}
                 onBlurCapture={() => {
-                  void triggerAutosaveNew();
+                  void saveDraftNow();
                 }}
               >
                 <ProntuarioEditor
