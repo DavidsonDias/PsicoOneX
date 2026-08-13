@@ -317,6 +317,94 @@ export function PatientForm({
     };
   };
 
+  // ── Draft Engine (Zero Data Loss) ──
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const [snapshot, setSnapshot] = useState<PatientFormData | null>(null);
+  const [changeTick, setChangeTick] = useState(0);
+
+  const draftKey = useMemo(() => {
+    if (!draft) return null;
+    if (draft.mode === "edit") return draft.entityId ? draftKeys.patientEdit(draft.entityId) : null;
+    return draft.userId ? draftKeys.patientNew(draft.userId) : null;
+  }, [draft]);
+
+  const {
+    status: draftStatus,
+    isOnline,
+    lastLocalAt,
+    lastSyncedAt,
+    pendingDraft,
+    checkForDraft,
+    restore,
+    discard,
+    commit,
+    saveNow,
+    setBaseline,
+  } = useDraftRecovery<PatientFormData>({
+    draftKey,
+    entityType: "patient",
+    entityId: draft?.entityId ?? null,
+    userId: draft?.userId ?? null,
+    data: snapshot,
+    enabled: !!draftKey,
+    label: draft?.label ?? null,
+    savedAt: draft?.savedAt ?? null,
+  });
+
+  // Captura o estado completo do formulário a cada alteração
+  useEffect(() => {
+    if (!draftKey || !formRef.current) return;
+    setSnapshot(buildPayload(formRef.current));
+  }, [
+    draftKey,
+    changeTick,
+    phone,
+    cpf,
+    emergencyPhone,
+    emergencyWa,
+    whatsappPhone,
+    residentialPhone,
+    cep,
+    street,
+    neighborhood,
+    city,
+    state,
+    sessionValue,
+    frequency,
+    monthlyPlan,
+    priorTherapy,
+    usesMedication,
+  ]);
+
+  // Define a linha de base e procura rascunho pendente ao montar
+  useEffect(() => {
+    if (!draftKey) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (formRef.current) setBaseline(buildPayload(formRef.current));
+      void checkForDraft().then(() => {
+        if (cancelled) return;
+      });
+    }, 60);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftApiRef) return;
+    draftApiRef.current = { commit: () => commit(), saveNow };
+    return () => {
+      if (draftApiRef) draftApiRef.current = null;
+    };
+  }, [draftApiRef, commit, saveNow]);
+
+  const applyDraft = (payload: Partial<PatientFormData>) => {
+    setDraftOverride(payload);
+    setFormKey((k) => k + 1);
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = buildPayload(e.currentTarget);
@@ -340,7 +428,34 @@ export function PatientForm({
   const init: any = initialData || {};
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form
+      key={formKey}
+      ref={formRef}
+      onSubmit={handleSubmit}
+      onInput={() => draftKey && setChangeTick((t) => t + 1)}
+      onChange={() => draftKey && setChangeTick((t) => t + 1)}
+      className="space-y-6"
+    >
+      {draftKey && (
+        <div className="flex items-center justify-between gap-2">
+          <DraftStatusIndicator
+            status={draftStatus}
+            isOnline={isOnline}
+            lastLocalAt={lastLocalAt}
+            lastSyncedAt={lastSyncedAt}
+          />
+        </div>
+      )}
+
+      {pendingDraft && (
+        <DraftRecoveryBanner
+          draft={pendingDraft}
+          savedData={initialDataProp || {}}
+          onRestore={() => restore(applyDraft)}
+          onDiscard={() => void discard()}
+        />
+      )}
+
       {/* Dados Pessoais */}
       <div className="space-y-4">
         <h3 className="text-sm font-medium text-muted-foreground">Dados Pessoais</h3>
