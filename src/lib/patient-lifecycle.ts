@@ -1,11 +1,13 @@
 export type LifecycleStatus =
   | "active"
   | "paused"
+  | "inactive"
   | "discharged"
   | "referred"
   | "dropout"
   | "closed"
   | "archived";
+
 
 export interface LifecycleMeta {
   value: LifecycleStatus;
