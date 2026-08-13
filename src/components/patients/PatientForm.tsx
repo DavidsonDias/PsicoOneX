@@ -169,7 +169,7 @@ const FREQUENCY_OPTIONS: { value: SessionFrequency; label: string }[] = [
 ];
 
 export function PatientForm({
-  initialData,
+  initialData: initialDataProp,
   onSubmit,
   submitLabel = "Salvar",
   loading = false,
@@ -177,8 +177,19 @@ export function PatientForm({
   extraContent,
   compact = false,
   onFinancialChange,
+  draft,
+  draftApiRef,
 }: PatientFormProps) {
+  // Rascunho restaurado sobrepõe os dados oficiais carregados
+  const [draftOverride, setDraftOverride] = useState<Partial<PatientFormData> | null>(null);
+  const [formKey, setFormKey] = useState(0);
+  const initialData = useMemo<Partial<PatientFormData> | undefined>(
+    () => (draftOverride ? { ...(initialDataProp || {}), ...draftOverride } : initialDataProp),
+    [initialDataProp, draftOverride],
+  );
+
   const [phone, setPhone] = useState(initialData?.phone || "");
+
   const [cpf, setCpf] = useState(initialData?.cpf || "");
   const [emergencyPhone, setEmergencyPhone] = useState(initialData?.emergency_phone || "");
   const [emergencyWa, setEmergencyWa] = useState(initialData?.emergency_whatsapp || "");
