@@ -11,6 +11,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DollarSign, CheckCircle2, Info, Repeat, ChevronDown, FileHeart, MapPin, Users, Stethoscope } from "lucide-react";
 import { useConsistencyCheck } from "@/hooks/useConsistencyCheck";
 import { ConsistencyDialog } from "@/components/shared/ConsistencyDialog";
+import { BillingConfiguration } from "@/components/shared/BillingConfiguration";
+import {
+  projectBilling,
+  type BillingConfig,
+  type SessionFrequency as BillingSessionFrequency,
+} from "@/lib/billing-rules-engine";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { draftKeys } from "@/lib/draft-engine";
 import { DraftStatusIndicator } from "@/components/drafts/DraftStatusIndicator";
