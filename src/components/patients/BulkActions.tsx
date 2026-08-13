@@ -17,14 +17,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Trash2, Download, FileSpreadsheet, FileText, File, ChevronDown, X, UserX } from "lucide-react";
+import { Trash2, Download, FileSpreadsheet, FileText, File, ChevronDown, X, UserX, Archive, RefreshCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { LIFECYCLE_STATUSES, type LifecycleStatus } from "@/lib/patient-lifecycle";
 
 interface BulkActionsProps {
   selectedCount: number;
   totalCount: number;
   onDelete: () => void;
   onInactivate?: () => void;
+  /** Alteração de ciclo de vida em massa (fonte única de verdade do status). */
+  onChangeLifecycle?: (status: LifecycleStatus) => void;
   onExportCSV: () => void;
   onExportExcel: () => void;
   onExportPDF: () => void;
@@ -36,6 +39,7 @@ export function BulkActions({
   totalCount,
   onDelete,
   onInactivate,
+  onChangeLifecycle,
   onExportCSV,
   onExportExcel,
   onExportPDF,
@@ -43,6 +47,35 @@ export function BulkActions({
 }: BulkActionsProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [inactivateDialogOpen, setInactivateDialogOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<LifecycleStatus | null>(null);
+
+  const statusMenu = onChangeLifecycle && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5 w-full sm:w-auto min-h-[48px] sm:min-h-0 text-xs sm:text-sm">
+          <RefreshCcw className="h-4 w-4 shrink-0" />
+          Status
+          <ChevronDown className="h-3 w-3 hidden sm:block" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {LIFECYCLE_STATUSES.map((st) => (
+          <DropdownMenuItem
+            key={st.value}
+            className="gap-2 cursor-pointer"
+            onClick={() => setPendingStatus(st.value)}
+          >
+            {st.value === "archived" ? (
+              <Archive className="h-4 w-4 shrink-0" />
+            ) : (
+              <span className={`h-2 w-2 rounded-full shrink-0 ${st.dot}`} />
+            )}
+            <span className="truncate">{st.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   if (selectedCount === 0) return null;
 
@@ -86,7 +119,7 @@ export function BulkActions({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {onInactivate && (
+              {statusMenu || (onInactivate && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -96,7 +129,7 @@ export function BulkActions({
                   <UserX className="h-4 w-4 shrink-0" />
                   Inativar
                 </Button>
-              )}
+              ))}
 
               <Button
                 variant="destructive"
@@ -137,6 +170,8 @@ export function BulkActions({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {statusMenu}
 
             {onInactivate && (
               <Button
@@ -203,6 +238,32 @@ export function BulkActions({
                 className="bg-amber-600 hover:bg-amber-700"
               >
                 Inativar {selectedCount} paciente(s)
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={!!pendingStatus} onOpenChange={(o) => !o && setPendingStatus(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Alterar status de {selectedCount} paciente(s)?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Os pacientes selecionados passarão para{" "}
+                <b>{LIFECYCLE_STATUSES.find((s) => s.value === pendingStatus)?.label}</b>. O histórico,
+                prontuários e lançamentos financeiros são sempre preservados e a mudança fica registrada
+                na auditoria.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (pendingStatus) onChangeLifecycle?.(pendingStatus);
+                  setPendingStatus(null);
+                }}
+              >
+                Confirmar
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

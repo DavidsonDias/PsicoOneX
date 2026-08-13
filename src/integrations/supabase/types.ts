@@ -1011,6 +1011,56 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_onboarding_drafts: {
+        Row: {
+          completion_percentage: number
+          created_at: string
+          current_step: number
+          id: string
+          last_synced_at: string | null
+          patient_id: string
+          payload: Json
+          psychologist_id: string
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          completion_percentage?: number
+          created_at?: string
+          current_step?: number
+          id?: string
+          last_synced_at?: string | null
+          patient_id: string
+          payload?: Json
+          psychologist_id: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          completion_percentage?: number
+          created_at?: string
+          current_step?: number
+          id?: string
+          last_synced_at?: string | null
+          patient_id?: string
+          payload?: Json
+          psychologist_id?: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_onboarding_drafts_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: true
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patient_onboarding_tokens: {
         Row: {
           created_at: string

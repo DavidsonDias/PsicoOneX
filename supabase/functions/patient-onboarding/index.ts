@@ -70,8 +70,54 @@ Deno.serve(async (req) => {
         .select("full_name, clinic_name, logo_url, crp")
         .eq("id", v.row.psychologist_id)
         .maybeSingle();
-      return json({ patient, psychologist: psy, expires_at: v.row.expires_at });
+      // Draft vinculado ao paciente (não ao token) — sobrevive a reenvio de link
+      const { data: draft } = await supabase
+        .from("patient_onboarding_drafts")
+        .select("payload, completion_percentage, current_step, version, status, updated_at")
+        .eq("patient_id", v.row.patient_id)
+        .maybeSingle();
+      return json({
+        patient,
+        psychologist: psy,
+        expires_at: v.row.expires_at,
+        draft: draft && draft.status !== "completed" ? draft : null,
+      });
     }
+
+    // Autosave do rascunho (silencioso, sem notificações)
+    if (req.method === "POST" && action === "draft") {
+      const body = await req.json().catch(() => ({}));
+      const payload = body?.payload ?? {};
+      if (typeof payload !== "object" || Array.isArray(payload)) {
+        return json({ error: "payload inválido" }, 400);
+      }
+      const size = new TextEncoder().encode(JSON.stringify(payload)).byteLength;
+      if (size > 1_000_000) return json({ error: "rascunho muito grande" }, 413);
+
+      const { data: existing } = await supabase
+        .from("patient_onboarding_drafts")
+        .select("id, version")
+        .eq("patient_id", v.row.patient_id)
+        .maybeSingle();
+
+      const row = {
+        patient_id: v.row.patient_id,
+        psychologist_id: v.row.psychologist_id,
+        payload,
+        completion_percentage: Math.max(0, Math.min(100, Number(body?.completion_percentage) || 0)),
+        current_step: Math.max(0, Number(body?.current_step) || 0),
+        status: "in_progress",
+        last_synced_at: new Date().toISOString(),
+        version: (existing?.version ?? 0) + 1,
+      };
+
+      const { error: dErr } = existing
+        ? await supabase.from("patient_onboarding_drafts").update(row).eq("id", existing.id)
+        : await supabase.from("patient_onboarding_drafts").insert(row);
+      if (dErr) return json({ error: dErr.message }, 500);
+      return json({ ok: true, version: row.version, synced_at: row.last_synced_at });
+    }
+
 
     // Upload de documento via base64 (contorna RLS do storage de forma segura — só com token válido)
     if (req.method === "POST" && action === "upload") {
@@ -105,19 +151,31 @@ Deno.serve(async (req) => {
       // SECURITY: allowlist fields the patient may set via onboarding.
       // Never trust arbitrary body keys — service_role bypasses RLS.
       const ALLOWED_FIELDS = new Set([
-        "full_name","social_name","preferred_name","birth_date","gender","gender_identity",
-        "cpf","rg","phone","whatsapp_phone","email","address","address_number","address_complement",
-        "neighborhood","city","state","zip_code","country","nationality","marital_status",
-        "occupation","education","emergency_contact_name","emergency_contact_phone",
-        "emergency_contact_relationship","health_insurance","health_insurance_number",
-        "referred_by","medical_conditions","current_medications","allergies","previous_therapy",
-        "chief_complaint","treatment_goals","family_history","personal_history","observations",
-        "lgpd_accepted","lgpd_accepted_at","terms_accepted","terms_accepted_at",
-        "signature_data","signature_name","preferred_notification_channel"
+        "full_name","social_name","birth_date","birth_place","gender","religion","marital_status",
+        "cpf","rg","rg_issuer","cnh","phone","phone_residential","whatsapp_phone","email",
+        "cep","street","address","address_number","complement","neighborhood","city","state",
+        "education","education_level","profession","profession_role","company",
+        "spouse_name","spouse_relationship_time","children",
+        "father_name","father_profession","mother_name","mother_profession",
+        "siblings_brothers","siblings_sisters",
+        "emergency_contact","emergency_relationship","emergency_phone","emergency_whatsapp",
+        "prior_therapy","prior_therapy_duration","prior_therapy_when","prior_therapy_reason",
+        "uses_medication","medications","initial_demand",
+        "health_plan","health_plan_id","health_plan_expiry",
+        "lgpd_truth_declaration","lgpd_privacy_consent","lgpd_data_consent",
+        "lgpd_signature_data","lgpd_signed_at","recording_authorization",
+        "signature_device","signature_timestamp","preferred_notification_channel"
       ]);
       const safeData: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(patientData || {})) {
-        if (ALLOWED_FIELDS.has(k)) safeData[k] = val;
+        if (ALLOWED_FIELDS.has(k) && val !== "" && val !== undefined) safeData[k] = val;
+      }
+      if (!safeData.full_name || String(safeData.full_name).trim().length < 2) {
+        return json({ error: "Nome completo é obrigatório" }, 400);
+      }
+      const anyPhone = safeData.whatsapp_phone || safeData.phone;
+      if (!anyPhone || String(anyPhone).replace(/\D/g, "").length < 8) {
+        return json({ error: "Telefone/celular é obrigatório" }, 400);
       }
 
       const { error: upErr } = await supabase
@@ -137,6 +195,13 @@ Deno.serve(async (req) => {
         .from("patient_onboarding_tokens")
         .update({ status: "used", used_at: new Date().toISOString() })
         .eq("id", v.row.id);
+
+      // Só marca o rascunho como concluído DEPOIS da persistência confirmada
+      await supabase
+        .from("patient_onboarding_drafts")
+        .update({ status: "completed", last_synced_at: new Date().toISOString() })
+        .eq("patient_id", v.row.patient_id);
+
 
       // Notificação unificada via dispatch-notification (insert + push + preferências)
       // Mesmo fluxo de Agenda/Financeiro: garante toast + badge + central + push

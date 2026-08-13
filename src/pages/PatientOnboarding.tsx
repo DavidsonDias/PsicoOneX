@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
@@ -12,12 +12,29 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
-import { CheckCircle2, Loader2, ShieldCheck, Upload, X, ArrowRight, ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Loader2, ShieldCheck, Upload, X, ArrowRight, ArrowLeft, Plus, Trash2, Cloud, CloudOff, CloudUpload, RotateCcw, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SignaturePad } from "@/components/documents/SignaturePad";
 import { BrandHeader } from "@/components/shared/BrandHeader";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  useOnboardingDraft,
+  readLocalDraft,
+  clearLocalDraft,
+  type OnboardingDraftSnapshot,
+} from "@/hooks/useOnboardingDraft";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/patient-onboarding`;
+const API_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+/** Campos considerados no cálculo de completude (todos opcionais, exceto nome e telefone). */
+const COMPLETION_FIELDS = [
+  "full_name","whatsapp_phone","email","birth_date","cpf","rg","gender","marital_status",
+  "cep","street","address_number","neighborhood","city","state","profession","education_level",
+  "emergency_contact","emergency_phone","initial_demand","father_name","mother_name",
+];
+
 
 type UploadedDoc = { name: string; path: string; type: string };
 type Child = { name: string; age: string };
@@ -67,17 +84,39 @@ export default function PatientOnboarding() {
     recording_authorization: "",
   });
 
+  const [pendingDraft, setPendingDraft] = useState<OnboardingDraftSnapshot | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(`${FUNCTION_URL}?token=${token}`, {
-          headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+          headers: { apikey: API_KEY },
         });
         const j = await res.json();
         if (!res.ok) throw new Error(j.error);
         setPatient(j.patient);
         setPsychologist(j.psychologist || null);
         setForm((f) => ({ ...f, full_name: j.patient?.full_name || "" }));
+
+        // Rascunho: escolhe o mais recente entre local (este dispositivo) e servidor
+        const local = readLocalDraft(j.patient?.id);
+        const remote = j.draft
+          ? {
+              payload: j.draft.payload || {},
+              completion_percentage: j.draft.completion_percentage || 0,
+              current_step: j.draft.current_step || 0,
+              updatedAt: j.draft.updated_at,
+              remote: true,
+            }
+          : null;
+        const best =
+          local && remote
+            ? new Date(local.updatedAt) >= new Date(remote.updatedAt)
+              ? local
+              : remote
+            : local || remote;
+        if (best && Object.keys(best.payload || {}).length > 0) setPendingDraft(best);
       } catch (e: any) {
         setError(e.message || "Link inválido");
       } finally {
@@ -87,6 +126,62 @@ export default function PatientOnboarding() {
   }, [token]);
 
   const u = (k: string) => (v: any) => setForm((f) => ({ ...f, [k]: v }));
+
+  const completion = useMemo(() => {
+    const filled = COMPLETION_FIELDS.filter((k) => {
+      const v = form[k];
+      return v !== undefined && v !== null && String(v).trim() !== "";
+    }).length;
+    return Math.round((filled / COMPLETION_FIELDS.length) * 100);
+  }, [form]);
+
+  const draft = useOnboardingDraft({
+    patientId: patient?.id,
+    functionUrl: FUNCTION_URL,
+    token,
+    apiKey: API_KEY,
+    data: form,
+    currentStep: step,
+    completion,
+    enabled: !!patient && !done && !error,
+  });
+
+  function restoreDraft() {
+    if (!pendingDraft) return;
+    setForm((f) => ({ ...f, ...pendingDraft.payload }));
+    setStep(Math.min(pendingDraft.current_step || 0, STEPS.length - 1));
+    setPendingDraft(null);
+    setDraftRestored(true);
+    toast({ title: "Rascunho restaurado", description: "Continuamos de onde você parou." });
+  }
+
+  function discardDraft() {
+    clearLocalDraft(patient?.id);
+    setPendingDraft(null);
+    toast({ title: "Rascunho descartado", description: "Você começará um novo preenchimento." });
+  }
+
+  /** Só nome e telefone são obrigatórios. */
+  function validateStep(current: number): string | null {
+    if (current === 0 && String(form.full_name || "").trim().length < 2)
+      return "Informe seu nome completo para continuar.";
+    if (
+      current === 1 &&
+      String(form.whatsapp_phone || form.phone || "").replace(/\D/g, "").length < 8
+    )
+      return "Informe um celular/WhatsApp válido para continuar.";
+    return null;
+  }
+
+  function nextStep() {
+    const msg = validateStep(step);
+    if (msg) {
+      toast({ title: "Campo obrigatório", description: msg, variant: "destructive" });
+      return;
+    }
+    setStep((s) => s + 1);
+  }
+
 
   async function fetchCep(cep: string) {
     const clean = cep.replace(/\D/g, "");
@@ -157,6 +252,14 @@ export default function PatientOnboarding() {
   }
 
   async function submit() {
+    for (const s of [0, 1]) {
+      const msg = validateStep(s);
+      if (msg) {
+        toast({ title: "Campo obrigatório", description: msg, variant: "destructive" });
+        setStep(s);
+        return;
+      }
+    }
     if (!signature) {
       toast({ title: "Assinatura necessária", description: "Por favor assine para concluir.", variant: "destructive" });
       return;
@@ -170,7 +273,7 @@ export default function PatientOnboarding() {
     try {
       const res = await fetch(`${FUNCTION_URL}?token=${token}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        headers: { "Content-Type": "application/json", apikey: API_KEY },
         body: JSON.stringify({
           ...form,
           lgpd_signature_data: signature,
@@ -182,6 +285,8 @@ export default function PatientOnboarding() {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error);
+      // Limpa o rascunho local só após confirmação do servidor
+      clearLocalDraft(patient?.id);
       setDone(true);
     } catch (e: any) {
       toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
@@ -189,6 +294,7 @@ export default function PatientOnboarding() {
       setSubmitting(false);
     }
   }
+
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (error) return (
@@ -233,21 +339,75 @@ export default function PatientOnboarding() {
               <ShieldCheck className="h-3.5 w-3.5" /> Conexão segura · LGPD
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold">Olá, {patient?.full_name?.split(" ")[0]}</h1>
-            <p className="text-muted-foreground text-sm mt-1">Complete sua ficha de cadastro com calma. Você pode voltar e avançar entre as etapas.</p>
+            <p className="text-muted-foreground text-sm mt-1">Complete sua ficha de cadastro com calma. Apenas nome e celular são obrigatórios — o resto pode ficar para depois, e tudo é salvo automaticamente.</p>
           </div>
+
+          {pendingDraft && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3"
+            >
+              <div className="flex items-start gap-3">
+                <History className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-medium">Você tem um cadastro em andamento</p>
+                  <p className="text-xs text-muted-foreground">
+                    Salvo em {format(new Date(pendingDraft.updatedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                    {pendingDraft.remote ? " · outro dispositivo" : " · este dispositivo"} ·{" "}
+                    {pendingDraft.completion_percentage}% preenchido
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={restoreDraft} className="gap-1.5">
+                  <RotateCcw className="h-3.5 w-3.5" /> Continuar de onde parei
+                </Button>
+                <Button size="sm" variant="ghost" onClick={discardDraft} className="text-muted-foreground">
+                  Começar do zero
+                </Button>
+              </div>
+            </motion.div>
+          )}
 
           <Card className="shadow-xl border-border/50">
             <CardHeader>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between gap-2 mb-2">
                 <CardTitle className="text-base">{STEPS[step]}</CardTitle>
-                <span className="text-xs text-muted-foreground">Etapa {step + 1} de {STEPS.length} · {Math.round(pct)}%</span>
+                <span className="text-xs text-muted-foreground shrink-0">Etapa {step + 1} de {STEPS.length} · {Math.round(pct)}%</span>
               </div>
               <Progress value={pct} />
+              <div className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+                {draft.status === "saving" ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                    <span className="text-primary">Salvando rascunho...</span>
+                  </>
+                ) : draft.status === "synced" ? (
+                  <>
+                    <CloudUpload className="h-3 w-3 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      Rascunho salvo{draft.lastSyncedAt ? ` · ${format(draft.lastSyncedAt, "HH:mm")}` : ""}
+                    </span>
+                  </>
+                ) : draft.status === "offline" || draft.status === "local" ? (
+                  <>
+                    <CloudOff className="h-3 w-3 text-amber-500" />
+                    <span className="text-amber-600 dark:text-amber-400">Salvo neste dispositivo · sincroniza ao reconectar</span>
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="h-3 w-3" />
+                    <span>Salvamento automático ativo{draftRestored ? " · rascunho restaurado" : ""}</span>
+                  </>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {step === 0 && (
                 <>
                   <Field label="Nome completo *"><Input value={form.full_name || ""} onChange={(e) => u("full_name")(e.target.value)} /></Field>
+
                   <Field label="Nome social (opcional)"><Input value={form.social_name || ""} onChange={(e) => u("social_name")(e.target.value)} /></Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Data de nascimento"><Input type="date" value={form.birth_date || ""} onChange={(e) => u("birth_date")(e.target.value)} /></Field>
@@ -425,7 +585,7 @@ export default function PatientOnboarding() {
 
               {step === 4 && (
                 <>
-                  <Field label="Qual o motivo da procura por atendimento psicológico? *">
+                  <Field label="Qual o motivo da procura por atendimento psicológico? (opcional)">
                     <Textarea rows={5} value={form.initial_demand || ""} onChange={(e) => u("initial_demand")(e.target.value)} placeholder="Conte com suas palavras o que te trouxe até aqui..." />
                   </Field>
                   <div className="space-y-3">
@@ -495,7 +655,7 @@ export default function PatientOnboarding() {
                   </Button>
                 )}
                 {step < STEPS.length - 1 ? (
-                  <Button onClick={() => setStep((s) => s + 1)} className="ml-auto gap-2">
+                  <Button onClick={nextStep} className="ml-auto gap-2">
                     Próximo <ArrowRight className="h-4 w-4" />
                   </Button>
                 ) : (

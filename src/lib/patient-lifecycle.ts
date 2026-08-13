@@ -1,11 +1,13 @@
 export type LifecycleStatus =
   | "active"
   | "paused"
+  | "inactive"
   | "discharged"
   | "referred"
   | "dropout"
   | "closed"
   | "archived";
+
 
 export interface LifecycleMeta {
   value: LifecycleStatus;
@@ -31,6 +33,13 @@ export const LIFECYCLE_STATUSES: LifecycleMeta[] = [
     className: "bg-amber-500/10 text-amber-600 border-amber-500/30",
     dot: "bg-amber-500",
     requiresReason: true,
+  },
+  {
+    value: "inactive",
+    label: "Inativo",
+    description: "Sem atendimentos ativos, sem encerramento formal",
+    className: "bg-slate-500/10 text-slate-600 border-slate-500/30",
+    dot: "bg-slate-400",
   },
   {
     value: "discharged",
@@ -77,4 +86,21 @@ export function getLifecycleMeta(status: string | null | undefined): LifecycleMe
   return (
     LIFECYCLE_STATUSES.find((s) => s.value === status) ?? LIFECYCLE_STATUSES[0]
   );
+}
+
+/** Status considerados "em tratamento" — aparecem por padrão em Agenda/Financeiro. */
+export const ACTIVE_LIFECYCLE: LifecycleStatus[] = ["active", "paused"];
+
+/** Status que retiram o paciente da operação do dia a dia. */
+export const INACTIVE_LIFECYCLE: LifecycleStatus[] = [
+  "inactive",
+  "discharged",
+  "referred",
+  "dropout",
+  "closed",
+  "archived",
+];
+
+export function isLifecycleActive(status: string | null | undefined): boolean {
+  return ACTIVE_LIFECYCLE.includes((status || "active") as LifecycleStatus);
 }
