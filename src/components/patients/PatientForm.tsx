@@ -11,6 +11,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DollarSign, CheckCircle2, Info, Repeat, ChevronDown, FileHeart, MapPin, Users, Stethoscope } from "lucide-react";
 import { useConsistencyCheck } from "@/hooks/useConsistencyCheck";
 import { ConsistencyDialog } from "@/components/shared/ConsistencyDialog";
+import { BillingConfiguration } from "@/components/shared/BillingConfiguration";
+import {
+  projectBilling,
+  type BillingConfig,
+  type SessionFrequency as BillingSessionFrequency,
+} from "@/lib/billing-rules-engine";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { draftKeys } from "@/lib/draft-engine";
 import { DraftStatusIndicator } from "@/components/drafts/DraftStatusIndicator";
@@ -204,6 +210,23 @@ export function PatientForm({
   const [frequency, setFrequency] = useState<SessionFrequency>(initialData?.frequency || "semanal");
   const [monthlyPlan, setMonthlyPlan] = useState(initialData?.monthly_plan_value || "");
   const [monthlyPlanManual, setMonthlyPlanManual] = useState(false);
+  // Configuração de cobrança (motor único de regras)
+  const [billing, setBilling] = useState<BillingConfig>(() => ({
+    billing_type: initialData?.payment_day ? "monthly" : "per_session",
+    session_value: initialData?.default_session_value
+      ? Number(initialData.default_session_value)
+      : null,
+    session_payment_timing: "on_session",
+    weekly_offset: 0,
+    weekly_weekday: null,
+    biweekly_mode: "every_14_days",
+    twice_month_days: [5, 20],
+    day_of_month: initialData?.payment_day ? Number(initialData.payment_day) : null,
+    monthly_amount_mode: initialData?.monthly_plan_value ? "fixed" : "auto",
+    monthly_amount: initialData?.monthly_plan_value
+      ? Number(initialData.monthly_plan_value)
+      : null,
+  }));
   const [priorTherapy, setPriorTherapy] = useState(!!initialData?.prior_therapy);
   const [usesMedication, setUsesMedication] = useState(!!initialData?.uses_medication);
 
@@ -228,9 +251,18 @@ export function PatientForm({
     }
   }, [initialData]);
 
+  // Valor da sessão é a fonte única — espelha no motor de cobrança
   useEffect(() => {
-    if (!monthlyPlanManual) setMonthlyPlan(calcMonthlyPlan(sessionValue, frequency));
-  }, [sessionValue, frequency, monthlyPlanManual]);
+    const n = sessionValue === "" ? null : Number(sessionValue);
+    setBilling((prev) => (prev.session_value === n ? prev : { ...prev, session_value: n }));
+  }, [sessionValue]);
+
+  // Plano mensal derivado do motor (nunca pedido duas vezes)
+  useEffect(() => {
+    if (monthlyPlanManual) return;
+    const p = projectBilling(billing, frequency as BillingSessionFrequency);
+    setMonthlyPlan(p.monthlyAverage > 0 ? p.monthlyAverage.toFixed(2) : "");
+  }, [billing, frequency, monthlyPlanManual]);
 
   useEffect(() => {
     onFinancialChange?.({ sessionValue, frequency, monthlyPlan });
@@ -272,7 +304,11 @@ export function PatientForm({
       emergency_phone: emergencyPhone,
       notes: (fd.get("notes") as string) || "",
       default_session_value: sessionValue,
-      payment_day: (fd.get("payment_day") as string) || "",
+      // Apenas cobrança mensal possui "dia de vencimento"
+      payment_day:
+        billing.billing_type === "monthly" && billing.day_of_month
+          ? String(billing.day_of_month)
+          : "",
       monthly_plan_value: monthlyPlan,
       frequency,
       social_name: opt("social_name"),
@@ -534,31 +570,31 @@ export function PatientForm({
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="default_session_value">Valor da Sessão (R$)</Label>
-            <Input id="default_session_value" name="default_session_value" type="number" step="0.01" placeholder="200.00" value={sessionValue} onChange={(e) => { setSessionValue(e.target.value); setMonthlyPlanManual(false); }} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="payment_day">Dia de Pagamento</Label>
-            <Select name="payment_day" defaultValue={initialData?.payment_day || ""}>
-              <SelectTrigger><SelectValue placeholder="Dia" /></SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 31 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input id="default_session_value" name="default_session_value" type="number" step="0.01" inputMode="decimal" className="min-h-11" placeholder="200.00" value={sessionValue} onChange={(e) => { setSessionValue(e.target.value); setMonthlyPlanManual(false); }} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="monthly_plan_value">Plano Mensal (R$)</Label>
             <div className="relative">
-              <Input id="monthly_plan_value" name="monthly_plan_value" type="number" step="0.01" placeholder="0.00" value={monthlyPlan} onChange={(e) => { setMonthlyPlanManual(true); setMonthlyPlan(e.target.value); }} />
+              <Input id="monthly_plan_value" name="monthly_plan_value" type="number" step="0.01" inputMode="decimal" className="min-h-11" placeholder="0.00" value={monthlyPlan} onChange={(e) => { setMonthlyPlanManual(true); setMonthlyPlan(e.target.value); }} />
               {!monthlyPlanManual && monthlyPlan && (
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">auto</span>
               )}
             </div>
           </div>
+        </div>
+
+        {/* Configuração de Cobrança — motor único de regras */}
+        <div className="rounded-xl border p-3 sm:p-4 space-y-3">
+          <h4 className="text-sm font-medium">Configuração de Cobrança</h4>
+          <BillingConfiguration
+            value={billing}
+            onChange={(next) => { setBilling(next); setMonthlyPlanManual(false); }}
+            sessionFrequency={frequency as BillingSessionFrequency}
+            hideSessionValue
+          />
         </div>
       </div>
 
