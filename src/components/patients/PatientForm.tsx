@@ -251,9 +251,18 @@ export function PatientForm({
     }
   }, [initialData]);
 
+  // Valor da sessão é a fonte única — espelha no motor de cobrança
   useEffect(() => {
-    if (!monthlyPlanManual) setMonthlyPlan(calcMonthlyPlan(sessionValue, frequency));
-  }, [sessionValue, frequency, monthlyPlanManual]);
+    const n = sessionValue === "" ? null : Number(sessionValue);
+    setBilling((prev) => (prev.session_value === n ? prev : { ...prev, session_value: n }));
+  }, [sessionValue]);
+
+  // Plano mensal derivado do motor (nunca pedido duas vezes)
+  useEffect(() => {
+    if (monthlyPlanManual) return;
+    const p = projectBilling(billing, frequency as BillingSessionFrequency);
+    setMonthlyPlan(p.monthlyAverage > 0 ? p.monthlyAverage.toFixed(2) : "");
+  }, [billing, frequency, monthlyPlanManual]);
 
   useEffect(() => {
     onFinancialChange?.({ sessionValue, frequency, monthlyPlan });
