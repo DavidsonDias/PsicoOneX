@@ -4,11 +4,12 @@
  */
 
 const DB_NAME = "psicoone-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = {
   cache: "cache",
   syncQueue: "sync-queue",
+  drafts: "drafts",
 } as const;
 
 function openDB(): Promise<IDBDatabase> {
@@ -23,11 +24,71 @@ function openDB(): Promise<IDBDatabase> {
         const store = db.createObjectStore(STORES.syncQueue, { keyPath: "id", autoIncrement: true });
         store.createIndex("created_at", "created_at", { unique: false });
       }
+      if (!db.objectStoreNames.contains(STORES.drafts)) {
+        const store = db.createObjectStore(STORES.drafts, { keyPath: "draft_key" });
+        store.createIndex("updated_at", "updated_at", { unique: false });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
+
+// ── Draft store (Zero Data Loss layer) ──
+
+export interface LocalDraftRecord {
+  draft_key: string;
+  entity_type: string;
+  entity_id?: string | null;
+  user_id?: string | null;
+  payload: any;
+  version: number;
+  device_id: string;
+  updated_at: number;
+  last_synced_at?: number | null;
+  label?: string | null;
+}
+
+export async function idbDraftPut(record: LocalDraftRecord): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.drafts, "readwrite");
+    tx.objectStore(STORES.drafts).put(record);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function idbDraftGet(draftKey: string): Promise<LocalDraftRecord | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.drafts, "readonly");
+    const req = tx.objectStore(STORES.drafts).get(draftKey);
+    req.onsuccess = () => resolve((req.result as LocalDraftRecord) ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function idbDraftGetAll(): Promise<LocalDraftRecord[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.drafts, "readonly");
+    const req = tx.objectStore(STORES.drafts).getAll();
+    req.onsuccess = () => resolve((req.result as LocalDraftRecord[]) || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function idbDraftDelete(draftKey: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.drafts, "readwrite");
+    tx.objectStore(STORES.drafts).delete(draftKey);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 
 // ── Cache helpers ──
 
