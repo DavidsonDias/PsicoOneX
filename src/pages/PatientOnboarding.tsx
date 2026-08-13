@@ -84,17 +84,39 @@ export default function PatientOnboarding() {
     recording_authorization: "",
   });
 
+  const [pendingDraft, setPendingDraft] = useState<OnboardingDraftSnapshot | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(`${FUNCTION_URL}?token=${token}`, {
-          headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+          headers: { apikey: API_KEY },
         });
         const j = await res.json();
         if (!res.ok) throw new Error(j.error);
         setPatient(j.patient);
         setPsychologist(j.psychologist || null);
         setForm((f) => ({ ...f, full_name: j.patient?.full_name || "" }));
+
+        // Rascunho: escolhe o mais recente entre local (este dispositivo) e servidor
+        const local = readLocalDraft(j.patient?.id);
+        const remote = j.draft
+          ? {
+              payload: j.draft.payload || {},
+              completion_percentage: j.draft.completion_percentage || 0,
+              current_step: j.draft.current_step || 0,
+              updatedAt: j.draft.updated_at,
+              remote: true,
+            }
+          : null;
+        const best =
+          local && remote
+            ? new Date(local.updatedAt) >= new Date(remote.updatedAt)
+              ? local
+              : remote
+            : local || remote;
+        if (best && Object.keys(best.payload || {}).length > 0) setPendingDraft(best);
       } catch (e: any) {
         setError(e.message || "Link inválido");
       } finally {
@@ -104,6 +126,62 @@ export default function PatientOnboarding() {
   }, [token]);
 
   const u = (k: string) => (v: any) => setForm((f) => ({ ...f, [k]: v }));
+
+  const completion = useMemo(() => {
+    const filled = COMPLETION_FIELDS.filter((k) => {
+      const v = form[k];
+      return v !== undefined && v !== null && String(v).trim() !== "";
+    }).length;
+    return Math.round((filled / COMPLETION_FIELDS.length) * 100);
+  }, [form]);
+
+  const draft = useOnboardingDraft({
+    patientId: patient?.id,
+    functionUrl: FUNCTION_URL,
+    token,
+    apiKey: API_KEY,
+    data: form,
+    currentStep: step,
+    completion,
+    enabled: !!patient && !done && !error,
+  });
+
+  function restoreDraft() {
+    if (!pendingDraft) return;
+    setForm((f) => ({ ...f, ...pendingDraft.payload }));
+    setStep(Math.min(pendingDraft.current_step || 0, STEPS.length - 1));
+    setPendingDraft(null);
+    setDraftRestored(true);
+    toast({ title: "Rascunho restaurado", description: "Continuamos de onde você parou." });
+  }
+
+  function discardDraft() {
+    clearLocalDraft(patient?.id);
+    setPendingDraft(null);
+    toast({ title: "Rascunho descartado", description: "Você começará um novo preenchimento." });
+  }
+
+  /** Só nome e telefone são obrigatórios. */
+  function validateStep(current: number): string | null {
+    if (current === 0 && String(form.full_name || "").trim().length < 2)
+      return "Informe seu nome completo para continuar.";
+    if (
+      current === 1 &&
+      String(form.whatsapp_phone || form.phone || "").replace(/\D/g, "").length < 8
+    )
+      return "Informe um celular/WhatsApp válido para continuar.";
+    return null;
+  }
+
+  function nextStep() {
+    const msg = validateStep(step);
+    if (msg) {
+      toast({ title: "Campo obrigatório", description: msg, variant: "destructive" });
+      return;
+    }
+    setStep((s) => s + 1);
+  }
+
 
   async function fetchCep(cep: string) {
     const clean = cep.replace(/\D/g, "");
