@@ -81,6 +81,22 @@ export interface PatientFormData {
   health_plan_id?: string;
 }
 
+export interface PatientDraftApi {
+  /** Remove o rascunho de todas as camadas — chame só após o backend confirmar. */
+  commit: () => Promise<void>;
+  /** Persiste imediatamente (fechar modal, trocar de página). */
+  saveNow: () => Promise<void>;
+}
+
+export interface PatientDraftScope {
+  mode: "new" | "edit";
+  entityId?: string | null;
+  userId?: string | null;
+  /** updated_at da versão oficial salva */
+  savedAt?: string | null;
+  label?: string | null;
+}
+
 interface PatientFormProps {
   initialData?: Partial<PatientFormData>;
   onSubmit: (data: PatientFormData) => void;
@@ -90,7 +106,11 @@ interface PatientFormProps {
   extraContent?: React.ReactNode;
   compact?: boolean;
   onFinancialChange?: (data: { sessionValue: string; frequency: SessionFrequency; monthlyPlan: string }) => void;
+  /** Ativa o Draft Engine (Zero Data Loss) neste formulário */
+  draft?: PatientDraftScope;
+  draftApiRef?: React.MutableRefObject<PatientDraftApi | null>;
 }
+
 
 const formatPhone = (value: string): string => {
   const numbers = value.replace(/\D/g, "");
