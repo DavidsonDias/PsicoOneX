@@ -4,12 +4,15 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getLifecycleMeta, isLifecycleActive } from "@/lib/patient-lifecycle";
 
 export interface PatientOption {
   id: string;
   full_name: string;
   default_session_value?: number | null;
   email?: string | null;
+  /** Ciclo de vida (ativo/pausado aparecem primeiro; inativos ganham selo). */
+  lifecycle_status?: string | null;
 }
 
 interface Props {
@@ -45,6 +48,16 @@ export function PatientCombobox({
   allLabel = "Todos os pacientes",
 }: Props) {
   const [open, setOpen] = useState(false);
+
+  // Ativos/pausados primeiro; inativos e encerrados ao final, sem serem escondidos
+  const ordered = useMemo(() => {
+    return [...patients].sort((a, b) => {
+      const ai = isLifecycleActive(a.lifecycle_status) ? 0 : 1;
+      const bi = isLifecycleActive(b.lifecycle_status) ? 0 : 1;
+      if (ai !== bi) return ai - bi;
+      return a.full_name.localeCompare(b.full_name, "pt-BR");
+    });
+  }, [patients]);
 
   const selected = useMemo(
     () => patients.find((p) => p.id === value),
@@ -109,7 +122,7 @@ export function PatientCombobox({
                   {allLabel}
                 </CommandItem>
               )}
-              {patients.map((p) => (
+              {ordered.map((p) => (
                 <CommandItem
                   key={p.id}
                   value={p.id}
@@ -126,7 +139,14 @@ export function PatientCombobox({
                     )}
                   />
                   <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                    <span className="truncate">{p.full_name}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate">{p.full_name}</span>
+                      {!isLifecycleActive(p.lifecycle_status) && (
+                        <span className="shrink-0 rounded border border-border px-1 text-[10px] text-muted-foreground">
+                          {getLifecycleMeta(p.lifecycle_status).label}
+                        </span>
+                      )}
+                    </span>
                     {renderTrailing ? (
                       renderTrailing(p)
                     ) : p.default_session_value ? (
