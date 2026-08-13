@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
@@ -12,12 +12,29 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
-import { CheckCircle2, Loader2, ShieldCheck, Upload, X, ArrowRight, ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Loader2, ShieldCheck, Upload, X, ArrowRight, ArrowLeft, Plus, Trash2, Cloud, CloudOff, CloudUpload, RotateCcw, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SignaturePad } from "@/components/documents/SignaturePad";
 import { BrandHeader } from "@/components/shared/BrandHeader";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  useOnboardingDraft,
+  readLocalDraft,
+  clearLocalDraft,
+  type OnboardingDraftSnapshot,
+} from "@/hooks/useOnboardingDraft";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/patient-onboarding`;
+const API_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+/** Campos considerados no cálculo de completude (todos opcionais, exceto nome e telefone). */
+const COMPLETION_FIELDS = [
+  "full_name","whatsapp_phone","email","birth_date","cpf","rg","gender","marital_status",
+  "cep","street","address_number","neighborhood","city","state","profession","education_level",
+  "emergency_contact","emergency_phone","initial_demand","father_name","mother_name",
+];
+
 
 type UploadedDoc = { name: string; path: string; type: string };
 type Child = { name: string; age: string };
