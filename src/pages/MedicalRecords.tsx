@@ -30,6 +30,10 @@ import { FilePreviewModal } from "@/components/medical-records/FilePreviewModal"
 import { QuickPatientForm } from "@/components/medical-records/QuickPatientForm";
 import { useAutosave } from "@/hooks/useAutosave";
 import { AutosaveIndicator } from "@/components/medical-records/AutosaveIndicator";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
+import { draftKeys, deleteDraft } from "@/lib/draft-engine";
+import { DraftStatusIndicator } from "@/components/drafts/DraftStatusIndicator";
+import { DraftRecoveryBanner } from "@/components/drafts/DraftRecoveryBanner";
 import { VersionHistory } from "@/components/medical-records/VersionHistory";
 
 interface MedicalRecord {
@@ -331,40 +335,61 @@ const MedicalRecords = () => {
     enabled: !!editingRecord,
   });
 
-  // ── Autosave: NEW mode (saves to localStorage only) ──
-  const autosaveNewData = useMemo(() => {
-    if (editingRecord || !dialogOpen) return null;
-    return { formData, freeFormNotes };
-  }, [formData, freeFormNotes, editingRecord, dialogOpen]);
+  // ── Draft Engine (Zero Data Loss): cobre criação e edição ──
+  const draftKey = useMemo(() => {
+    if (editingRecord) return draftKeys.medicalRecordEdit(editingRecord.id);
+    if (!dialogOpen || !userId) return null;
+    return draftKeys.medicalRecordNew(formData.patient_id || "sem-paciente", userId);
+  }, [editingRecord, dialogOpen, userId, formData.patient_id]);
 
-  const handleAutosaveNew = useCallback(async (data: any, _signal: AbortSignal) => {
-    if (!data) return;
+  const draftData = useMemo(
+    () => (draftKey ? { formData, freeFormNotes } : null),
+    [draftKey, formData, freeFormNotes],
+  );
 
-    const localPayload: RecordDraftPayload = {
-      formData: data.formData,
-      freeFormNotes: data.freeFormNotes || "",
-      updatedAt: new Date().toISOString(),
-    };
+  const patientLabel = useMemo(
+    () => patients.find((p) => p.id === formData.patient_id)?.full_name || "Prontuário sem paciente",
+    [patients, formData.patient_id],
+  );
 
-    saveDraftLocally(newDraftKey, localPayload);
-
-    try {
-      localStorage.setItem(NEW_DRAFT_POINTER_KEY, newDraftKey);
-      if (lastNewDraftKeyRef.current && lastNewDraftKeyRef.current !== newDraftKey) {
-        removeDraftLocally(lastNewDraftKeyRef.current);
-      }
-      lastNewDraftKeyRef.current = newDraftKey;
-    } catch {
-      // ignore localStorage failures
-    }
-  }, [NEW_DRAFT_POINTER_KEY, newDraftKey, removeDraftLocally, saveDraftLocally]);
-
-  const { status: autosaveNewStatus, save: triggerAutosaveNew, lastSavedAt: newSavedAt } = useAutosave({
-    data: autosaveNewData,
-    onSave: handleAutosaveNew,
-    interval: 1500,
-    enabled: dialogOpen && !editingRecord,
+  const {
+    status: draftStatus,
+    isOnline: draftOnline,
+    lastLocalAt: draftLocalAt,
+    lastSyncedAt: draftSyncedAt,
+    pendingDraft,
+    checkForDraft,
+    restore: restoreDraft,
+    discard: discardDraft,
+    commit: commitDraft,
+    saveNow: saveDraftNow,
+    setBaseline: setDraftBaseline,
+  } = useDraftRecovery<{ formData: RecordFormState; freeFormNotes: string }>({
+    draftKey,
+    entityType: "medical_record",
+    entityId: editingRecord?.id ?? formData.patient_id ?? null,
+    userId,
+    data: draftData,
+    enabled: !!draftKey,
+    label: patientLabel,
+    savedAt: editingRecord?.updated_at ?? null,
   });
+
+  // Ao selecionar o paciente, migra o rascunho temporário para a nova chave
+  const prevDraftKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevDraftKeyRef.current;
+    if (prev && draftKey && prev !== draftKey && !editingRecord) {
+      void deleteDraft(prev);
+    }
+    prevDraftKeyRef.current = draftKey;
+  }, [draftKey, editingRecord]);
+
+  // Procura rascunho pendente ao abrir criação
+  useEffect(() => {
+    if (!dialogOpen && !editingRecord) return;
+    void checkForDraft();
+  }, [dialogOpen, editingRecord, checkForDraft]);
 
   useEffect(() => {
     if (autosaveEditStatus === "saved" && editingRecord) {
@@ -373,45 +398,10 @@ const MedicalRecords = () => {
   }, [autosaveEditStatus, editingRecord, currentEditorSnapshot, markSnapshotCommitted]);
 
   useEffect(() => {
-    if (autosaveNewStatus === "saved" && dialogOpen && !editingRecord) {
+    if ((draftStatus === "local" || draftStatus === "synced") && dialogOpen && !editingRecord) {
       markSnapshotCommitted(currentEditorSnapshot);
     }
-  }, [autosaveNewStatus, dialogOpen, editingRecord, currentEditorSnapshot, markSnapshotCommitted]);
-
-  // Recover draft when opening new record dialog
-  useEffect(() => {
-    if (dialogOpen && !editingRecord) {
-      const pointer = localStorage.getItem(NEW_DRAFT_POINTER_KEY);
-      if (!pointer) return;
-
-      const draft = readDraftLocally(pointer);
-      if (!draft) return;
-
-      const hasDraftContent = Boolean(
-        draft.freeFormNotes?.trim() ||
-        draft.formData?.patient_id ||
-        draft.formData?.complaints?.trim() ||
-        draft.formData?.observations?.trim() ||
-        draft.formData?.techniques_used?.trim() ||
-        draft.formData?.evolution?.trim() ||
-        draft.formData?.next_steps?.trim(),
-      );
-
-      if (!hasDraftContent) return;
-
-      const shouldRecover = window.confirm("📝 Rascunho encontrado\n\nVocê deseja recuperar o conteúdo não salvo?");
-
-      if (shouldRecover) {
-        setFormData(draft.formData);
-        setFreeFormNotes(draft.freeFormNotes || "");
-        markSnapshotCommitted(JSON.stringify({ formData: draft.formData, freeFormNotes: draft.freeFormNotes || "" }));
-        toast.success("Rascunho recuperado");
-      } else {
-        removeDraftLocally(pointer);
-        localStorage.removeItem(NEW_DRAFT_POINTER_KEY);
-      }
-    }
-  }, [dialogOpen, editingRecord, NEW_DRAFT_POINTER_KEY, markSnapshotCommitted, readDraftLocally, removeDraftLocally]);
+  }, [draftStatus, dialogOpen, editingRecord, currentEditorSnapshot, markSnapshotCommitted]);
 
   useEffect(() => {
     if (!(dialogOpen || editingRecord) || !isDirty) return;
@@ -430,19 +420,16 @@ const MedicalRecords = () => {
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== "hidden") return;
-      if (editingRecord) {
-        void triggerAutosaveEdit();
-      } else {
-        void triggerAutosaveNew();
-      }
+      void saveDraftNow();
+      if (editingRecord) void triggerAutosaveEdit();
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [dialogOpen, editingRecord, triggerAutosaveEdit, triggerAutosaveNew]);
+  }, [dialogOpen, editingRecord, triggerAutosaveEdit, saveDraftNow]);
 
-  const autosaveStatus = editingRecord ? autosaveEditStatus : autosaveNewStatus;
-  const lastSavedAt = editingRecord ? (editSavedAt || lastLocalDraftSavedAt) : (newSavedAt || lastLocalDraftSavedAt);
+  const autosaveStatus = autosaveEditStatus;
+  const lastSavedAt = editSavedAt || lastLocalDraftSavedAt;
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -608,11 +595,7 @@ const MedicalRecords = () => {
     }
 
     toast.success("Prontuário criado com sucesso!");
-    if (lastNewDraftKeyRef.current) {
-      removeDraftLocally(lastNewDraftKeyRef.current);
-      lastNewDraftKeyRef.current = null;
-    }
-    localStorage.removeItem(NEW_DRAFT_POINTER_KEY);
+    await commitDraft();
     setDialogOpen(false);
     setNewDraftTempId(`temp-${Date.now()}`);
     resetForm();
@@ -680,7 +663,7 @@ const MedicalRecords = () => {
     }
 
     toast.success("Prontuário atualizado com sucesso!");
-    if (editingRecord) removeDraftLocally(`draft:prontuario:${editingRecord.id}`);
+    await commitDraft();
     setEditingRecord(null);
     resetForm();
     await loadRecords(userId);
@@ -1061,7 +1044,7 @@ const MedicalRecords = () => {
                 const leaveAnyway = window.confirm("⚠️ Você possui alterações não salvas.\n\nSair mesmo assim?");
                 if (!leaveAnyway) return;
               }
-              void triggerAutosaveNew();
+              void saveDraftNow();
               setDialogOpen(false);
               resetForm();
             }
@@ -1076,24 +1059,31 @@ const MedicalRecords = () => {
               <DialogHeader>
                 <div className="flex items-center justify-between">
                   <DialogTitle>Novo Registro de Sessão</DialogTitle>
-                  <div className="flex flex-col items-end">
-                    <AutosaveIndicator status={autosaveNewStatus} lastSavedAt={newSavedAt || lastLocalDraftSavedAt} />
-                    <span className="text-[11px] text-muted-foreground">
-                      {autosaveNewStatus === "saved"
-                        ? "Salvo localmente"
-                        : autosaveNewStatus === "saving"
-                          ? "Salvando rascunho..."
-                          : autosaveNewStatus === "error"
-                            ? "Erro ao salvar rascunho"
-                            : "Rascunho"}
-                    </span>
-                  </div>
+                  <DraftStatusIndicator
+                    status={draftStatus}
+                    isOnline={draftOnline}
+                    lastLocalAt={draftLocalAt}
+                    lastSyncedAt={draftSyncedAt}
+                  />
                 </div>
               </DialogHeader>
+              {pendingDraft && (
+                <DraftRecoveryBanner
+                  draft={pendingDraft}
+                  savedData={{ formData, freeFormNotes }}
+                  onRestore={() =>
+                    restoreDraft((payload) => {
+                      if (payload?.formData) setFormData(payload.formData);
+                      setFreeFormNotes(payload?.freeFormNotes || "");
+                    })
+                  }
+                  onDiscard={() => void discardDraft()}
+                />
+              )}
               <form
                 onSubmit={handleCreateRecord}
                 onBlurCapture={() => {
-                  void triggerAutosaveNew();
+                  void saveDraftNow();
                 }}
               >
                 <ProntuarioEditor
@@ -1387,23 +1377,34 @@ const MedicalRecords = () => {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Editar Prontuário</DialogTitle>
-              <div className="flex flex-col items-end">
+              <div className="flex flex-col items-end gap-1">
                 <AutosaveIndicator status={autosaveEditStatus} lastSavedAt={editSavedAt || lastLocalDraftSavedAt} />
-                <span className="text-[11px] text-muted-foreground">
-                  {autosaveEditStatus === "saved"
-                    ? "Sincronizado com servidor"
-                    : autosaveEditStatus === "saving"
-                      ? "Sincronizando..."
-                      : autosaveEditStatus === "error"
-                        ? "Erro de sincronização"
-                        : "Rascunho"}
-                </span>
+                <DraftStatusIndicator
+                  status={draftStatus}
+                  isOnline={draftOnline}
+                  lastLocalAt={draftLocalAt}
+                  lastSyncedAt={draftSyncedAt}
+                />
               </div>
             </div>
           </DialogHeader>
+          {pendingDraft && (
+            <DraftRecoveryBanner
+              draft={pendingDraft}
+              savedData={{ formData, freeFormNotes }}
+              onRestore={() =>
+                restoreDraft((payload) => {
+                  if (payload?.formData) setFormData(payload.formData);
+                  setFreeFormNotes(payload?.freeFormNotes || "");
+                })
+              }
+              onDiscard={() => void discardDraft()}
+            />
+          )}
           <form
             onSubmit={handleEditRecord}
             onBlurCapture={() => {
+              void saveDraftNow();
               void triggerAutosaveEdit();
             }}
           >

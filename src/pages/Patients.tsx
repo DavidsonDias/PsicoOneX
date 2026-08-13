@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useWriteGuard } from "@/components/subscription/WriteBlockedModal";
 import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkActions } from "@/components/patients/BulkActions";
-import { PatientForm, PatientFormData, SessionFrequency } from "@/components/patients/PatientForm";
+import { PatientForm, PatientFormData, SessionFrequency, type PatientDraftApi } from "@/components/patients/PatientForm";
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils";
 import { format, addWeeks, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -112,6 +112,9 @@ export default function Patients() {
   const [lifecycleFilter, setLifecycleFilter] = useState<string>("all");
   const [importOpen, setImportOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const createDraftApi = useRef<PatientDraftApi | null>(null);
+  const editDraftApi = useRef<PatientDraftApi | null>(null);
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -223,6 +226,10 @@ export default function Patients() {
     return dates;
   };
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setCurrentUserId(data.session?.user.id || ""));
+  }, []);
+
   const handleCreatePatientFromForm = async (formValues: PatientFormData) => {
     const canProceed = await checkSubscriptionBeforeWrite();
     if (!canProceed) { setDialogOpen(false); return; }
@@ -328,6 +335,7 @@ export default function Patients() {
         entity_id: newPatient?.id, new_data: { schedule_enabled: scheduleEnabled, full_name: fullName },
       } as any);
 
+      await createDraftApi.current?.commit();
       setDialogOpen(false);
       loadPatients();
       resetCreateForm();
@@ -368,6 +376,7 @@ export default function Patients() {
       } as any).eq("id", editingPatient.id);
       if (error) throw error;
       toast.success("Paciente atualizado com sucesso!");
+      await editDraftApi.current?.commit();
       setEditingPatient(null);
       loadPatients();
     } catch {
@@ -595,6 +604,8 @@ export default function Patients() {
               </DialogHeader>
               <ScrollArea className="max-h-[calc(90vh-140px)] pr-4">
                 <PatientForm
+                  draft={{ mode: "new", userId: currentUserId, label: "Novo paciente" }}
+                  draftApiRef={createDraftApi}
                   onSubmit={handleCreatePatientFromForm}
                   submitLabel={scheduleEnabled ? "Cadastrar e Agendar" : "Cadastrar Paciente"}
                   loading={creating}
@@ -811,6 +822,8 @@ export default function Patients() {
           {editingPatient && (
             <ScrollArea className="max-h-[calc(90vh-140px)] pr-4">
               <PatientForm
+                draft={{ mode: "edit", entityId: editingPatient.id, userId: currentUserId, savedAt: (editingPatient as any).updated_at || null, label: editingPatient.full_name }}
+                draftApiRef={editDraftApi}
                 initialData={{
                   full_name: editingPatient.full_name,
                   email: editingPatient.email || "",
