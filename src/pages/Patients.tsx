@@ -454,26 +454,48 @@ export default function Patients() {
     }
   };
 
-  // Bulk inactivate
-  const handleBulkInactivate = async () => {
+  // Alteração de ciclo de vida em massa (fonte única de verdade: lifecycle_status)
+  const handleBulkLifecycle = async (newStatus: LifecycleStatus) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       const ids = Array.from(selectedIds);
-      for (const id of ids) {
-        await supabase.from("patients").update({ status: "inactive" }).eq("id", id);
-        await supabase.from("audit_logs").insert({
-          user_id: session.user.id, action_type: "status_change", entity_type: "patient", entity_id: id,
-          new_data: { status: "inactive", bulk_action: true },
-        } as any);
-      }
-      toast.success(`${ids.length} paciente(s) inativado(s)!`);
+      // status legado permanece espelhado para compatibilidade dos módulos antigos
+      const legacy = newStatus === "active" ? "active" : "inactive";
+
+      const { error } = await supabase
+        .from("patients")
+        .update({
+          lifecycle_status: newStatus,
+          lifecycle_updated_at: new Date().toISOString(),
+          status: legacy,
+        } as any)
+        .in("id", ids);
+      if (error) throw error;
+
+      await supabase.from("patient_status_history").insert(
+        ids.map((id) => ({
+          patient_id: id,
+          psychologist_id: session.user.id,
+          changed_by: session.user.id,
+          previous_status: patients.find((p) => p.id === id)?.lifecycle_status || "active",
+          new_status: newStatus,
+          reason: "Alteração em massa",
+        })) as any,
+      );
+
+      const label = LIFECYCLE_STATUSES.find((s) => s.value === newStatus)?.label || newStatus;
+      toast.success(`${ids.length} paciente(s) atualizados para ${label}`);
       setSelectedIds(new Set());
       loadPatients();
     } catch {
-      toast.error("Erro ao inativar pacientes");
+      toast.error("Erro ao alterar status dos pacientes");
     }
   };
+
+  // Bulk inactivate (atalho)
+  const handleBulkInactivate = () => handleBulkLifecycle("inactive");
+
 
   // Selection helpers
   const toggleSelection = (id: string) => {
