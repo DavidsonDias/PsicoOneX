@@ -58,6 +58,7 @@ export default function PatientProfile() {
   const [activeTab, setActiveTab] = useState("overview");
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const profileDraftApi = useRef<PatientDraftApi | null>(null);
 
   useEffect(() => {
     if (id) loadPatient(id);
@@ -232,6 +233,7 @@ export default function PatientProfile() {
 
       if (error) throw error;
       toast.success("Cadastro atualizado com sucesso!");
+      await profileDraftApi.current?.commit();
       setEditOpen(false);
       if (id) loadPatient(id);
     } catch (e: any) {
