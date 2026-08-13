@@ -210,6 +210,23 @@ export function PatientForm({
   const [frequency, setFrequency] = useState<SessionFrequency>(initialData?.frequency || "semanal");
   const [monthlyPlan, setMonthlyPlan] = useState(initialData?.monthly_plan_value || "");
   const [monthlyPlanManual, setMonthlyPlanManual] = useState(false);
+  // Configuração de cobrança (motor único de regras)
+  const [billing, setBilling] = useState<BillingConfig>(() => ({
+    billing_type: initialData?.payment_day ? "monthly" : "per_session",
+    session_value: initialData?.default_session_value
+      ? Number(initialData.default_session_value)
+      : null,
+    session_payment_timing: "on_session",
+    weekly_offset: 0,
+    weekly_weekday: null,
+    biweekly_mode: "every_14_days",
+    twice_month_days: [5, 20],
+    day_of_month: initialData?.payment_day ? Number(initialData.payment_day) : null,
+    monthly_amount_mode: initialData?.monthly_plan_value ? "fixed" : "auto",
+    monthly_amount: initialData?.monthly_plan_value
+      ? Number(initialData.monthly_plan_value)
+      : null,
+  }));
   const [priorTherapy, setPriorTherapy] = useState(!!initialData?.prior_therapy);
   const [usesMedication, setUsesMedication] = useState(!!initialData?.uses_medication);
 
