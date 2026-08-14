@@ -85,11 +85,12 @@ export function BulkActions({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-xl"
+        className="fixed inset-x-3 sm:inset-x-0 z-50 mx-auto w-auto sm:w-[calc(100%-2rem)] max-w-xl bottom-[calc(4.75rem+env(safe-area-inset-bottom))] sm:bottom-6"
       >
-        <div className="bg-card border border-border shadow-2xl rounded-xl p-4 sm:px-6 sm:py-3">
+        <div className="bg-card border border-border shadow-2xl rounded-xl p-3 sm:px-6 sm:py-3 overflow-hidden">
           {/* Mobile layout */}
           <div className="sm:hidden">
+
             <div className="flex items-center justify-between mb-3">
               <Badge variant="secondary" className="text-sm px-3 py-1">
                 {selectedCount} de {totalCount} selecionado(s)
