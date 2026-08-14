@@ -85,20 +85,22 @@ export function BulkActions({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-xl"
+        className="fixed inset-x-3 sm:inset-x-0 z-50 mx-auto w-auto sm:w-[calc(100%-2rem)] max-w-xl bottom-[calc(4.75rem+env(safe-area-inset-bottom))] sm:bottom-6"
       >
-        <div className="bg-card border border-border shadow-2xl rounded-xl p-4 sm:px-6 sm:py-3">
+        <div className="bg-card border border-border shadow-2xl rounded-xl p-3 sm:px-6 sm:py-3 overflow-hidden">
           {/* Mobile layout */}
           <div className="sm:hidden">
-            <div className="flex items-center justify-between mb-3">
-              <Badge variant="secondary" className="text-sm px-3 py-1">
+
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <Badge variant="secondary" className="truncate text-xs px-2.5 py-1">
                 {selectedCount} de {totalCount} selecionado(s)
               </Badge>
-              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onClearSelection}>
+              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={onClearSelection}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
             <div className="grid grid-cols-3 gap-2">
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1.5 w-full min-h-[48px] text-xs">
