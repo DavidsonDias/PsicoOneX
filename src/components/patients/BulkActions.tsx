@@ -91,15 +91,16 @@ export function BulkActions({
           {/* Mobile layout */}
           <div className="sm:hidden">
 
-            <div className="flex items-center justify-between mb-3">
-              <Badge variant="secondary" className="text-sm px-3 py-1">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <Badge variant="secondary" className="truncate text-xs px-2.5 py-1">
                 {selectedCount} de {totalCount} selecionado(s)
               </Badge>
-              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onClearSelection}>
+              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={onClearSelection}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
             <div className="grid grid-cols-3 gap-2">
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1.5 w-full min-h-[48px] text-xs">
