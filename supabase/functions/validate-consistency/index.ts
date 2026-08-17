@@ -15,25 +15,21 @@ function localValidate(payload: any): Issue[] {
   const { kind, data } = payload || {};
 
   if (kind === 'patient') {
+    if (!data.full_name || String(data.full_name).trim().length < 2) {
+      issues.push({ field: 'full_name', severity: 'error', message: 'Informe o nome do paciente' });
+    }
+    const primaryPhone = data.phone || data.whatsapp_phone;
+    if (!primaryPhone || String(primaryPhone).replace(/\D/g, '').length < 10) {
+      issues.push({ field: 'phone', severity: 'error', message: 'Informe um telefone ou WhatsApp válido' });
+    }
     if (data.cpf && !/^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(String(data.cpf))) {
       issues.push({ field: 'cpf', severity: 'warning', message: 'CPF parece inválido' });
-    }
-    if (data.phone && String(data.phone).replace(/\D/g, '').length < 10) {
-      issues.push({ field: 'phone', severity: 'warning', message: 'Telefone incompleto' });
     }
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       issues.push({ field: 'email', severity: 'warning', message: 'Email inválido' });
     }
     if (data.zip_code && String(data.zip_code).replace(/\D/g, '').length !== 8) {
       issues.push({ field: 'zip_code', severity: 'warning', message: 'CEP inválido' });
-    }
-    const missing = ['cpf', 'phone', 'email'].filter((k) => !data[k]);
-    if (missing.length) {
-      issues.push({
-        severity: 'info',
-        message: `Faltam dados importantes: ${missing.join(', ')}`,
-        suggestion: 'Solicitar atualização ao paciente',
-      });
     }
   }
 
@@ -94,7 +90,7 @@ Deno.serve(async (req) => {
               {
                 role: 'system',
                 content:
-                  'Você é validador clínico do PsicoOne. Retorne JSON {"issues":[{"severity":"info|warning|error","message":"..."}]}. Foque em inconsistências de negócio, NÃO repita validações já feitas.',
+                  'Você é validador clínico do PsicoOne. Retorne JSON {"issues":[{"severity":"info|warning","message":"..."}]}. No cadastro de paciente, SOMENTE nome e telefone/WhatsApp são obrigatórios. CPF, email, nascimento, endereço, contatos de emergência e todos os demais campos são opcionais e sua ausência nunca deve gerar issue. Não repita validações existentes.',
               },
               { role: 'user', content: JSON.stringify({ payload, existing: issues }) },
             ],

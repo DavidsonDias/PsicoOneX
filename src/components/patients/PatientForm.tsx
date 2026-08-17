@@ -444,8 +444,9 @@ export function PatientForm({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = buildPayload(e.currentTarget);
-    // Validação inteligente (IA + local) antes de salvar
-    const found = await check("patient", { ...data, zip_code: cep }, true);
+    // Cadastro usa regras determinísticas: somente nome e telefone/WhatsApp
+    // são obrigatórios. A IA não pode transformar dados opcionais em bloqueios.
+    const found = await check("patient", { ...data, zip_code: cep }, false);
     if (found.length === 0) {
       onSubmit(data);
       return;
@@ -509,8 +510,8 @@ export function PatientForm({
             <Input id="email" name="email" type="email" defaultValue={initialData?.email} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phone">Telefone</Label>
-            <Input id="phone" name="phone" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} />
+            <Label htmlFor="phone">Telefone / WhatsApp *</Label>
+            <Input id="phone" name="phone" type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} minLength={14} required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="birth_date">Data de Nascimento</Label>
