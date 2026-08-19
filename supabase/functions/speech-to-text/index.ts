@@ -22,6 +22,46 @@ const EXT: Record<string, string> = {
   "audio/mpeg": "mp3",
 };
 
+/** Frases típicas de alucinação em janelas sem fala real */
+const HALLUCINATION_PATTERNS = [
+  /^(obrigad[oa]|tchau|ol[áa]|legendas?|amara\.?org|subtitles?)[\s.!?]*$/i,
+  /legendas? pela comunidade/i,
+  /amara\.org/i,
+  /subscribe|subtitles by|www\./i,
+  /^[\s.,!?…-]*$/,
+];
+
+/**
+ * Rejeita saídas que não são português real:
+ *  - presença de escritas não latinas (chinês, japonês, cirílico, árabe, tailandês…)
+ *  - excesso de caracteres fora do alfabeto latino/acentuado
+ *  - frases-fantasma clássicas de janelas silenciosas
+ */
+function sanitizePt(text: string): string {
+  const t = text.trim();
+  if (!t) return "";
+  if (HALLUCINATION_PATTERNS.some((re) => re.test(t))) return "";
+
+  const nonLatinScript =
+    /[\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u0900-\u097F\u0E00-\u0E7F\u1100-\u11FF\u3040-\u30FF\u3130-\u318F\u4E00-\u9FFF\uAC00-\uD7AF]/;
+  if (nonLatinScript.test(t)) return "";
+
+  const letters = t.replace(/[^\p{L}]/gu, "");
+  if (letters.length < 2) return "";
+  const latin = letters.replace(/[^A-Za-zÀ-ÿ]/g, "");
+  if (latin.length / letters.length < 0.95) return "";
+
+  // Repetição patológica ("blá blá blá blá…")
+  const words = t.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length >= 6) {
+    const unique = new Set(words).size;
+    if (unique / words.length < 0.3) return "";
+  }
+
+  return t;
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
