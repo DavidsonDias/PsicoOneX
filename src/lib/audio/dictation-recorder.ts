@@ -106,28 +106,40 @@ export class DictationRecorder {
       if (!this.running) return;
       const input = event.inputBuffer.getChannelData(0);
       const copy = new Float32Array(input);
-      this.buffer.push(copy);
-      this.bufferedSamples += copy.length;
+      const frameMs = (copy.length / (this.ctx?.sampleRate || 48000)) * 1000;
 
       let sum = 0;
       for (let i = 0; i < copy.length; i++) sum += copy[i] * copy[i];
       const rms = Math.sqrt(sum / copy.length);
+
+      // Noise floor adaptativo: acompanha o ruído ambiente lentamente
+      this.noiseFloor = this.noiseFloor === 0 ? rms : this.noiseFloor * 0.995 + rms * 0.005;
+      const speechGate = Math.max(this.opts.silenceThreshold, this.noiseFloor * 2.2);
+      const isSpeech = rms > speechGate;
+
+      // Só começa a acumular quando há fala (evita janelas 100% de ruído)
+      if (isSpeech || this.speechMs > 0) {
+        this.buffer.push(copy);
+        this.bufferedSamples += copy.length;
+      }
+
+      if (isSpeech) {
+        this.speechMs += frameMs;
+        this.silenceMs = 0;
+      } else if (this.speechMs > 0) {
+        this.silenceMs += frameMs;
+      }
+
       this.peakRms = Math.max(this.peakRms, rms);
       this.opts.onLevel?.(rms);
+
+      // Fecha a janela numa pausa natural da fala, ou no limite máximo
+      const totalMs = (this.bufferedSamples / (this.ctx?.sampleRate || 48000)) * 1000;
+      const pauseClose = this.speechMs >= 1200 && this.silenceMs >= 700;
+      const hardClose = totalMs >= this.opts.windowMs;
+      if (pauseClose || hardClose) void this.flush(false);
     };
 
-    // Saída silenciosa: mantém o grafo ativo sem devolver áudio ao usuário
-    this.sink = this.ctx.createGain();
-    this.sink.gain.value = 0;
-
-    this.source.connect(this.gainNode);
-    this.gainNode.connect(this.compressor);
-    this.compressor.connect(this.processor);
-    this.processor.connect(this.sink);
-    this.sink.connect(this.ctx.destination);
-
-    this.running = true;
-    this.flushTimer = setInterval(() => this.flush(false), this.opts.windowMs);
 
     this.startKeepAlive();
     this.requestWakeLock();
