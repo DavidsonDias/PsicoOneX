@@ -43,6 +43,10 @@ export class DictationRecorder {
   private visibilityHandler: (() => void) | null = null;
   private running = false;
   private peakRms = 0;
+  private noiseFloor = 0;
+  private speechMs = 0;
+  private silenceMs = 0;
+
 
   constructor(options: DictationRecorderOptions) {
     this.opts = {
