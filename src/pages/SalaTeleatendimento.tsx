@@ -43,25 +43,27 @@ const SalaTeleatendimento = () => {
   const loadSession = async () => {
     setRoomState("loading");
     try {
-      const { data, error: fetchError } = await supabase
-        .from("telehealth_sessions")
-        .select("*")
-        .eq("room_token", token)
-        .single();
+      // A tabela é protegida por RLS (só o psicólogo lê), então o paciente
+      // anônimo resolve a sala por uma função pública.
+      const { data, error: fnError } = await supabase.functions.invoke("telehealth-room-info", {
+        body: { roomToken: token },
+      });
 
-      if (fetchError || !data) {
-        setError("Sala não encontrada ou link expirado.");
-        setRoomState("error");
-        return;
-      }
+      const payloadError = (data as { error?: string } | null)?.error;
 
-      if (data.status === "ended") {
+      if (payloadError === "ended") {
         setError("Esta sessão já foi encerrada.");
         setRoomState("error");
         return;
       }
 
-      setSessionInfo(data);
+      if (fnError || payloadError || !(data as { session?: unknown })?.session) {
+        setError("Sala não encontrada ou link expirado.");
+        setRoomState("error");
+        return;
+      }
+
+      setSessionInfo((data as { session: any }).session);
       setRoomState("name-entry");
     } catch {
       setError("Erro ao carregar sala.");
