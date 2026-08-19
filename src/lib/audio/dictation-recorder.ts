@@ -144,9 +144,21 @@ export class DictationRecorder {
       if (pauseClose || hardClose) void this.flush(false);
     };
 
+    // Saída silenciosa: mantém o grafo ativo sem devolver áudio ao usuário
+    this.sink = this.ctx.createGain();
+    this.sink.gain.value = 0;
+
+    this.source.connect(this.gainNode);
+    this.gainNode.connect(this.compressor);
+    this.compressor.connect(this.processor);
+    this.processor.connect(this.sink);
+    this.sink.connect(this.ctx.destination);
+
+    this.running = true;
 
     this.startKeepAlive();
     this.requestWakeLock();
+
 
     this.visibilityHandler = () => {
       if (!this.running) return;
