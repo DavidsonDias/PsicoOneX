@@ -184,19 +184,24 @@ export class DictationRecorder {
 
     const chunks = this.buffer;
     const peak = this.peakRms;
+    const speechMs = this.speechMs;
     this.buffer = [];
     this.bufferedSamples = 0;
     this.peakRms = 0;
+    this.speechMs = 0;
+    this.silenceMs = 0;
 
-    // Descarta janelas silenciosas para não gastar transcrição
-    if (!force && peak < this.opts.silenceThreshold) return;
-    if (peak < this.opts.silenceThreshold * 0.5) return;
+    // Sem fala suficiente: transcrever ruído é o que gera texto inventado
+    // (alucinação do modelo em outros idiomas). Descarta a janela.
+    if (speechMs < 700) return;
+    if (peak < this.opts.silenceThreshold) return;
 
     const merged = concatFloat32(chunks);
     const rate = this.ctx.sampleRate;
     const resampled = downsample(merged, rate, this.opts.targetSampleRate);
     const durationMs = (merged.length / rate) * 1000;
-    if (durationMs < 400) return;
+    if (durationMs < 700) return;
+
 
     const wav = encodeWav(resampled, this.opts.targetSampleRate);
     if (wav.size < 2048) return;
