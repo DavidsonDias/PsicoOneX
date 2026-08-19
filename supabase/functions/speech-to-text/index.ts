@@ -24,7 +24,7 @@ const EXT: Record<string, string> = {
 
 /** Frases típicas de alucinação em janelas sem fala real */
 const HALLUCINATION_PATTERNS = [
-  /^(obrigad[oa]|tchau|ol[áa]|legendas?|amara\.?org|subtitles?)[\s.!?]*$/i,
+  /^(legendas?|amara\.?org|subtitles?)[\s.!?]*$/i,
   /legendas? pela comunidade/i,
   /amara\.org/i,
   /subscribe|subtitles by|www\./i,

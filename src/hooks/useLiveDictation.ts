@@ -28,6 +28,7 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
 
   const recorderRef = useRef<DictationRecorder | null>(null);
   const pendingRef = useRef(0);
+  const pendingTasksRef = useRef(new Set<Promise<void>>());
   const textRef = useRef("");
   const levelRaf = useRef<number | null>(null);
   const lastLevel = useRef(0);
@@ -60,7 +61,7 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
   /** Libera os resultados na ordem original das janelas */
   const drain = useCallback(() => {
     while (bufferedResults.current.has(expectedSeqRef.current)) {
-      const value = bufferedResults.current.get(expectedSeqRef.current)!;
+      const value = bufferedResults.current.get(expectedSeqRef.current) ?? "";
       bufferedResults.current.delete(expectedSeqRef.current);
       expectedSeqRef.current += 1;
       appendText(value);
@@ -68,26 +69,30 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
   }, [appendText]);
 
   const transcribeWindow = useCallback(
-    async (base64: string, mimeType: string) => {
+    (base64: string, mimeType: string) => {
       const seq = nextSeqRef.current++;
       pendingRef.current += 1;
       setIsTranscribing(true);
-      try {
-        const { data, error } = await supabase.functions.invoke("speech-to-text", {
-          body: { audio: base64, mimeType, language: "pt" },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        bufferedResults.current.set(seq, typeof data?.text === "string" ? data.text : "");
-      } catch (e: any) {
-        bufferedResults.current.set(seq, "");
-        const msg = typeof e?.message === "string" ? e.message : "Falha ao transcrever o áudio";
-        onError?.(msg);
-      } finally {
-        drain();
-        pendingRef.current = Math.max(0, pendingRef.current - 1);
-        if (pendingRef.current === 0) setIsTranscribing(false);
-      }
+      const task = (async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke("speech-to-text", {
+            body: { audio: base64, mimeType, language: "pt" },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          bufferedResults.current.set(seq, typeof data?.text === "string" ? data.text : "");
+        } catch (error: unknown) {
+          bufferedResults.current.set(seq, "");
+          const msg = error instanceof Error ? error.message : "Falha ao transcrever o áudio";
+          onError?.(msg);
+        } finally {
+          drain();
+          pendingRef.current = Math.max(0, pendingRef.current - 1);
+          if (pendingRef.current === 0) setIsTranscribing(false);
+        }
+      })();
+      pendingTasksRef.current.add(task);
+      void task.finally(() => pendingTasksRef.current.delete(task));
     },
     [drain, onError]
   );
@@ -108,8 +113,8 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
 
     const recorder = new DictationRecorder({
       gain,
-      windowMs: 12000,
-      onWindow: ({ base64, mimeType }) => void transcribeWindow(base64, mimeType),
+      windowMs: 15000,
+      onWindow: ({ base64, mimeType }) => transcribeWindow(base64, mimeType),
       onLevel: (rms) => {
         lastLevel.current = Math.min(1, rms * 12);
       },
@@ -131,11 +136,12 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
     setIsRecording(false);
     lastLevel.current = 0;
     await recorder?.stop();
-    // Aguarda as janelas em voo terminarem
-    const deadline = Date.now() + 20000;
-    while (pendingRef.current > 0 && Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 250));
+    // Não devolve um texto incompleto: todas as janelas iniciadas pertencem
+    // à sessão e precisam terminar antes da inserção no prontuário.
+    while (pendingTasksRef.current.size > 0) {
+      await Promise.allSettled([...pendingTasksRef.current]);
     }
+    drain();
     setIsTranscribing(false);
     return textRef.current;
   }, []);

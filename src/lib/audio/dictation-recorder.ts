@@ -7,6 +7,7 @@
  */
 
 import { blobToBase64, concatFloat32, downsample, encodeWav } from "./wav";
+import { AdaptiveVoiceActivityDetector } from "./voice-activity";
 
 export interface DictationRecorderOptions {
   /** Ganho aplicado ao microfone (1 = normal, 3 = alta sensibilidade) */
@@ -36,6 +37,8 @@ export class DictationRecorder {
   private processor: ScriptProcessorNode | null = null;
   private sink: GainNode | null = null;
   private buffer: Float32Array[] = [];
+  private preRoll: Float32Array[] = [];
+  private preRollSamples = 0;
   private bufferedSamples = 0;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private keepAliveEl: HTMLAudioElement | null = null;
@@ -43,7 +46,7 @@ export class DictationRecorder {
   private visibilityHandler: (() => void) | null = null;
   private running = false;
   private peakRms = 0;
-  private noiseFloor = 0;
+  private readonly voiceDetector = new AdaptiveVoiceActivityDetector();
   private speechMs = 0;
   private silenceMs = 0;
 
@@ -75,8 +78,11 @@ export class DictationRecorder {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
+          // A finalidade clínica inclui captar a voz remota reproduzida pelo
+          // alto-falante em Meet/WhatsApp. Cancelamento de eco e supressão de
+          // ruído costumam apagar exatamente essa voz, sobretudo no mobile.
+          echoCancellation: false,
+          noiseSuppression: false,
           autoGainControl: true,
           channelCount: 1,
         },
@@ -117,13 +123,25 @@ export class DictationRecorder {
       for (let i = 0; i < copy.length; i++) sum += copy[i] * copy[i];
       const rms = Math.sqrt(sum / copy.length);
 
-      // Noise floor adaptativo: acompanha o ruído ambiente lentamente
-      this.noiseFloor = this.noiseFloor === 0 ? rms : this.noiseFloor * 0.995 + rms * 0.005;
-      const speechGate = Math.max(this.opts.silenceThreshold, this.noiseFloor * 2.2);
-      const isSpeech = rms > speechGate;
+      const activity = this.voiceDetector.analyze(rms);
+      const isSpeech = activity.isSpeech || rms >= this.opts.silenceThreshold;
 
-      // Só começa a acumular quando há fala (evita janelas 100% de ruído)
-      if (isSpeech || this.speechMs > 0) {
+      if (this.speechMs === 0) {
+        this.preRoll.push(copy);
+        this.preRollSamples += copy.length;
+        const maxPreRollSamples = Math.round((this.ctx?.sampleRate || 48000) * 0.8);
+        while (this.preRollSamples > maxPreRollSamples && this.preRoll.length > 1) {
+          const removed = this.preRoll.shift();
+          if (removed) this.preRollSamples -= removed.length;
+        }
+      }
+
+      if (isSpeech && this.speechMs === 0) {
+        this.buffer.push(...this.preRoll);
+        this.bufferedSamples += this.preRollSamples;
+        this.preRoll = [];
+        this.preRollSamples = 0;
+      } else if (this.speechMs > 0) {
         this.buffer.push(copy);
         this.bufferedSamples += copy.length;
       }
@@ -140,7 +158,7 @@ export class DictationRecorder {
 
       // Fecha a janela numa pausa natural da fala, ou no limite máximo
       const totalMs = (this.bufferedSamples / (this.ctx?.sampleRate || 48000)) * 1000;
-      const pauseClose = this.speechMs >= 1200 && this.silenceMs >= 700;
+      const pauseClose = this.speechMs >= 700 && this.silenceMs >= 1100;
       const hardClose = totalMs >= this.opts.windowMs;
       if (pauseClose || hardClose) void this.flush(false);
     };
@@ -159,6 +177,12 @@ export class DictationRecorder {
 
     this.startKeepAlive();
     this.requestWakeLock();
+    // Retoma o contexto se o navegador o suspender ao trocar de app/tela.
+    this.flushTimer = setInterval(() => {
+      if (this.running && this.ctx?.state === "suspended") {
+        void this.ctx.resume().catch(() => undefined);
+      }
+    }, 1500);
 
 
     this.visibilityHandler = () => {
@@ -187,6 +211,8 @@ export class DictationRecorder {
     const peak = this.peakRms;
     const speechMs = this.speechMs;
     this.buffer = [];
+    this.preRoll = [];
+    this.preRollSamples = 0;
     this.bufferedSamples = 0;
     this.peakRms = 0;
     this.speechMs = 0;
@@ -194,14 +220,14 @@ export class DictationRecorder {
 
     // Sem fala suficiente: transcrever ruído é o que gera texto inventado
     // (alucinação do modelo em outros idiomas). Descarta a janela.
-    if (speechMs < 700) return;
-    if (peak < this.opts.silenceThreshold) return;
+    if (speechMs < 250) return;
+    if (peak < 0.0035) return;
 
     const merged = concatFloat32(chunks);
     const rate = this.ctx.sampleRate;
     const resampled = downsample(merged, rate, this.opts.targetSampleRate);
     const durationMs = (merged.length / rate) * 1000;
-    if (durationMs < 700) return;
+    if (durationMs < 350) return;
 
 
     const wav = encodeWav(resampled, this.opts.targetSampleRate);
