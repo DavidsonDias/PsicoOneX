@@ -38,7 +38,7 @@ serve(async (req) => {
     const {
       audio,
       mimeType = "audio/wav",
-      language,
+      language = "pt",
       model = "openai/gpt-4o-transcribe",
     } = body as {
       audio?: string;
@@ -59,10 +59,18 @@ serve(async (req) => {
     if (bytes.byteLength > 24 * 1024 * 1024) return json({ error: "Áudio muito grande" }, 413);
 
     const base = (mimeType || "audio/wav").split(";")[0];
+    const lang = (language || "pt").split("-")[0].toLowerCase();
     const form = new FormData();
     form.append("model", model);
     form.append("file", new Blob([bytes], { type: base }), `recording.${EXT[base] ?? "wav"}`);
-    if (language) form.append("language", language);
+    form.append("language", lang);
+    form.append("temperature", "0");
+    if (lang === "pt") {
+      form.append(
+        "prompt",
+        "Transcreva literalmente em português do Brasil. Contexto: sessão de psicoterapia clínica. Não traduza, não invente conteúdo e não use outros idiomas. Se não houver fala audível, devolva vazio."
+      );
+    }
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
       method: "POST",
@@ -86,7 +94,10 @@ serve(async (req) => {
     }
 
     const data = await resp.json();
-    return json({ text: (data?.text ?? "").trim(), usage: data?.usage });
+    const raw = (data?.text ?? "").trim();
+    const clean = lang === "pt" ? sanitizePt(raw) : raw;
+    return json({ text: clean, usage: data?.usage, discarded: raw !== "" && clean === "" });
+
   } catch (e) {
     console.error("speech-to-text error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
