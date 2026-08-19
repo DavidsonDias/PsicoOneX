@@ -36,29 +36,31 @@ Deno.serve(async (req) => {
       .from("telehealth_sessions")
       .select("id, status, room_token, psychologist_id, patient_id, started_at, ended_at")
       .eq("room_token", roomToken)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
 
     if (error) throw error;
-    if (!data) return json({ error: "not_found" });
-    if (data.status === "ended") return json({ error: "ended" });
+    const session = data?.[0];
+    if (!session) return json({ error: "not_found" });
+    if (session.status === "ended") return json({ error: "ended" });
 
     // Nome do profissional (exibido na sala de espera) — sem expor outros dados
     let psychologistName: string | null = null;
-    if (data.psychologist_id) {
+    if (session.psychologist_id) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name, clinic_name")
-        .eq("id", data.psychologist_id)
+        .eq("id", session.psychologist_id)
         .maybeSingle();
       psychologistName = profile?.full_name ?? profile?.clinic_name ?? null;
     }
 
     return json({
       session: {
-        id: data.id,
-        status: data.status,
-        room_token: data.room_token,
-        started_at: data.started_at,
+        id: session.id,
+        status: session.status,
+        room_token: session.room_token,
+        started_at: session.started_at,
         psychologist_name: psychologistName,
       },
     });
