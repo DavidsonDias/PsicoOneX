@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (error) throw error;
-    if (!data) return json({ error: "not_found" }, 404);
-    if (data.status === "ended") return json({ error: "ended" }, 410);
+    if (!data) return json({ error: "not_found" });
+    if (data.status === "ended") return json({ error: "ended" });
 
     // Nome do profissional (exibido na sala de espera) — sem expor outros dados
     let psychologistName: string | null = null;
