@@ -31,6 +31,10 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
   const textRef = useRef("");
   const levelRaf = useRef<number | null>(null);
   const lastLevel = useRef(0);
+  // Ordenação: janelas são transcritas em paralelo e podem voltar fora de ordem
+  const nextSeqRef = useRef(0);
+  const expectedSeqRef = useRef(0);
+  const bufferedResults = useRef(new Map<number, string>());
 
   useEffect(() => {
     // Atualiza o medidor no máximo ~15x/s para não sobrecarregar o React
@@ -47,30 +51,45 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
   const appendText = useCallback((chunk: string) => {
     const clean = chunk.trim();
     if (!clean) return;
+    // Evita duplicar a mesma frase quando duas janelas capturam o mesmo trecho
+    if (clean.length > 8 && textRef.current.endsWith(clean)) return;
     textRef.current = textRef.current ? `${textRef.current} ${clean}` : clean;
     setText(textRef.current);
   }, []);
 
+  /** Libera os resultados na ordem original das janelas */
+  const drain = useCallback(() => {
+    while (bufferedResults.current.has(expectedSeqRef.current)) {
+      const value = bufferedResults.current.get(expectedSeqRef.current)!;
+      bufferedResults.current.delete(expectedSeqRef.current);
+      expectedSeqRef.current += 1;
+      appendText(value);
+    }
+  }, [appendText]);
+
   const transcribeWindow = useCallback(
     async (base64: string, mimeType: string) => {
+      const seq = nextSeqRef.current++;
       pendingRef.current += 1;
       setIsTranscribing(true);
       try {
         const { data, error } = await supabase.functions.invoke("speech-to-text", {
-          body: { audio: base64, mimeType, language },
+          body: { audio: base64, mimeType, language: "pt" },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        if (data?.text) appendText(data.text);
+        bufferedResults.current.set(seq, typeof data?.text === "string" ? data.text : "");
       } catch (e: any) {
+        bufferedResults.current.set(seq, "");
         const msg = typeof e?.message === "string" ? e.message : "Falha ao transcrever o áudio";
         onError?.(msg);
       } finally {
+        drain();
         pendingRef.current = Math.max(0, pendingRef.current - 1);
         if (pendingRef.current === 0) setIsTranscribing(false);
       }
     },
-    [appendText, language, onError]
+    [drain, onError]
   );
 
   const setGain = useCallback((next: number) => {
@@ -83,10 +102,13 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
     if (recorderRef.current?.isRunning) return true;
     textRef.current = "";
     setText("");
+    nextSeqRef.current = 0;
+    expectedSeqRef.current = 0;
+    bufferedResults.current.clear();
 
     const recorder = new DictationRecorder({
       gain,
-      windowMs: 6000,
+      windowMs: 12000,
       onWindow: ({ base64, mimeType }) => void transcribeWindow(base64, mimeType),
       onLevel: (rms) => {
         lastLevel.current = Math.min(1, rms * 12);
@@ -101,6 +123,7 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
     setIsRecording(true);
     return true;
   }, [gain, onError, transcribeWindow]);
+
 
   const stop = useCallback(async () => {
     const recorder = recorderRef.current;
