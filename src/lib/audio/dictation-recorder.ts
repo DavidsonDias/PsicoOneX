@@ -51,9 +51,10 @@ export class DictationRecorder {
   constructor(options: DictationRecorderOptions) {
     this.opts = {
       gain: 2,
-      windowMs: 6000,
-      silenceThreshold: 0.004,
+      windowMs: 12000,
+      silenceThreshold: 0.012,
       targetSampleRate: 16000,
+
       ...options,
     } as any;
   }
