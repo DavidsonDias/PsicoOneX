@@ -43,13 +43,18 @@ export class DictationRecorder {
   private visibilityHandler: (() => void) | null = null;
   private running = false;
   private peakRms = 0;
+  private noiseFloor = 0;
+  private speechMs = 0;
+  private silenceMs = 0;
+
 
   constructor(options: DictationRecorderOptions) {
     this.opts = {
       gain: 2,
-      windowMs: 6000,
-      silenceThreshold: 0.004,
+      windowMs: 12000,
+      silenceThreshold: 0.012,
       targetSampleRate: 16000,
+
       ...options,
     } as any;
   }
@@ -106,14 +111,38 @@ export class DictationRecorder {
       if (!this.running) return;
       const input = event.inputBuffer.getChannelData(0);
       const copy = new Float32Array(input);
-      this.buffer.push(copy);
-      this.bufferedSamples += copy.length;
+      const frameMs = (copy.length / (this.ctx?.sampleRate || 48000)) * 1000;
 
       let sum = 0;
       for (let i = 0; i < copy.length; i++) sum += copy[i] * copy[i];
       const rms = Math.sqrt(sum / copy.length);
+
+      // Noise floor adaptativo: acompanha o ruído ambiente lentamente
+      this.noiseFloor = this.noiseFloor === 0 ? rms : this.noiseFloor * 0.995 + rms * 0.005;
+      const speechGate = Math.max(this.opts.silenceThreshold, this.noiseFloor * 2.2);
+      const isSpeech = rms > speechGate;
+
+      // Só começa a acumular quando há fala (evita janelas 100% de ruído)
+      if (isSpeech || this.speechMs > 0) {
+        this.buffer.push(copy);
+        this.bufferedSamples += copy.length;
+      }
+
+      if (isSpeech) {
+        this.speechMs += frameMs;
+        this.silenceMs = 0;
+      } else if (this.speechMs > 0) {
+        this.silenceMs += frameMs;
+      }
+
       this.peakRms = Math.max(this.peakRms, rms);
       this.opts.onLevel?.(rms);
+
+      // Fecha a janela numa pausa natural da fala, ou no limite máximo
+      const totalMs = (this.bufferedSamples / (this.ctx?.sampleRate || 48000)) * 1000;
+      const pauseClose = this.speechMs >= 1200 && this.silenceMs >= 700;
+      const hardClose = totalMs >= this.opts.windowMs;
+      if (pauseClose || hardClose) void this.flush(false);
     };
 
     // Saída silenciosa: mantém o grafo ativo sem devolver áudio ao usuário
@@ -127,10 +156,10 @@ export class DictationRecorder {
     this.sink.connect(this.ctx.destination);
 
     this.running = true;
-    this.flushTimer = setInterval(() => this.flush(false), this.opts.windowMs);
 
     this.startKeepAlive();
     this.requestWakeLock();
+
 
     this.visibilityHandler = () => {
       if (!this.running) return;
@@ -156,19 +185,24 @@ export class DictationRecorder {
 
     const chunks = this.buffer;
     const peak = this.peakRms;
+    const speechMs = this.speechMs;
     this.buffer = [];
     this.bufferedSamples = 0;
     this.peakRms = 0;
+    this.speechMs = 0;
+    this.silenceMs = 0;
 
-    // Descarta janelas silenciosas para não gastar transcrição
-    if (!force && peak < this.opts.silenceThreshold) return;
-    if (peak < this.opts.silenceThreshold * 0.5) return;
+    // Sem fala suficiente: transcrever ruído é o que gera texto inventado
+    // (alucinação do modelo em outros idiomas). Descarta a janela.
+    if (speechMs < 700) return;
+    if (peak < this.opts.silenceThreshold) return;
 
     const merged = concatFloat32(chunks);
     const rate = this.ctx.sampleRate;
     const resampled = downsample(merged, rate, this.opts.targetSampleRate);
     const durationMs = (merged.length / rate) * 1000;
-    if (durationMs < 400) return;
+    if (durationMs < 700) return;
+
 
     const wav = encodeWav(resampled, this.opts.targetSampleRate);
     if (wav.size < 2048) return;

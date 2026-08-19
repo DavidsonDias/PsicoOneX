@@ -22,6 +22,46 @@ const EXT: Record<string, string> = {
   "audio/mpeg": "mp3",
 };
 
+/** Frases típicas de alucinação em janelas sem fala real */
+const HALLUCINATION_PATTERNS = [
+  /^(obrigad[oa]|tchau|ol[áa]|legendas?|amara\.?org|subtitles?)[\s.!?]*$/i,
+  /legendas? pela comunidade/i,
+  /amara\.org/i,
+  /subscribe|subtitles by|www\./i,
+  /^[\s.,!?…-]*$/,
+];
+
+/**
+ * Rejeita saídas que não são português real:
+ *  - presença de escritas não latinas (chinês, japonês, cirílico, árabe, tailandês…)
+ *  - excesso de caracteres fora do alfabeto latino/acentuado
+ *  - frases-fantasma clássicas de janelas silenciosas
+ */
+function sanitizePt(text: string): string {
+  const t = text.trim();
+  if (!t) return "";
+  if (HALLUCINATION_PATTERNS.some((re) => re.test(t))) return "";
+
+  const nonLatinScript =
+    /[\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u0900-\u097F\u0E00-\u0E7F\u1100-\u11FF\u3040-\u30FF\u3130-\u318F\u4E00-\u9FFF\uAC00-\uD7AF]/;
+  if (nonLatinScript.test(t)) return "";
+
+  const letters = t.replace(/[^\p{L}]/gu, "");
+  if (letters.length < 2) return "";
+  const latin = letters.replace(/[^A-Za-zÀ-ÿ]/g, "");
+  if (latin.length / letters.length < 0.95) return "";
+
+  // Repetição patológica ("blá blá blá blá…")
+  const words = t.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length >= 6) {
+    const unique = new Set(words).size;
+    if (unique / words.length < 0.3) return "";
+  }
+
+  return t;
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -38,7 +78,7 @@ serve(async (req) => {
     const {
       audio,
       mimeType = "audio/wav",
-      language,
+      language = "pt",
       model = "openai/gpt-4o-transcribe",
     } = body as {
       audio?: string;
@@ -59,10 +99,18 @@ serve(async (req) => {
     if (bytes.byteLength > 24 * 1024 * 1024) return json({ error: "Áudio muito grande" }, 413);
 
     const base = (mimeType || "audio/wav").split(";")[0];
+    const lang = (language || "pt").split("-")[0].toLowerCase();
     const form = new FormData();
     form.append("model", model);
     form.append("file", new Blob([bytes], { type: base }), `recording.${EXT[base] ?? "wav"}`);
-    if (language) form.append("language", language);
+    form.append("language", lang);
+    form.append("temperature", "0");
+    if (lang === "pt") {
+      form.append(
+        "prompt",
+        "Transcreva literalmente em português do Brasil. Contexto: sessão de psicoterapia clínica. Não traduza, não invente conteúdo e não use outros idiomas. Se não houver fala audível, devolva vazio."
+      );
+    }
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
       method: "POST",
@@ -86,7 +134,10 @@ serve(async (req) => {
     }
 
     const data = await resp.json();
-    return json({ text: (data?.text ?? "").trim(), usage: data?.usage });
+    const raw = (data?.text ?? "").trim();
+    const clean = lang === "pt" ? sanitizePt(raw) : raw;
+    return json({ text: clean, usage: data?.usage, discarded: raw !== "" && clean === "" });
+
   } catch (e) {
     console.error("speech-to-text error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
