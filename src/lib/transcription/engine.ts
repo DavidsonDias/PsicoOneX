@@ -375,7 +375,12 @@ export class ClinicalTranscriptionEngine {
         await sleep(backoff(attempt));
       }
       try {
-        await putChunk({ ...chunk, status: attempt === 1 ? "queued" : "processing", retry_count: attempt - 1 });
+        // Falha de IndexedDB nunca deve virar falha de STT
+        await putChunk({
+          ...chunk,
+          status: attempt === 1 ? "queued" : "processing",
+          retry_count: attempt - 1,
+        }).catch(() => undefined);
         const { data, error } = await supabase.functions.invoke("speech-to-text", {
           body: {
             audio: chunk.audio,
