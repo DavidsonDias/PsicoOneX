@@ -57,14 +57,17 @@ export function useLiveDictation({ language = "pt", onError, onSegment }: UseLiv
     };
   }, []);
 
-  const appendText = useCallback((chunk: string) => {
-    const clean = chunk.trim();
-    if (!clean) return;
-    // Evita duplicar a mesma frase quando duas janelas capturam o mesmo trecho
-    if (clean.length > 8 && textRef.current.endsWith(clean)) return;
-    textRef.current = textRef.current ? `${textRef.current} ${clean}` : clean;
-    setText(textRef.current);
-  }, []);
+  const appendText = useCallback(
+    (chunk: string) => {
+      const clean = dedupeOverlap(textRef.current, chunk);
+      if (!clean) return;
+      textRef.current = textRef.current ? `${textRef.current} ${clean}` : clean;
+      setText(textRef.current);
+      onSegment?.(clean);
+    },
+    [onSegment]
+  );
+
 
   /** Libera os resultados na ordem original das janelas */
   const drain = useCallback(() => {
