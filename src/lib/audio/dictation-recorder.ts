@@ -342,6 +342,9 @@ export class DictationRecorder {
       this.processor?.disconnect();
       this.compressor?.disconnect();
       this.gainNode?.disconnect();
+      this.presence?.disconnect();
+      this.highpass?.disconnect();
+
       this.source?.disconnect();
       this.sink?.disconnect();
     } catch {
