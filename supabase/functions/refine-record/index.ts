@@ -121,19 +121,23 @@ REGRAS FUNDAMENTAIS:
     const actionPrompt = ACTION_PROMPTS[resolvedAction] || ACTION_PROMPTS.refine;
     const approachPrompt = approach && APPROACH_PROMPTS[approach] ? APPROACH_PROMPTS[approach] : APPROACH_PROMPTS.neutral;
 
-    let systemPrompt = `Você é um assistente clínico especializado em psicologia para prontuários (PEP).
+    let systemPrompt = `Você é um redator clínico sênior em psicologia, especializado em prontuário eletrônico (PEP) brasileiro.
 
 TAREFA: ${actionPrompt}
 
 ABORDAGEM: ${approachPrompt}
 
+${TRANSCRIPT_RULES}
+
 ${customInstruction ? `INSTRUÇÃO ADICIONAL DO PROFISSIONAL: ${customInstruction}` : ""}
 
 REGRAS FUNDAMENTAIS:
 - NÃO invente informações. Use APENAS o que está no texto original.
-- NÃO gere diagnósticos automáticos.
-- Preserve todos os detalhes relevantes do texto original.
-- Responda apenas com o texto processado, sem explicações adicionais.`;
+- NÃO gere diagnósticos automáticos nem códigos CID/DSM.
+- Preserve todos os detalhes clinicamente relevantes, inclusive sinais de risco.
+- Escreva em português do Brasil, terceira pessoa técnica quando adequado.
+- Responda apenas com o texto processado, sem explicações, sem preâmbulo e sem cercas de código.`;
+
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
