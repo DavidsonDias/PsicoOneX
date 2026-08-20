@@ -26,12 +26,30 @@ const ACTION_PROMPTS: Record<string, string> = {
 ## Evolução
 ## Plano Terapêutico
 Omita seções sem conteúdo correspondente.`,
-  summarize: "Resuma os principais pontos da sessão de forma concisa e objetiva, mantendo as informações clinicamente relevantes.",
+  summarize: `Produza um resumo clínico de alto padrão da sessão, em português do Brasil:
+1. Um parágrafo de síntese (3-5 linhas) com queixa/tema central e estado do paciente.
+2. "Pontos-chave": 3 a 6 bullets com falas/temas clinicamente relevantes.
+3. "Intervenções": o que o profissional fez na sessão (somente o que consta no texto).
+4. "Encaminhamentos": tarefas, combinados e próximos passos, se houver.
+Preserve dados objetivos (datas, medicações, riscos) exatamente como aparecem.`,
   clinical: "Torne a linguagem mais clínica e profissional, adequada para documentação em prontuário psicológico.",
   objective: "Torne o texto mais objetivo e direto, removendo redundâncias e mantendo apenas as informações essenciais.",
   grammar: "Corrija apenas erros gramaticais, ortográficos e de pontuação. Não altere o conteúdo ou estilo do texto.",
   expand: "Expanda a reflexão clínica do texto, aprofundando observações e análises sem inventar informações novas.",
 };
+
+/**
+ * O texto costuma vir de transcrição automática de fala: tem repetições,
+ * marcadores de oralidade e palavras cortadas. Estas regras evitam que a IA
+ * "invente" para preencher lacunas e garantem leitura profissional.
+ */
+const TRANSCRIPT_RULES = `TEXTO DE ORIGEM POSSIVELMENTE TRANSCRITO DE FALA — trate assim:
+- Remova hesitações e muletas ("é...", "então", "né", "tipo", repetições imediatas).
+- Corrija concordância e pontuação da oralidade, sem mudar o sentido.
+- Palavras truncadas ou inaudíveis: mantenha o sentido provável apenas quando inequívoco pelo contexto; caso contrário escreva [inaudível].
+- Não crie sintomas, hipóteses, falas, datas ou números que não estejam no texto.
+- Mantenha a primeira pessoa do profissional e o relato do paciente separados quando o texto permitir identificar.`;
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -103,19 +121,23 @@ REGRAS FUNDAMENTAIS:
     const actionPrompt = ACTION_PROMPTS[resolvedAction] || ACTION_PROMPTS.refine;
     const approachPrompt = approach && APPROACH_PROMPTS[approach] ? APPROACH_PROMPTS[approach] : APPROACH_PROMPTS.neutral;
 
-    let systemPrompt = `Você é um assistente clínico especializado em psicologia para prontuários (PEP).
+    let systemPrompt = `Você é um redator clínico sênior em psicologia, especializado em prontuário eletrônico (PEP) brasileiro.
 
 TAREFA: ${actionPrompt}
 
 ABORDAGEM: ${approachPrompt}
 
+${TRANSCRIPT_RULES}
+
 ${customInstruction ? `INSTRUÇÃO ADICIONAL DO PROFISSIONAL: ${customInstruction}` : ""}
 
 REGRAS FUNDAMENTAIS:
 - NÃO invente informações. Use APENAS o que está no texto original.
-- NÃO gere diagnósticos automáticos.
-- Preserve todos os detalhes relevantes do texto original.
-- Responda apenas com o texto processado, sem explicações adicionais.`;
+- NÃO gere diagnósticos automáticos nem códigos CID/DSM.
+- Preserve todos os detalhes clinicamente relevantes, inclusive sinais de risco.
+- Escreva em português do Brasil, terceira pessoa técnica quando adequado.
+- Responda apenas com o texto processado, sem explicações, sem preâmbulo e sem cercas de código.`;
+
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -125,6 +147,7 @@ REGRAS FUNDAMENTAIS:
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
+        temperature: 0.2,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: text },

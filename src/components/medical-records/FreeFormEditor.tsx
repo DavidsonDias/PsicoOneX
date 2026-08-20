@@ -144,11 +144,13 @@ export const FreeFormEditor = memo(function FreeFormEditor({
     onChange(value ? `${value}\n\n${text}: ` : `${text}: `);
   }, [value, onChange]);
 
-  const handleVoiceTranscript = useCallback((transcript: string) => {
+  const handleVoiceTranscript = useCallback((transcript: string, live?: boolean) => {
     const newValue = value ? `${value} ${transcript}` : transcript;
-    setUndoStack(prev => [...prev, value]);
+    // Em streaming não empilha undo a cada trecho (seriam dezenas por sessão)
+    if (!live) setUndoStack(prev => [...prev, value]);
     onChange(newValue);
   }, [value, onChange]);
+
 
   const handleAIAction = useCallback(async (action: string) => {
     if (!value?.trim()) {

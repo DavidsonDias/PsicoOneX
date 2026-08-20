@@ -21,7 +21,7 @@ export interface TranscriptSegment {
   engine: "webspeech" | "deepgram" | "whisper";
 }
 
-export type TranscriptionEngine = "webspeech" | "deepgram" | "auto";
+export type TranscriptionEngine = "webspeech" | "deepgram" | "gateway" | "auto";
 
 export interface TranscriptionEngineConfig {
   engine: TranscriptionEngine;

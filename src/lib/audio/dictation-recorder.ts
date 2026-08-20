@@ -6,7 +6,7 @@
  *    MediaSession, Wake Lock e retomada automática do AudioContext.
  */
 
-import { blobToBase64, concatFloat32, downsample, encodeWav } from "./wav";
+import { blobToBase64, concatFloat32, downsample, encodeWav, normalizePeak } from "./wav";
 import { AdaptiveVoiceActivityDetector } from "./voice-activity";
 
 export interface DictationRecorderOptions {
@@ -32,6 +32,8 @@ export class DictationRecorder {
   private stream: MediaStream | null = null;
   private ctx: AudioContext | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
+  private highpass: BiquadFilterNode | null = null;
+  private presence: BiquadFilterNode | null = null;
   private gainNode: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
   private processor: ScriptProcessorNode | null = null;
@@ -49,18 +51,22 @@ export class DictationRecorder {
   private readonly voiceDetector = new AdaptiveVoiceActivityDetector();
   private speechMs = 0;
   private silenceMs = 0;
+  /** Cauda da janela anterior: evita perder palavras cortadas na fronteira */
+  private overlapTail: Float32Array[] = [];
+  private overlapSamples = 0;
 
 
   constructor(options: DictationRecorderOptions) {
     this.opts = {
       gain: 2,
       windowMs: 12000,
-      silenceThreshold: 0.012,
+      silenceThreshold: 0.006,
       targetSampleRate: 16000,
 
       ...options,
     } as any;
   }
+
 
   get isRunning() {
     return this.running;
@@ -101,16 +107,28 @@ export class DictationRecorder {
 
     this.source = this.ctx.createMediaStreamSource(this.stream);
 
-    // Sensibilidade: ganho + compressão para captar voz baixa sem distorcer
+    // Cadeia de tratamento: corta rumor de fundo, realça a banda da fala,
+    // aplica ganho e comprime — voz baixa fica audível sem distorcer.
+    this.highpass = this.ctx.createBiquadFilter();
+    this.highpass.type = "highpass";
+    this.highpass.frequency.value = 80;
+    this.highpass.Q.value = 0.7;
+
+    this.presence = this.ctx.createBiquadFilter();
+    this.presence.type = "peaking";
+    this.presence.frequency.value = 2600;
+    this.presence.Q.value = 0.9;
+    this.presence.gain.value = 4;
+
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.value = this.opts.gain;
 
     this.compressor = this.ctx.createDynamicsCompressor();
-    this.compressor.threshold.value = -45;
+    this.compressor.threshold.value = -50;
     this.compressor.knee.value = 30;
-    this.compressor.ratio.value = 8;
-    this.compressor.attack.value = 0.003;
-    this.compressor.release.value = 0.25;
+    this.compressor.ratio.value = 6;
+    this.compressor.attack.value = 0.004;
+    this.compressor.release.value = 0.3;
 
     this.processor = this.ctx.createScriptProcessor(4096, 1, 1);
     this.processor.onaudioprocess = (event) => {
@@ -129,7 +147,9 @@ export class DictationRecorder {
       if (this.speechMs === 0) {
         this.preRoll.push(copy);
         this.preRollSamples += copy.length;
-        const maxPreRollSamples = Math.round((this.ctx?.sampleRate || 48000) * 0.8);
+        // Pré-buffer generoso (1,5s): nunca perde o início da frase, mesmo
+        // quando o começo da fala é sussurrado.
+        const maxPreRollSamples = Math.round((this.ctx?.sampleRate || 48000) * 1.5);
         while (this.preRollSamples > maxPreRollSamples && this.preRoll.length > 1) {
           const removed = this.preRoll.shift();
           if (removed) this.preRollSamples -= removed.length;
@@ -137,6 +157,12 @@ export class DictationRecorder {
       }
 
       if (isSpeech && this.speechMs === 0) {
+        if (this.overlapSamples > 0) {
+          this.buffer.push(...this.overlapTail);
+          this.bufferedSamples += this.overlapSamples;
+          this.overlapTail = [];
+          this.overlapSamples = 0;
+        }
         this.buffer.push(...this.preRoll);
         this.bufferedSamples += this.preRollSamples;
         this.preRoll = [];
@@ -158,7 +184,7 @@ export class DictationRecorder {
 
       // Fecha a janela numa pausa natural da fala, ou no limite máximo
       const totalMs = (this.bufferedSamples / (this.ctx?.sampleRate || 48000)) * 1000;
-      const pauseClose = this.speechMs >= 700 && this.silenceMs >= 1100;
+      const pauseClose = this.speechMs >= 600 && this.silenceMs >= 900;
       const hardClose = totalMs >= this.opts.windowMs;
       if (pauseClose || hardClose) void this.flush(false);
     };
@@ -167,10 +193,13 @@ export class DictationRecorder {
     this.sink = this.ctx.createGain();
     this.sink.gain.value = 0;
 
-    this.source.connect(this.gainNode);
+    this.source.connect(this.highpass);
+    this.highpass.connect(this.presence);
+    this.presence.connect(this.gainNode);
     this.gainNode.connect(this.compressor);
     this.compressor.connect(this.processor);
     this.processor.connect(this.sink);
+
     this.sink.connect(this.ctx.destination);
 
     this.running = true;
@@ -220,18 +249,33 @@ export class DictationRecorder {
 
     // Sem fala suficiente: transcrever ruído é o que gera texto inventado
     // (alucinação do modelo em outros idiomas). Descarta a janela.
-    if (speechMs < 250) return;
-    if (peak < 0.0035) return;
+    const minSpeechMs = force ? 150 : 220;
+    if (speechMs < minSpeechMs) return;
+    if (peak < 0.0022) return;
 
     const merged = concatFloat32(chunks);
     const rate = this.ctx.sampleRate;
+
+    // Guarda a cauda (0,6s) para a próxima janela: palavra cortada na
+    // fronteira aparece completa em uma das duas janelas.
+    if (!force) {
+      const tailSamples = Math.min(merged.length, Math.round(rate * 0.6));
+      this.overlapTail = [merged.slice(merged.length - tailSamples)];
+      this.overlapSamples = tailSamples;
+    } else {
+      this.overlapTail = [];
+      this.overlapSamples = 0;
+    }
+
     const resampled = downsample(merged, rate, this.opts.targetSampleRate);
     const durationMs = (merged.length / rate) * 1000;
-    if (durationMs < 350) return;
+    if (durationMs < 300) return;
 
-
-    const wav = encodeWav(resampled, this.opts.targetSampleRate);
+    // AGC por janela: entrega amplitude útil ao modelo mesmo com voz baixa
+    const leveled = normalizePeak(resampled);
+    const wav = encodeWav(leveled, this.opts.targetSampleRate);
     if (wav.size < 2048) return;
+
 
     try {
       const base64 = await blobToBase64(wav);
@@ -298,6 +342,9 @@ export class DictationRecorder {
       this.processor?.disconnect();
       this.compressor?.disconnect();
       this.gainNode?.disconnect();
+      this.presence?.disconnect();
+      this.highpass?.disconnect();
+
       this.source?.disconnect();
       this.sink?.disconnect();
     } catch {
@@ -308,6 +355,10 @@ export class DictationRecorder {
     this.stream = null;
     await this.ctx?.close().catch(() => {});
     this.ctx = null;
+    this.overlapTail = [];
+    this.overlapSamples = 0;
+    this.voiceDetector.reset();
+
 
     if (this.keepAliveEl) {
       this.keepAliveEl.pause();

@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import type { TranscriptSegment, TranscriptionEngine } from "@/lib/transcription/types";
 import { WebSpeechAdapter } from "@/lib/transcription/webspeech-adapter";
 import { DeepgramAdapter } from "@/lib/transcription/deepgram-adapter";
+import { GatewayAdapter } from "@/lib/transcription/gateway-adapter";
 
 export type { TranscriptSegment };
 
@@ -27,10 +28,10 @@ export function useSessionTranscription({
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState("");
   const [supported, setSupported] = useState(true);
-  const [activeEngine, setActiveEngine] = useState<TranscriptionEngine>("webspeech");
+  const [activeEngine, setActiveEngine] = useState<TranscriptionEngine>("gateway");
   const [engineChecked, setEngineChecked] = useState(false);
 
-  const adapterRef = useRef<WebSpeechAdapter | DeepgramAdapter | null>(null);
+  const adapterRef = useRef<WebSpeechAdapter | DeepgramAdapter | GatewayAdapter | null>(null);
 
   // Auto-detect best available engine
   useEffect(() => {
@@ -43,16 +44,13 @@ export function useSessionTranscription({
     let cancelled = false;
     DeepgramAdapter.isAvailable().then((available) => {
       if (cancelled) return;
-      setActiveEngine(available ? "deepgram" : "webspeech");
+      // Sem Deepgram, usa a mesma engine do prontuário (gateway de IA):
+      // precisão alta, português travado e captação de voz baixa/remota.
+      setActiveEngine(available ? "deepgram" : "gateway");
       setEngineChecked(true);
-      if (available) {
-        console.log("[Transcription] Deepgram disponível — usando engine server-side");
-      } else {
-        console.log("[Transcription] Deepgram não configurado — usando Web Speech API (fallback)");
-      }
     }).catch(() => {
       if (!cancelled) {
-        setActiveEngine("webspeech");
+        setActiveEngine("gateway");
         setEngineChecked(true);
       }
     });
@@ -91,34 +89,25 @@ export function useSessionTranscription({
 
     const cbs = callbacks();
 
-    if (activeEngine === "deepgram") {
-      const adapter = new DeepgramAdapter(config, cbs);
-      if (adapter.isSupported()) {
-        adapterRef.current = adapter;
-        adapter.start();
-        setSupported(true);
-      } else {
-        // Fallback to WebSpeech
-        const fallback = new WebSpeechAdapter(config, cbs);
-        if (fallback.isSupported()) {
-          adapterRef.current = fallback;
-          fallback.start();
-          setActiveEngine("webspeech");
-          setSupported(true);
-        } else {
-          setSupported(false);
-        }
-      }
-    } else {
-      const adapter = new WebSpeechAdapter(config, cbs);
-      if (adapter.isSupported()) {
-        adapterRef.current = adapter;
-        adapter.start();
-        setSupported(true);
-      } else {
-        setSupported(false);
-      }
+    const tryAdapter = (adapter: WebSpeechAdapter | DeepgramAdapter | GatewayAdapter) => {
+      if (!adapter.isSupported()) return false;
+      adapterRef.current = adapter;
+      adapter.start();
+      setSupported(true);
+      return true;
+    };
+
+    // Cadeia de precisão: Deepgram → gateway de IA (mesma do prontuário) → Web Speech
+    if (activeEngine === "deepgram" && tryAdapter(new DeepgramAdapter(config, cbs))) return;
+    if (tryAdapter(new GatewayAdapter(config, cbs))) {
+      setActiveEngine("gateway");
+      return;
     }
+    if (tryAdapter(new WebSpeechAdapter(config, cbs))) {
+      setActiveEngine("webspeech");
+      return;
+    }
+    setSupported(false);
   }, [enabled, engineChecked, activeEngine, lang, localLabel, remoteLabel, callbacks]);
 
   const stopListening = useCallback(() => {
@@ -140,7 +129,7 @@ export function useSessionTranscription({
           text: text.trim(),
           timestamp: new Date().toISOString(),
           isFinal: true,
-          engine: activeEngine === "deepgram" ? "deepgram" : "webspeech",
+          engine: activeEngine === "deepgram" ? "deepgram" : activeEngine === "gateway" ? "whisper" : "webspeech",
         },
       ]);
     },

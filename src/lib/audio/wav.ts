@@ -62,6 +62,29 @@ export function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   return new Blob([buffer], { type: "audio/wav" });
 }
 
+/**
+ * Normaliza o pico da janela (AGC por janela).
+ * Voz baixa/distante chega ao modelo com amplitude útil, sem clipping —
+ * é o ganho que mais melhora precisão em quem fala baixo.
+ */
+export function normalizePeak(samples: Float32Array, target = 0.82): Float32Array {
+  let peak = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = Math.abs(samples[i]);
+    if (v > peak) peak = v;
+  }
+  if (peak < 1e-5) return samples;
+  // Limita o fator para não amplificar apenas ruído de fundo
+  const factor = Math.min(12, target / peak);
+  if (factor <= 1.02) return samples;
+  const out = new Float32Array(samples.length);
+  for (let i = 0; i < samples.length; i++) {
+    out[i] = Math.max(-1, Math.min(1, samples[i] * factor));
+  }
+  return out;
+}
+
+
 export async function blobToBase64(blob: Blob): Promise<string> {
   const buffer = new Uint8Array(await blob.arrayBuffer());
   let binary = "";

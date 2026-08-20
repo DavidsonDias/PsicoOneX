@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { DictationRecorder } from "@/lib/audio/dictation-recorder";
+import { dedupeOverlap } from "@/lib/audio/dedupe-overlap";
+
 
 const GAIN_KEY = "psicoone:dictation:gain";
 
@@ -16,9 +18,15 @@ export function storeGain(gain: number) {
 interface UseLiveDictationOptions {
   language?: string;
   onError?: (message: string) => void;
+  /**
+   * Chamado a cada trecho novo transcrito, na ordem correta.
+   * Permite gravar no prontuário/rascunho em tempo real (zero perda de dados).
+   */
+  onSegment?: (chunk: string) => void;
 }
 
-export function useLiveDictation({ language = "pt", onError }: UseLiveDictationOptions = {}) {
+export function useLiveDictation({ language = "pt", onError, onSegment }: UseLiveDictationOptions = {}) {
+
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [level, setLevel] = useState(0);
@@ -51,14 +59,17 @@ export function useLiveDictation({ language = "pt", onError }: UseLiveDictationO
     };
   }, []);
 
-  const appendText = useCallback((chunk: string) => {
-    const clean = chunk.trim();
-    if (!clean) return;
-    // Evita duplicar a mesma frase quando duas janelas capturam o mesmo trecho
-    if (clean.length > 8 && textRef.current.endsWith(clean)) return;
-    textRef.current = textRef.current ? `${textRef.current} ${clean}` : clean;
-    setText(textRef.current);
-  }, []);
+  const appendText = useCallback(
+    (chunk: string) => {
+      const clean = dedupeOverlap(textRef.current, chunk);
+      if (!clean) return;
+      textRef.current = textRef.current ? `${textRef.current} ${clean}` : clean;
+      setText(textRef.current);
+      onSegment?.(clean);
+    },
+    [onSegment]
+  );
+
 
   /** Libera os resultados na ordem original das janelas */
   const drain = useCallback(() => {

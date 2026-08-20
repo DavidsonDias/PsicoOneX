@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 import { useLiveDictation } from "@/hooks/useLiveDictation";
 
 interface VoiceRecorderProps {
-  onTranscript: (text: string) => void;
+  /** Recebe cada trecho transcrito (streaming) — grave imediatamente para não perder nada */
+  onTranscript: (text: string, live?: boolean) => void;
   disabled?: boolean;
 }
+
 
 function polish(raw: string): string {
   let text = raw.trim().replace(/\s{2,}/g, " ");
@@ -33,6 +35,11 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
   const dictation = useLiveDictation({
     language: "pt",
     onError: (msg) => toast.error(msg),
+    // Streaming: cada trecho já entra no prontuário/rascunho
+    onSegment: (chunk) => {
+      const piece = polish(chunk);
+      if (piece) onTranscript(piece, true);
+    },
   });
 
   const { isRecording, isTranscribing, level, text, gain, setGain, inBackground } = dictation;
@@ -43,7 +50,7 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
   const handleStart = useCallback(async () => {
     const ok = await dictation.start();
     if (ok) {
-      toast.info("🎙️ Gravando. Pode minimizar o app — a transcrição continua.");
+      toast.info("🎙️ Gravando. O texto entra no prontuário em tempo real.");
     }
   }, [dictation]);
 
@@ -51,10 +58,8 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
     setFinishing(true);
     try {
       const result = await dictation.stop();
-      const finalText = polish(result);
-      if (finalText) {
-        onTranscript(finalText);
-        toast.success("Transcrição inserida no prontuário!");
+      if (result.trim()) {
+        toast.success("Transcrição concluída e salva no prontuário.");
       } else {
         toast.info("Nenhuma fala foi reconhecida.");
       }
@@ -62,7 +67,8 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
     } finally {
       setFinishing(false);
     }
-  }, [dictation, onTranscript]);
+  }, [dictation]);
+
 
   const handleCancel = useCallback(async () => {
     await dictation.cancel();
