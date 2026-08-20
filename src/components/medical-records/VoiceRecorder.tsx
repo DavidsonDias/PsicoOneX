@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 import { useLiveDictation } from "@/hooks/useLiveDictation";
 
 interface VoiceRecorderProps {
-  onTranscript: (text: string) => void;
+  /** Recebe cada trecho transcrito (streaming) — grave imediatamente para não perder nada */
+  onTranscript: (text: string, live?: boolean) => void;
   disabled?: boolean;
 }
+
 
 function polish(raw: string): string {
   let text = raw.trim().replace(/\s{2,}/g, " ");
