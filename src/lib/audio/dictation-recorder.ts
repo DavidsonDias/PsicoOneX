@@ -6,7 +6,7 @@
  *    MediaSession, Wake Lock e retomada automática do AudioContext.
  */
 
-import { blobToBase64, concatFloat32, downsample, encodeWav } from "./wav";
+import { blobToBase64, concatFloat32, downsample, encodeWav, normalizePeak } from "./wav";
 import { AdaptiveVoiceActivityDetector } from "./voice-activity";
 
 export interface DictationRecorderOptions {
