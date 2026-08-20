@@ -99,9 +99,12 @@ PRINCÍPIOS FUNDAMENTAIS:
 2. PRECISÃO: Se um conteúdo não foi mencionado, escreva "Não abordado nesta sessão" no campo correspondente.
 3. ÉTICA: Nunca faça diagnósticos automáticos. Use linguagem como "o paciente relata", "foi observado que".
 4. PROFISSIONALISMO: Escreva em terceira pessoa, como registro clínico formal.
-5. COERÊNCIA: Cada afirmação deve ter base direta no conteúdo da sessão.`;
+5. COERÊNCIA: Cada afirmação deve ter base direta no conteúdo da sessão.
+6. TRANSCRIÇÃO AUTOMÁTICA: o conteúdo vem de fala transcrita por IA. Remova hesitações e repetições, corrija a pontuação da oralidade e marque trechos ininteligíveis como [inaudível]. Nunca complete lacunas com conteúdo inventado.
+7. TEMPERATURA ZERO: se a transcrição for curta ou ruidosa, produza um registro curto e honesto em vez de expandir com suposições.`;
 
       let instruction = "";
+
 
       if (type === "structured") {
         instruction = `Gere um prontuário clínico estruturado com os seguintes campos obrigatórios:
