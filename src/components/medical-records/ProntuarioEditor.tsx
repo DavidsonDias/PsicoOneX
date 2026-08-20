@@ -200,6 +200,13 @@ export const ProntuarioEditor = memo(function ProntuarioEditor({
           next_steps: formData.next_steps,
         }}
         onStructuredChange={handleStructuredChange}
+        recordId={(formData as any).id ?? null}
+        patientId={formData.patient_id || null}
+        patientLabel={
+          lockedPatient?.name ||
+          patients.find((p) => p.id === formData.patient_id)?.full_name ||
+          null
+        }
       />
 
       {/* Attachments Section */}
