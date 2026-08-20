@@ -355,6 +355,10 @@ export class DictationRecorder {
     this.stream = null;
     await this.ctx?.close().catch(() => {});
     this.ctx = null;
+    this.overlapTail = [];
+    this.overlapSamples = 0;
+    this.voiceDetector.reset();
+
 
     if (this.keepAliveEl) {
       this.keepAliveEl.pause();
