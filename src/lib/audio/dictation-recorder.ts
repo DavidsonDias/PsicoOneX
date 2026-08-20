@@ -47,6 +47,9 @@ export class DictationRecorder {
   private wakeLock: any = null;
   private visibilityHandler: (() => void) | null = null;
   private running = false;
+  private paused = false;
+  private lastFrameAt = 0;
+  private lastSpeechAt = 0;
   private peakRms = 0;
   private readonly voiceDetector = new AdaptiveVoiceActivityDetector();
   private speechMs = 0;
@@ -70,6 +73,34 @@ export class DictationRecorder {
 
   get isRunning() {
     return this.running;
+  }
+
+  get isPaused() {
+    return this.paused;
+  }
+
+  /** Sinais reais de saúde da captura (detecção de "gravação fantasma"). */
+  get health() {
+    const track = this.stream?.getAudioTracks?.()[0];
+    return {
+      trackLive: !!track && track.readyState === "live" && !track.muted,
+      contextState: this.ctx?.state ?? "closed",
+      frameAgeMs: this.lastFrameAt ? Date.now() - this.lastFrameAt : Infinity,
+      speechAgeMs: this.lastSpeechAt ? Date.now() - this.lastSpeechAt : Infinity,
+    };
+  }
+
+  /** Pausa mantendo os recursos e a sessão recuperável (não é "parar"). */
+  async pause() {
+    if (!this.running || this.paused) return;
+    this.paused = true;
+    await this.flush(true);
+  }
+
+  resume() {
+    if (!this.running) return;
+    this.paused = false;
+    void this.ctx?.resume().catch(() => undefined);
   }
 
   setGain(gain: number) {
@@ -133,6 +164,8 @@ export class DictationRecorder {
     this.processor = this.ctx.createScriptProcessor(4096, 1, 1);
     this.processor.onaudioprocess = (event) => {
       if (!this.running) return;
+      this.lastFrameAt = Date.now();
+      if (this.paused) return;
       const input = event.inputBuffer.getChannelData(0);
       const copy = new Float32Array(input);
       const frameMs = (copy.length / (this.ctx?.sampleRate || 48000)) * 1000;
@@ -173,6 +206,7 @@ export class DictationRecorder {
       }
 
       if (isSpeech) {
+        this.lastSpeechAt = Date.now();
         this.speechMs += frameMs;
         this.silenceMs = 0;
       } else if (this.speechMs > 0) {
