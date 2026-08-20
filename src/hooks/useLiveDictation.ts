@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { DictationRecorder } from "@/lib/audio/dictation-recorder";
+import { dedupeOverlap } from "@/lib/audio/dedupe-overlap";
+
 
 const GAIN_KEY = "psicoone:dictation:gain";
 
