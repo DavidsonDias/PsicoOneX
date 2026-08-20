@@ -26,12 +26,30 @@ const ACTION_PROMPTS: Record<string, string> = {
 ## Evolução
 ## Plano Terapêutico
 Omita seções sem conteúdo correspondente.`,
-  summarize: "Resuma os principais pontos da sessão de forma concisa e objetiva, mantendo as informações clinicamente relevantes.",
+  summarize: `Produza um resumo clínico de alto padrão da sessão, em português do Brasil:
+1. Um parágrafo de síntese (3-5 linhas) com queixa/tema central e estado do paciente.
+2. "Pontos-chave": 3 a 6 bullets com falas/temas clinicamente relevantes.
+3. "Intervenções": o que o profissional fez na sessão (somente o que consta no texto).
+4. "Encaminhamentos": tarefas, combinados e próximos passos, se houver.
+Preserve dados objetivos (datas, medicações, riscos) exatamente como aparecem.`,
   clinical: "Torne a linguagem mais clínica e profissional, adequada para documentação em prontuário psicológico.",
   objective: "Torne o texto mais objetivo e direto, removendo redundâncias e mantendo apenas as informações essenciais.",
   grammar: "Corrija apenas erros gramaticais, ortográficos e de pontuação. Não altere o conteúdo ou estilo do texto.",
   expand: "Expanda a reflexão clínica do texto, aprofundando observações e análises sem inventar informações novas.",
 };
+
+/**
+ * O texto costuma vir de transcrição automática de fala: tem repetições,
+ * marcadores de oralidade e palavras cortadas. Estas regras evitam que a IA
+ * "invente" para preencher lacunas e garantem leitura profissional.
+ */
+const TRANSCRIPT_RULES = `TEXTO DE ORIGEM POSSIVELMENTE TRANSCRITO DE FALA — trate assim:
+- Remova hesitações e muletas ("é...", "então", "né", "tipo", repetições imediatas).
+- Corrija concordância e pontuação da oralidade, sem mudar o sentido.
+- Palavras truncadas ou inaudíveis: mantenha o sentido provável apenas quando inequívoco pelo contexto; caso contrário escreva [inaudível].
+- Não crie sintomas, hipóteses, falas, datas ou números que não estejam no texto.
+- Mantenha a primeira pessoa do profissional e o relato do paciente separados quando o texto permitir identificar.`;
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
