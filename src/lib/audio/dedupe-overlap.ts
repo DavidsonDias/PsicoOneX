@@ -19,14 +19,16 @@ export function dedupeOverlap(previous: string, chunk: string, maxWords = 14): s
   const nextWords = clean.split(/\s+/);
   const limit = Math.min(maxWords, prevWords.length, nextWords.length);
 
-  for (let n = limit; n >= 2; n -= 1) {
+  for (let n = limit; n >= 1; n -= 1) {
     const tail = prevWords.slice(-n).map(norm).filter(Boolean).join(" ");
     const head = nextWords.slice(0, n).map(norm).filter(Boolean).join(" ");
-    if (tail && tail === head) {
-      const remainder = nextWords.slice(n).join(" ").trim();
-      return remainder;
-    }
+    if (!tail || tail !== head) continue;
+    // Sobreposição de 1 palavra só conta se for uma palavra longa (evita
+    // remover artigos/preposições legítimos como "de", "o", "que").
+    if (n === 1 && tail.length < 5) continue;
+    return nextWords.slice(n).join(" ").trim();
   }
+
 
   // Repetição exata de frase curta
   const prevNorm = prevWords.map(norm).join(" ");
