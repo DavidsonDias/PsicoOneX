@@ -16,9 +16,15 @@ export function storeGain(gain: number) {
 interface UseLiveDictationOptions {
   language?: string;
   onError?: (message: string) => void;
+  /**
+   * Chamado a cada trecho novo transcrito, na ordem correta.
+   * Permite gravar no prontuário/rascunho em tempo real (zero perda de dados).
+   */
+  onSegment?: (chunk: string) => void;
 }
 
-export function useLiveDictation({ language = "pt", onError }: UseLiveDictationOptions = {}) {
+export function useLiveDictation({ language = "pt", onError, onSegment }: UseLiveDictationOptions = {}) {
+
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [level, setLevel] = useState(0);
