@@ -34,6 +34,10 @@ interface FreeFormEditorProps {
   };
   onStructuredChange?: (field: string, value: string) => void;
   className?: string;
+  /** Contexto clínico para a engine de transcrição (recuperação por prontuário) */
+  recordId?: string | null;
+  patientId?: string | null;
+  patientLabel?: string | null;
 }
 
 const APPROACHES = [
@@ -252,7 +256,12 @@ export const FreeFormEditor = memo(function FreeFormEditor({
                 Desfazer
               </Button>
             )}
-            <VoiceRecorder onTranscript={handleVoiceTranscript} />
+            <VoiceRecorder
+              onTranscript={handleVoiceTranscript}
+              recordId={recordId ?? null}
+              patientId={patientId ?? null}
+              patientLabel={patientLabel ?? null}
+            />
           </div>
         </div>
 
