@@ -105,6 +105,8 @@ MainTextarea.displayName = "MainTextarea";
 
 export const FreeFormEditor = memo(function FreeFormEditor({
   value, onChange, structuredFields, onStructuredChange, className,
+  recordId, patientId, patientLabel,
+
 }: FreeFormEditorProps) {
   const [showStructured, setShowStructured] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
