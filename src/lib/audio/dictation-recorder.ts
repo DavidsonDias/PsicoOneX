@@ -249,18 +249,33 @@ export class DictationRecorder {
 
     // Sem fala suficiente: transcrever ruído é o que gera texto inventado
     // (alucinação do modelo em outros idiomas). Descarta a janela.
-    if (speechMs < 250) return;
-    if (peak < 0.0035) return;
+    const minSpeechMs = force ? 150 : 220;
+    if (speechMs < minSpeechMs) return;
+    if (peak < 0.0022) return;
 
     const merged = concatFloat32(chunks);
     const rate = this.ctx.sampleRate;
+
+    // Guarda a cauda (0,6s) para a próxima janela: palavra cortada na
+    // fronteira aparece completa em uma das duas janelas.
+    if (!force) {
+      const tailSamples = Math.min(merged.length, Math.round(rate * 0.6));
+      this.overlapTail = [merged.slice(merged.length - tailSamples)];
+      this.overlapSamples = tailSamples;
+    } else {
+      this.overlapTail = [];
+      this.overlapSamples = 0;
+    }
+
     const resampled = downsample(merged, rate, this.opts.targetSampleRate);
     const durationMs = (merged.length / rate) * 1000;
-    if (durationMs < 350) return;
+    if (durationMs < 300) return;
 
-
-    const wav = encodeWav(resampled, this.opts.targetSampleRate);
+    // AGC por janela: entrega amplitude útil ao modelo mesmo com voz baixa
+    const leveled = normalizePeak(resampled);
+    const wav = encodeWav(leveled, this.opts.targetSampleRate);
     if (wav.size < 2048) return;
+
 
     try {
       const base64 = await blobToBase64(wav);
