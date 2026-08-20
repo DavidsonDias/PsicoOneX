@@ -32,6 +32,8 @@ export class DictationRecorder {
   private stream: MediaStream | null = null;
   private ctx: AudioContext | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
+  private highpass: BiquadFilterNode | null = null;
+  private presence: BiquadFilterNode | null = null;
   private gainNode: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
   private processor: ScriptProcessorNode | null = null;
@@ -49,18 +51,22 @@ export class DictationRecorder {
   private readonly voiceDetector = new AdaptiveVoiceActivityDetector();
   private speechMs = 0;
   private silenceMs = 0;
+  /** Cauda da janela anterior: evita perder palavras cortadas na fronteira */
+  private overlapTail: Float32Array[] = [];
+  private overlapSamples = 0;
 
 
   constructor(options: DictationRecorderOptions) {
     this.opts = {
       gain: 2,
       windowMs: 12000,
-      silenceThreshold: 0.012,
+      silenceThreshold: 0.006,
       targetSampleRate: 16000,
 
       ...options,
     } as any;
   }
+
 
   get isRunning() {
     return this.running;
