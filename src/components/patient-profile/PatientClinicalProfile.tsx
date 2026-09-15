@@ -106,7 +106,7 @@ export function PatientClinicalProfile({ patientId, patientName }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [patientId, patientName]);
+  }, [patientId, patientName, cacheKey]);
 
   const riskColors = {
     low: "bg-green-500/10 text-green-600 border-green-500/20",
@@ -161,6 +161,11 @@ export function PatientClinicalProfile({ patientId, patientName }: Props) {
               Resumo Clínico (IA)
             </CardTitle>
             <div className="flex items-center gap-2">
+              {outdated && (
+                <Badge variant="outline" className="text-[10px]">
+                  Desatualizado
+                </Badge>
+              )}
               <Badge className={cn("text-xs", riskColors[profile.riskLevel])}>
                 Risco: {riskLabels[profile.riskLevel]}
               </Badge>
