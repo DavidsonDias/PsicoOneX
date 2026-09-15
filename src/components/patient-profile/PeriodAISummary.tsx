@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { readAiCache, writeAiCache } from "@/lib/ai-cache";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -63,11 +64,23 @@ export function PeriodAISummary({ patientId, patientName }: Props) {
         nextSteps: r.next_steps,
       }));
 
+      // Reaproveita o resumo já gerado quando nada mudou no período.
+      const last = records[records.length - 1];
+      const signature = `${records.length}|${last?.session_date ?? ""}|${last?.session_number ?? ""}`;
+      const cacheKey = `period-summary:${patientId}:${periodDays}`;
+      const cached = readAiCache<SummaryResult>(cacheKey, signature, DAY_MS);
+      if (cached && !cached.stale) {
+        setResult(cached.value);
+        setLoading(false);
+        return;
+      }
+
       const { data, error: aiError } = await supabase.functions.invoke("clinical-ai", {
         body: { type: "period-summary", patientName, periodDays, records: payload },
       });
       if (aiError) throw aiError;
       setResult(data as SummaryResult);
+      writeAiCache(cacheKey, signature, data as SummaryResult);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao gerar resumo");
