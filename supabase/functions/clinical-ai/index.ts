@@ -19,61 +19,56 @@ serve(async (req) => {
     const body = await req.json();
     const { type } = body;
 
+    /** Contexto enxuto: mantém o clinicamente relevante, corta desperdício. */
+    const clip = (value: unknown, max: number) => {
+      const t = String(value ?? '').replace(/\s+/g, ' ').trim();
+      return t.length > max ? `${t.slice(0, max)}…` : t;
+    };
+    const sessionLine = (r: any, max: number) =>
+      `S${r.session ?? '?'} ${r.date}: ${clip(
+        [r.complaints, r.observations, r.evolution, r.techniques, r.nextSteps].filter(Boolean).join(' | '),
+        max
+      )}`;
+
     let systemPrompt = '';
     let userContent = '';
+    let model = 'google/gemini-2.5-flash';
+    let maxTokens = 700;
 
     if (type === 'clinical-profile') {
       const { patientName, records } = body;
-      systemPrompt = `Você é um assistente clínico para psicólogos. Analise os prontuários do paciente e gere um perfil clínico completo.
-Responda APENAS em JSON válido com esta estrutura:
-{
-  "summary": "Resumo clínico geral do paciente (2-4 frases)",
-  "patterns": ["padrão comportamental 1", "padrão 2"],
-  "evolution": "Descrição da evolução clínica ao longo das sessões",
-  "tags": ["ansiedade", "relacionamento", "autoestima"],
-  "riskLevel": "low|medium|high",
-  "recommendations": ["recomendação terapêutica 1", "recomendação 2"]
-}
-Seja objetivo e clinicamente relevante. Use linguagem profissional.`;
+      systemPrompt = `Assistente clínico para psicólogos. Gere o perfil clínico a partir dos prontuários.
+Responda só JSON: {"summary":"2-4 frases","patterns":["..."],"evolution":"...","tags":["..."],"riskLevel":"low|medium|high","recommendations":["..."]}
+Objetivo, linguagem profissional. Máximo 4 itens por lista.`;
 
-      userContent = `Paciente: ${patientName}\n\nProntuários (${records.length} sessões):\n${
-        records.map((r: any) =>
-          `Sessão ${r.session || '?'} (${r.date}): ${[r.complaints, r.observations, r.evolution, r.techniques, r.nextSteps].filter(Boolean).join(' | ')}`
-        ).join('\n')
-      }`;
+      // Sessões mais recentes primeiro, limitadas: o histórico completo não
+      // muda o perfil e multiplica tokens.
+      const recent = (records as any[]).slice(-24);
+      userContent = `Paciente: ${patientName}\nSessões (${recent.length} de ${records.length}):\n${recent
+        .map((r) => sessionLine(r, 700))
+        .join('\n')}`;
     } else if (type === 'search-records') {
       const { query, records } = body;
-      systemPrompt = `Você é um assistente de busca inteligente para prontuários clínicos de psicologia.
-O profissional buscou: "${query}"
-Analise os prontuários e retorne APENAS em JSON:
-{
-  "matchingIds": ["id1", "id2"],
-  "summary": "Resumo dos resultados encontrados",
-  "relatedThemes": ["tema1", "tema2"]
-}
-Busque por temas, sintomas, técnicas e conteúdo semântico — não apenas texto literal.`;
+      model = 'google/gemini-2.5-flash-lite';
+      maxTokens = 400;
+      systemPrompt = `Busca semântica em prontuários de psicologia. Consulta: "${query}"
+Responda só JSON: {"matchingIds":["..."],"summary":"1-2 frases","relatedThemes":["..."]}
+Considere temas, sintomas e técnicas, não só texto literal.`;
 
-      userContent = `Prontuários:\n${records.map((r: any) => `[${r.id}] Sessão ${r.session} (${r.date}): ${r.content}`).join('\n')}`;
+      userContent = (records as any[])
+        .slice(0, 60)
+        .map((r) => `[${r.id}] S${r.session} ${r.date}: ${clip(r.content, 500)}`)
+        .join('\n');
     } else if (type === 'period-summary') {
       const { patientName, periodDays, records } = body;
-      systemPrompt = `Você é um assistente clínico para psicólogos. Gere um resumo executivo dos últimos ${periodDays} dias de atendimento do paciente.
-Responda APENAS em JSON válido:
-{
-  "headline": "Frase curta resumindo o período (1 linha)",
-  "summary": "Resumo clínico de 3-5 frases sobre o que ocorreu no período",
-  "progress": "positive|neutral|negative",
-  "keyThemes": ["tema1", "tema2", "tema3"],
-  "techniquesUsed": ["técnica1", "técnica2"],
-  "alerts": ["alerta clínico relevante, se houver"],
-  "suggestedFocus": ["sugestão de foco para próximas sessões"]
-}
-Seja objetivo, clínico e útil. Se não houver dados suficientes, indique isso em summary.`;
+      systemPrompt = `Assistente clínico. Resumo executivo dos últimos ${periodDays} dias.
+Responda só JSON: {"headline":"1 linha","summary":"3-5 frases","progress":"positive|neutral|negative","keyThemes":["..."],"techniquesUsed":["..."],"alerts":["..."],"suggestedFocus":["..."]}
+Objetivo e clínico. Máximo 4 itens por lista. Sem dados suficientes, diga em summary.`;
 
-      userContent = `Paciente: ${patientName}\nPeríodo: últimos ${periodDays} dias\n\nProntuários (${records.length}):\n${
-        records.map((r: any) =>
-          `Sessão ${r.session || '?'} (${r.date}): ${[r.complaints, r.observations, r.evolution, r.techniques, r.nextSteps].filter(Boolean).join(' | ')}`
-        ).join('\n')
-      }`;
+      const recent = (records as any[]).slice(-24);
+      userContent = `Paciente: ${patientName}\nSessões (${recent.length}):\n${recent
+        .map((r) => sessionLine(r, 700))
+        .join('\n')}`;
     } else {
       throw new Error(`Unknown insight type: ${type}`);
     }
@@ -85,7 +80,9 @@ Seja objetivo, clínico e útil. Se não houver dados suficientes, indique isso 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
+        temperature: 0.2,
+        max_tokens: maxTokens,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
