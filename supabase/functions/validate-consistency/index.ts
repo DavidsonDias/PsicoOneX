@@ -75,38 +75,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const payload = await req.json();
+    // Validação 100% determinística: nome, telefone, CPF, e-mail, CEP,
+    // horário, duração e coerência de cobrança são regras — não precisam de IA.
     const issues = localValidate(payload);
-
-    // Optional AI enrichment (best-effort, non-blocking failure)
-    const apiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (apiKey && payload.useAI) {
-      try {
-        const r = await fetch(LOVABLE_AI_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-lite',
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'Você é validador clínico do PsicoOne. Retorne JSON {"issues":[{"severity":"info|warning","message":"..."}]}. No cadastro de paciente, SOMENTE nome e telefone/WhatsApp são obrigatórios. CPF, email, nascimento, endereço, contatos de emergência e todos os demais campos são opcionais e sua ausência nunca deve gerar issue. Não repita validações existentes.',
-              },
-              { role: 'user', content: JSON.stringify({ payload, existing: issues }) },
-            ],
-            response_format: { type: 'json_object' },
-          }),
-        });
-        if (r.ok) {
-          const j = await r.json();
-          const content = j.choices?.[0]?.message?.content;
-          if (content) {
-            const parsed = JSON.parse(content);
-            if (Array.isArray(parsed.issues)) issues.push(...parsed.issues);
-          }
-        }
-      } catch (_) { /* ignore AI errors */ }
-    }
 
     return new Response(JSON.stringify({ ok: true, issues }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

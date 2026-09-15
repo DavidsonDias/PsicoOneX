@@ -87,15 +87,29 @@ export function ProactiveInsightsPanel({ insights, isLoading, onRefresh, onNavig
               </Badge>
             )}
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 px-2 text-xs"
+              onClick={handleAnalyze}
+              disabled={isAnalyzing}
+            >
+              <Sparkles className={cn("h-3.5 w-3.5 text-primary", isAnalyzing && "animate-pulse")} />
+              <span className="hidden sm:inline">
+                {isAnalyzing ? "Analisando..." : "Analisar com IA"}
+              </span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
