@@ -39,11 +39,20 @@ const typeStyles = {
 export function ProactiveInsightsPanel({ insights, isLoading, onRefresh, onNavigate }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Atualização normal: apenas dados calculados, sem consumir IA.
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await onRefresh(true);
+    await onRefresh(false);
     setIsRefreshing(false);
+  };
+
+  // Ação explícita do profissional: só aqui a IA é acionada.
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true);
+    await onRefresh(true);
+    setIsAnalyzing(false);
   };
 
   const currentInsight = insights[activeIndex];
