@@ -62,7 +62,7 @@ export class DictationRecorder {
   constructor(options: DictationRecorderOptions) {
     this.opts = {
       gain: 2,
-      windowMs: 12000,
+      windowMs: 24000,
       silenceThreshold: 0.006,
       targetSampleRate: 16000,
 
@@ -216,9 +216,14 @@ export class DictationRecorder {
       this.peakRms = Math.max(this.peakRms, rms);
       this.opts.onLevel?.(rms);
 
-      // Fecha a janela numa pausa natural da fala, ou no limite máximo
+      // Fecha a janela numa pausa natural da fala, ou no limite máximo.
+      // A janela só fecha por pausa depois de acumular fala suficiente — isso
+      // reduz drasticamente o número de chamadas de transcrição sem cortar
+      // frases (o overlap + dedupe garantem a continuidade).
       const totalMs = (this.bufferedSamples / (this.ctx?.sampleRate || 48000)) * 1000;
-      const pauseClose = this.speechMs >= 600 && this.silenceMs >= 900;
+      const pauseClose =
+        (totalMs >= 15000 && this.silenceMs >= 1000) ||
+        (this.speechMs >= 600 && this.silenceMs >= 4000);
       const hardClose = totalMs >= this.opts.windowMs;
       if (pauseClose || hardClose) void this.flush(false);
     };
@@ -290,10 +295,10 @@ export class DictationRecorder {
     const merged = concatFloat32(chunks);
     const rate = this.ctx.sampleRate;
 
-    // Guarda a cauda (0,6s) para a próxima janela: palavra cortada na
-    // fronteira aparece completa em uma das duas janelas.
+    // Guarda uma cauda curta (0,25s) para a próxima janela: suficiente para
+    // não perder a palavra na fronteira, com o mínimo de áudio reenviado.
     if (!force) {
-      const tailSamples = Math.min(merged.length, Math.round(rate * 0.6));
+      const tailSamples = Math.min(merged.length, Math.round(rate * 0.25));
       this.overlapTail = [merged.slice(merged.length - tailSamples)];
       this.overlapSamples = tailSamples;
     } else {
