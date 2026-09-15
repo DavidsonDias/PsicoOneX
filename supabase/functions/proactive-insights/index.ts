@@ -187,10 +187,12 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               model: "google/gemini-2.5-flash-lite",
+              temperature: 0.3,
+              max_tokens: 220,
               messages: [
                 {
                   role: "system",
-                  content: `Você é um assistente de gestão clínica para psicólogos. Analise os dados abaixo e gere 1-2 recomendações estratégicas curtas (máx 80 caracteres cada). Responda em JSON: {"recommendations": [{"title": "...", "description": "..."}]}`
+                  content: `Gestão clínica para psicólogos. Gere 1-2 recomendações estratégicas curtas (máx 80 caracteres cada). Só JSON: {"recommendations":[{"title":"...","description":"..."}]}`
                 },
                 {
                   role: "user",

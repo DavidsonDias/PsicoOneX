@@ -73,13 +73,16 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY not configured" }, 500);
 
     const body = await req.json();
-    if (body.healthCheck) return json({ available: true, model: "openai/gpt-4o-transcribe" });
+    // Modelo econômico como padrão (etapa A): mantém qualidade adequada em
+    // pt-BR com custo bem menor por minuto de áudio.
+    const DEFAULT_MODEL = "openai/gpt-4o-mini-transcribe";
+    if (body.healthCheck) return json({ available: true, model: DEFAULT_MODEL });
 
     const {
       audio,
       mimeType = "audio/wav",
       language = "pt",
-      model = "openai/gpt-4o-transcribe",
+      model = DEFAULT_MODEL,
     } = body as {
       audio?: string;
       mimeType?: string;

@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { readAiCache, writeAiCache } from "@/lib/ai-cache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,10 +23,42 @@ interface ClinicalProfile {
   recommendations: string[];
 }
 
+/** Assinatura dos prontuários: muda só quando há sessão nova/alterada. */
+function signatureOf(records: Array<Record<string, any>>) {
+  const last = records[records.length - 1];
+  return `${records.length}|${last?.session_date ?? ""}|${last?.session_number ?? ""}`;
+}
+
 export function PatientClinicalProfile({ patientId, patientName }: Props) {
   const [profile, setProfile] = useState<ClinicalProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [outdated, setOutdated] = useState(false);
+  const cacheKey = `clinical-profile:${patientId}`;
+
+  // Reaproveita o último perfil gerado; marca como desatualizado se houver
+  // sessão nova desde então. Nenhuma chamada de IA acontece aqui.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data: records } = await supabase
+        .from("medical_records")
+        .select("session_date, session_number")
+        .eq("patient_id", patientId)
+        .is("deleted_at", null)
+        .order("session_date", { ascending: true });
+      if (!active) return;
+      const cached = readAiCache<ClinicalProfile>(cacheKey, signatureOf(records || []), Infinity);
+      if (cached) {
+        setProfile(cached.value);
+        setGenerated(true);
+        setOutdated(cached.stale);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [patientId, cacheKey]);
 
   const generateProfile = useCallback(async () => {
     setLoading(true);
@@ -64,6 +97,8 @@ export function PatientClinicalProfile({ patientId, patientName }: Props) {
 
       setProfile(data);
       setGenerated(true);
+      setOutdated(false);
+      writeAiCache(cacheKey, signatureOf(records), data);
       toast.success("Perfil clínico gerado com IA!");
     } catch (err: any) {
       console.error("Error generating profile:", err);
@@ -71,7 +106,7 @@ export function PatientClinicalProfile({ patientId, patientName }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [patientId, patientName]);
+  }, [patientId, patientName, cacheKey]);
 
   const riskColors = {
     low: "bg-green-500/10 text-green-600 border-green-500/20",
@@ -126,6 +161,11 @@ export function PatientClinicalProfile({ patientId, patientName }: Props) {
               Resumo Clínico (IA)
             </CardTitle>
             <div className="flex items-center gap-2">
+              {outdated && (
+                <Badge variant="outline" className="text-[10px]">
+                  Desatualizado
+                </Badge>
+              )}
               <Badge className={cn("text-xs", riskColors[profile.riskLevel])}>
                 Risco: {riskLabels[profile.riskLevel]}
               </Badge>
