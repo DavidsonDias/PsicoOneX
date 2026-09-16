@@ -1,9 +1,9 @@
 {
+  "version": 1,
   "asset_id": "af492c7b-7ffe-4b4e-a7d3-e19d77203719",
-  "created_at": "2026-05-06T22:14:35Z",
-  "original_filename": "demo-psicoone.mp4",
-  "project_id": "92e9bb62-fcca-47ed-abb7-9232845924a6",
-  "size": 22559565,
+  "project_id": "0e22dc73-13eb-4a42-a911-ba9ec182b65e",
   "url": "/__l5e/assets-v1/af492c7b-7ffe-4b4e-a7d3-e19d77203719/demo-psicoone.mp4",
-  "version": 1
+  "original_filename": "demo-psicoone.mp4",
+  "size": 22559565,
+  "created_at": "2026-05-06T22:14:35Z"
 }
