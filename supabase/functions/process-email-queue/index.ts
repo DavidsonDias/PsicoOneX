@@ -14,21 +14,23 @@ Deno.serve(async (req) => {
   const url = Deno.env.get('SUPABASE_URL')?.replace(/\/$/, '')
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   const apiKey = Deno.env.get('RESEND_API_KEY')
+  const workerSecret = Deno.env.get('EMAIL_WORKER_SECRET')
   const from = Deno.env.get('EMAIL_FROM')?.trim()
   const recipient = Deno.env.get('EMAIL_TEST_RECIPIENT')?.trim().toLowerCase()
-  if (url !== STAGING_URL || !key || !apiKey || !from || !recipient ||
+  if (url !== STAGING_URL || !key || !apiKey || !workerSecret || workerSecret.length < 32 || !from || !recipient ||
       !/^[^\s<>;,]+@[^\s<>;,]+\.[^\s<>;,]+$/.test(recipient) ||
       !/^(?:[^<>\r\n]+\s*<)?noreply@psicoone-mail\.sevendevx\.com>?$/.test(from)) {
     return reply(503, { error: 'Invalid staging configuration' })
   }
 
-  // Compare the actual service key, never trust decoded unsigned JWT claims.
-  const supplied = req.headers.get('Authorization')?.replace(/^Bearer /, '') || ''
+  // Dedicated worker credential; independent of platform JWT/key representation.
+  // Keep gateway verification enabled. Never trust decoded unsigned JWT claims.
+  const supplied = req.headers.get('x-email-worker-secret') || ''
   const digest = async (s) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))
-  const [a, b] = await Promise.all([digest(supplied), digest(key)])
+  const [a, b] = await Promise.all([digest(supplied), digest(workerSecret)])
   let different = 0
   for (let i = 0; i < a.length; i++) different |= a[i] ^ b[i]
-  if (different !== 0) return reply(401, { error: 'Service role required' })
+  if (different !== 0) return reply(401, { error: 'Worker secret required' })
 
   async function db(path, body = undefined) {
     const response = await fetch(`${url}/rest/v1/${path}`, {
