@@ -41,14 +41,19 @@ export default function Auth() {
   useEffect(() => {
     setLastIdentifier(localStorage.getItem(LAST_ID_KEY) || "");
     setRemember(localStorage.getItem(REMEMBER_KEY) !== "false");
+    // Token callbacks are handled globally, including password recovery.
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    if (params.has("access_token") || params.get("type") === "recovery") return;
+    let active = true;
     // If user already has a session (e.g. PWA reopened), skip the form.
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
+      if (active && session?.user) {
         const path = await getRedirectPath(session.user.id);
-        navigate(path, { replace: true });
+        if (active && window.location.pathname === "/auth") navigate(path, { replace: true });
       }
-    })();
+    })().catch(() => { /* Keep the login form available on session errors. */ });
+    return () => { active = false; };
   }, [navigate]);
 
 
