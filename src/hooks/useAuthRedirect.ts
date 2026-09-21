@@ -1,59 +1,75 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 const getRedirectPath = async (userId: string): Promise<string> => {
-  const { data } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-  const roles = data?.map(r => r.role) || [];
-  return roles.includes("super_admin") ? "/super-admin" : "/dashboard";
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  return data?.some(r => r.role === "super_admin") ? "/super-admin" : "/dashboard";
 };
 
 export function useAuthRedirect() {
   const navigate = useNavigate();
+  const { pathname, hash } = useLocation();
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash.includes("access_token")) return;
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    if (pathname === "/reset-password") return;
+    if (params.get("type") === "recovery") {
+      navigate(`/reset-password${hash}`, { replace: true });
+      return;
+    }
+    if (!params.has("access_token")) return;
 
-    const handleRedirect = async () => {
-      // Let Supabase process the hash tokens first via setSession or internal detection
-      // Poll for session since Supabase processes the hash asynchronously
-      let attempts = 0;
-      const tryRedirect = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
+    let cancelled = false;
+    let running = false;
+    let attempts = 0;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const canRedirect = () => !cancelled && window.location.pathname !== "/reset-password" &&
+      new URLSearchParams(window.location.hash.slice(1)).get("type") !== "recovery";
+
+    const tryRedirect = async () => {
+      if (!canRedirect() || running) return;
+      running = true;
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!canRedirect() || error) return;
         if (session?.user) {
-          // Clear the hash AFTER Supabase processed it
-          window.history.replaceState(null, "", window.location.pathname);
           const path = await getRedirectPath(session.user.id);
+          if (!canRedirect()) return;
+          cancelled = true;
           navigate(path, { replace: true });
-          return;
+        } else if (++attempts < 20) {
+          retry = setTimeout(() => void tryRedirect(), 500);
         }
-        attempts++;
-        if (attempts < 20) {
-          setTimeout(tryRedirect, 500);
-        }
-      };
-
-      // Also listen for auth state change as primary mechanism
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user) {
-          window.history.replaceState(null, "", window.location.pathname);
-          const path = await getRedirectPath(session.user.id);
-          navigate(path, { replace: true });
-          subscription.unsubscribe();
-        }
-      });
-
-      // Start polling as backup
-      tryRedirect();
-
-      // Cleanup after 15s
-      setTimeout(() => subscription.unsubscribe(), 15000);
+      } catch {
+        // Keep the auth page available for another login attempt.
+      } finally {
+        running = false;
+      }
     };
 
-    handleRedirect();
-  }, [navigate]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        cancelled = true;
+        if (retry) clearTimeout(retry);
+        navigate("/reset-password", { replace: true });
+      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (retry) clearTimeout(retry);
+        // Defer SDK calls until its auth callback releases the session lock.
+        retry = setTimeout(() => void tryRedirect(), 0);
+      }
+    });
+    void tryRedirect();
+    const deadline = setTimeout(() => {
+      cancelled = true;
+      if (retry) clearTimeout(retry);
+      subscription.unsubscribe();
+    }, 15000);
+    return () => {
+      cancelled = true;
+      if (retry) clearTimeout(retry);
+      clearTimeout(deadline);
+      subscription.unsubscribe();
+    };
+  }, [navigate, pathname, hash]);
 }

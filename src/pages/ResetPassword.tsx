@@ -11,18 +11,38 @@ import { toast } from "sonner";
 export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [sessionState, setSessionState] = useState<"checking" | "ready" | "invalid">("checking");
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for recovery token in URL hash
-    const hash = window.location.hash;
-    if (!hash.includes("type=recovery")) {
-      toast.error("Link de recuperação inválido ou expirado");
+    let active = true;
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    const query = new URLSearchParams(window.location.search);
+    if (hash.has("error") || hash.has("error_code") || query.has("error") || query.has("error_code")) {
+      setSessionState("invalid");
+      return;
     }
+    // The SDK can consume the recovery hash before this page mounts.
+    void supabase.auth.getUser().then(({ data, error }) => {
+      if (active) setSessionState(!error && data.user ? "ready" : "invalid");
+    }).catch(() => {
+      if (active) setSessionState("invalid");
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (active && event === "SIGNED_OUT") setSessionState("invalid");
+    });
+    return () => { active = false; subscription.unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => navigate("/auth", { replace: true }), 2000);
+    return () => clearTimeout(timer);
+  }, [success, navigate]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (sessionState !== "ready" || loading) return;
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
@@ -38,9 +58,13 @@ export default function ResetPassword() {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+      if (signOutError) {
+        toast.error("Senha atualizada, mas não foi possível encerrar a sessão. Saia da conta antes de entrar novamente.");
+        return;
+      }
       setSuccess(true);
       toast.success("Senha atualizada com sucesso!");
-      setTimeout(() => navigate("/auth"), 2000);
     } catch (error: any) {
       toast.error(error.message || "Erro ao atualizar senha");
     } finally {
@@ -62,7 +86,7 @@ export default function ResetPassword() {
           <CardHeader>
             <CardTitle>{success ? "Senha Atualizada" : "Redefinir Senha"}</CardTitle>
             <CardDescription>
-              {success ? "Sua senha foi atualizada. Redirecionando..." : "Digite sua nova senha abaixo"}
+              {success ? "Sua senha foi atualizada. Redirecionando..." : sessionState === "ready" ? "Digite sua nova senha abaixo" : sessionState === "checking" ? "Verificando seu acesso..." : "Link inválido ou expirado. Solicite um novo link de recuperação."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -71,6 +95,10 @@ export default function ResetPassword() {
                 <CheckCircle2 className="h-12 w-12 text-green-500" />
                 <p className="text-sm text-muted-foreground">Redirecionando para o login...</p>
               </div>
+            ) : sessionState === "checking" ? (
+              <div role="status" className="flex justify-center py-6"><Loader2 aria-label="Verificando acesso" className="h-6 w-6 animate-spin" /></div>
+            ) : sessionState === "invalid" ? (
+              <Button className="w-full" onClick={() => navigate("/auth", { replace: true })}>Voltar para o login</Button>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
