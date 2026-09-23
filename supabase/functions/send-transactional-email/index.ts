@@ -1,24 +1,15 @@
 import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 
-// Configuration baked in at scaffold time — do NOT change these manually.
-// To update, re-run the email domain setup flow.
-const SITE_NAME = "psicoone"
-// SENDER_DOMAIN is the verified sender subdomain FQDN (e.g., "notify.example.com").
-// It MUST match the subdomain delegated to Lovable's nameservers — never the root domain.
-// The email API looks up this exact domain; a mismatch causes "No email domain record found".
-const SENDER_DOMAIN = "notify.sevendevx.com"
-// FROM_DOMAIN is the domain shown in the From: header (e.g., "example.com").
-// When display_from_root is enabled, this can be the root domain for cleaner branding,
-// even though actual sending uses the subdomain above.
-const FROM_DOMAIN = "notify.sevendevx.com"
+// STAGING ONLY: authenticated manual enqueue; worker is invoked separately.
+const STAGING_URL = 'https://jeguvjpfuyksqiqrrvyz.supabase.co'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://psicoonex.vercel.app',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
+    'authorization, x-client-info, apikey, content-type, x-email-worker-secret',
 }
 
 // Generate a cryptographically random 32-byte hex token
@@ -30,10 +21,7 @@ function generateToken(): string {
     .join('')
 }
 
-// Auth note: this function uses verify_jwt = true in config.toml, so Supabase's
-// gateway validates the caller's JWT (anon or service_role) before the request
-// reaches this code. No in-function auth check is needed.
-
+// Authenticate every POST with the dedicated secret before database access.
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -53,6 +41,26 @@ Deno.serve(async (req) => {
       }
     )
   }
+
+  const respond = (status: number, body: unknown) => new Response(JSON.stringify(body), {
+    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+  if (req.method !== 'POST') return respond(405, { error: 'POST required' })
+  const workerSecret = Deno.env.get('EMAIL_WORKER_SECRET')
+  const testRecipient = Deno.env.get('EMAIL_TEST_RECIPIENT')?.trim().toLowerCase()
+  const emailFrom = Deno.env.get('EMAIL_FROM')?.trim()
+  if (supabaseUrl.replace(/\/$/, '') !== STAGING_URL || !workerSecret || workerSecret.length < 32 ||
+      !testRecipient || !/^[^\s<>;,]+@[^\s<>;,]+\.[^\s<>;,]+$/.test(testRecipient) ||
+      !emailFrom || !/^(?:[^<>\r\n]+\s*<)?noreply@psicoone-mail\.sevendevx\.com>?$/.test(emailFrom)) {
+    return respond(503, { error: 'Invalid staging configuration' })
+  }
+  const digest = async (s: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))
+  const [provided, expected] = await Promise.all([
+    digest(req.headers.get('x-email-worker-secret') || ''), digest(workerSecret),
+  ])
+  let mismatch = 0
+  for (let i = 0; i < expected.length; i++) mismatch |= provided[i] ^ expected[i]
+  if (mismatch) return respond(401, { error: 'Worker secret required' })
 
   // Parse request body
   let templateName: string
@@ -94,7 +102,7 @@ Deno.serve(async (req) => {
   }
 
   // 1. Look up template from registry (early — needed to resolve recipient)
-  const template = TEMPLATES[templateName]
+  const template = Object.hasOwn(TEMPLATES, templateName) ? TEMPLATES[templateName] : undefined
 
   if (!template) {
     console.error('Template not found in registry', { templateName })
@@ -124,6 +132,21 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
+  }
+
+  if (typeof effectiveRecipient !== 'string' || effectiveRecipient.trim().toLowerCase() !== testRecipient) {
+    return respond(403, { error: 'Recipient blocked by staging allowlist' })
+  }
+  // Template buttons must remain inside staging. Never rewrite real-user links.
+  for (const field of ['portalUrl', 'inviteUrl', 'agendaUrl']) {
+    if (templateData[field] !== undefined && templateData[field] !== '') {
+      try {
+        const link = new URL(templateData[field])
+        if (link.origin !== 'https://psicoonex.vercel.app' || link.username || link.password) throw new Error()
+      } catch {
+        return respond(400, { error: 'Template links must use the staging site', field })
+      }
+    }
   }
 
   // Create Supabase client with service role (bypasses RLS)
@@ -318,8 +341,8 @@ Deno.serve(async (req) => {
     payload: {
       message_id: messageId,
       to: effectiveRecipient,
-      from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
-      sender_domain: SENDER_DOMAIN,
+      from: emailFrom,
+      sender_domain: 'psicoone-mail.sevendevx.com',
       subject: resolvedSubject,
       html,
       text: plainText,
@@ -352,28 +375,12 @@ Deno.serve(async (req) => {
     })
   }
 
-  try {
-    await fetch(`${supabaseUrl}/functions/v1/process-email-queue`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${supabaseServiceKey}`,
-        apikey: supabaseServiceKey,
-      },
-      body: JSON.stringify({ source: 'send-transactional-email', messageId }),
-    })
-  } catch (queueKickError) {
-    console.warn('Email queued but immediate processing kick failed', {
-      templateName,
-      effectiveRecipient,
-      error: queueKickError instanceof Error ? queueKickError.message : String(queueKickError),
-    })
-  }
+  // Manual staging: do not wake the worker or activate scheduled jobs.
 
   console.log('Transactional email enqueued', { templateName, effectiveRecipient })
 
   return new Response(
-    JSON.stringify({ success: true, queued: true, messageId }),
+    JSON.stringify({ success: true, queued: true, sent: false, manual_processing: true, messageId }),
     {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
