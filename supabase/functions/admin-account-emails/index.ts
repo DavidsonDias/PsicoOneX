@@ -7,10 +7,17 @@ const headers = {
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
 };
-const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), {status, headers});
+
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, {status: 204, headers});
+  const allowedOrigins = new Set([
+    'https://psicoonex.vercel.app',
+    'https://psicoonex-git-codex-admin-account-emails-davidson-dias-projects.vercel.app',
+  ]);
+  const origin = req.headers.get('Origin') || '';
+  const responseHeaders = {...headers, 'Access-Control-Allow-Origin': allowedOrigins.has(origin) ? origin : 'https://psicoonex.vercel.app', Vary: 'Origin'};
+  const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), {status, headers: responseHeaders});
+  if (req.method === 'OPTIONS') return new Response(null, {status: 204, headers: responseHeaders});
   if (req.method !== 'POST') return reply(405, {error: 'POST required'});
   const token = req.headers.get('Authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
   if (!token) return reply(401, {error: 'Authentication required'});
