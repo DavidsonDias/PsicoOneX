@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -20,6 +21,9 @@ function json(body: unknown, status = 200) {
 }
 
 Deno.serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -34,7 +38,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const user = userData.user;
-    const origin = req.headers.get("origin") || "https://psicoone.lovable.app";
+    const origin = req.headers.get("origin") || "https://psicoonex.vercel.app";
     const runId = crypto.randomUUID();
 
     const { data: profile } = await supabase

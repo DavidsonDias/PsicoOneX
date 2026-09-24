@@ -18,34 +18,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE
-  url text := 'https://jlnpehjlfwejwshvxwhs.supabase.co/functions/v1/dispatch-notification';
-  anon_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsbnBlaGpsZndlandzaHZ4d2hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMTE1MzcsImV4cCI6MjA3NTY4NzUzN30.ZPbxgwGryhGivDfGIiQyT-Rvv9w4pwcFtzEWrmGkT3Q';
 BEGIN
-  IF _user_id IS NULL THEN RETURN; END IF;
-  BEGIN
-    PERFORM net.http_post(
-      url := url,
-      headers := jsonb_build_object(
-        'Content-Type','application/json',
-        'apikey', anon_key,
-        'Authorization','Bearer '||anon_key
-      ),
-      body := jsonb_build_object(
-        'user_id', _user_id,
-        'category', _category,
-        'type', _type,
-        'title', _title,
-        'message', _message,
-        'action_path', _action_path,
-        'action_label', _action_label,
-        'metadata', _metadata
-      )
-    );
-  EXCEPTION WHEN OTHERS THEN
-    -- never block original op
-    NULL;
-  END;
+  -- PsicoOneX staging: outbound dispatch remains disabled on migration replay.
+  RETURN;
 END;
 $$;
 

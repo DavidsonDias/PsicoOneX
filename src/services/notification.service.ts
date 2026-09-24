@@ -30,7 +30,7 @@ export interface NotificationResult {
 const APP_BASE_URL =
   typeof window !== "undefined"
     ? window.location.origin
-    : "https://psicoone.lovable.app";
+    : "https://psicoonex.vercel.app";
 
 /**
  * Sends appointment confirmation email + generates patient portal link.

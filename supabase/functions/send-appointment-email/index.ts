@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     const date = new Date(apt.scheduled_at);
     const dateStr = date.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
     const timeStr = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-    const portalUrl = `${Deno.env.get("APP_BASE_URL") || "https://psicoone.lovable.app"}/portal/${token}`;
+    const portalUrl = `https://psicoonex.vercel.app/portal/${token}`;
 
     const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
       method: "POST",

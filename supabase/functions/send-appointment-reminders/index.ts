@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
         .select("token")
         .single();
 
-      const portalUrl = link?.token ? `https://psicoone.com/portal/${link.token}` : undefined;
+      const portalUrl = link?.token ? `https://psicoonex.vercel.app/portal/${link.token}` : undefined;
       const dateStr = new Date(apt.scheduled_at).toLocaleDateString("pt-BR", {
         weekday: "long", day: "2-digit", month: "long", year: "numeric",
         timeZone: "America/Sao_Paulo",

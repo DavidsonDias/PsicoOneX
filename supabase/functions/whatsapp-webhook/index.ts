@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 // WhatsApp webhook (Meta) - verify + status/messages receiver
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
@@ -21,6 +22,9 @@ async function verifySignature(rawBody: string, header: string | null, appSecret
 }
 
 serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "";

@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -91,6 +92,9 @@ async function getValidAccessToken(serviceClient: any, userId: string): Promise<
 }
 
 Deno.serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

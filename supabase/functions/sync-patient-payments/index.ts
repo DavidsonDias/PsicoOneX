@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 // Polls Stripe for recent payments and marks matching financial_transactions as paid.
 // Triggered from the frontend (refresh button) and can be scheduled via cron.
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -13,6 +14,9 @@ const corsHeaders = {
 const log = (s: string, d?: any) => console.log(`[SYNC-PATIENT-PAYMENTS] ${s}${d ? ` - ${JSON.stringify(d)}` : ""}`);
 
 serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {

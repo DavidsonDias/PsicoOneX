@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 // Internal endpoint called by DB triggers (or app code) to dispatch
 // WhatsApp templates for appointment lifecycle events.
 // Body: { appointment_id: string, event: "created"|"rescheduled"|"cancelled"|"started" }
@@ -35,6 +36,9 @@ function fmtDateTime(iso: string) {
 }
 
 serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 // Central dispatcher: writes a notification row + fires Web Push respecting
 // per-user category preferences. Called by DB triggers (via pg_net) and by
 // any server-side code that needs to notify a user.
@@ -20,6 +21,9 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const PROJECT_FUNCTIONS = `${SUPABASE_URL}/functions/v1`;
 
 Deno.serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // Server-to-server only. Accept SERVICE_ROLE_KEY (used by pg_net triggers)

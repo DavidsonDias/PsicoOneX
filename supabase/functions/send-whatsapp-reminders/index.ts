@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 // Cron job: dispatches WhatsApp 24h and 1h reminders for upcoming appointments.
 // Idempotency via whatsapp_logs (template + appointment_id within window).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
@@ -8,6 +9,9 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "")
