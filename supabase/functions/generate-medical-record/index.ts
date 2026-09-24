@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireUser } from "../_shared/require-auth.ts";
 
@@ -10,6 +11,9 @@ const corsHeaders = {
 const AI_PROMPT_VERSION = "2.0_ENTERPRISE";
 
 serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

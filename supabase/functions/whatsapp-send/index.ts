@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 // WhatsApp Cloud API (Meta) - sender
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
@@ -40,6 +41,9 @@ async function sendOnce(payload: any, accessToken: string, phoneNumberId: string
 }
 
 serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

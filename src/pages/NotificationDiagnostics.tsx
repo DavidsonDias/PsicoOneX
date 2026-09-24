@@ -130,7 +130,7 @@ export default function NotificationDiagnostics() {
             duration: "50",
             type: "presential",
             psychologistName: "Diagnóstico",
-            portalUrl: "https://psicoone.com",
+            portalUrl: "https://psicoonex.vercel.app",
           },
           metadata: { test: true },
         },

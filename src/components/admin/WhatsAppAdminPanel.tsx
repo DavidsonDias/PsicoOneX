@@ -37,7 +37,7 @@ interface WaConfig {
   updated_at: string;
 }
 
-const PROJECT_ID = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID || "jlnpehjlfwejwshvxwhs";
+const PROJECT_ID = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID || "jeguvjpfuyksqiqrrvyz";
 const WEBHOOK_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/whatsapp-webhook`;
 
 const QUALITY_COLORS: Record<string, string> = {

@@ -1,3 +1,4 @@
+import { unvalidatedIntegrationResponse } from "../_shared/staging-isolation.ts";
 // WhatsApp Admin API - Super Admin only
 // Actions: test, phone_numbers, templates, business_profile, ping
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -29,6 +30,9 @@ async function gFetch(url: string, token: string) {
 }
 
 serve(async (req) => {
+  const migrationPause = unvalidatedIntegrationResponse(req);
+  if (migrationPause) return migrationPause;
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
