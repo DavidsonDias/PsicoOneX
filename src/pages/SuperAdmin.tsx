@@ -92,6 +92,7 @@ const SuperAdmin = () => {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [accountEmails, setAccountEmails] = useState<Record<string, string | null>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [trashFilter, setTrashFilter] = useState("all");
   const [trashDateFilter, setTrashDateFilter] = useState("");
@@ -220,6 +221,21 @@ const SuperAdmin = () => {
   const loadSubscriptions = async () => {
     const { data } = await supabase.from("subscriptions").select("*");
     setSubscriptions(data || []);
+    setAccountEmails({});
+    const ids = [...new Set((data || []).map(sub => sub.user_id))];
+    const emails: Record<string, string | null> = {};
+    try {
+      for (let offset = 0; offset < ids.length; offset += 100) {
+        const { data: result, error } = await supabase.functions.invoke("admin-account-emails", {
+          body: { userIds: ids.slice(offset, offset + 100) },
+        });
+        if (error || !Array.isArray(result?.users)) throw new Error("email_lookup_failed");
+        for (const user of result.users) emails[user.id] = user.email;
+      }
+      setAccountEmails(emails);
+    } catch {
+      toast({ title: "E-mails indisponíveis", description: "Não foi possível consultar os e-mails das contas. Atualize a página para tentar novamente.", variant: "destructive" });
+    }
   };
 
   const handleUpdateSubscription = async (userId: string, updates: Record<string, any>) => {
@@ -653,6 +669,7 @@ const SuperAdmin = () => {
                               </div>
                               <div>
                                 <p className="text-sm font-medium">{profile?.full_name || "Desconhecido"}</p>
+                                <p className="text-xs text-muted-foreground break-all">{accountEmails[sub.user_id] === undefined ? "E-mail indisponível" : accountEmails[sub.user_id] || "Conta sem e-mail"}</p>
                                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                   <Badge className={cn("text-[10px] h-5", statusColors[sub.status] || "")}>
                                     {sub.status}
@@ -903,6 +920,7 @@ const SuperAdmin = () => {
                               </div>
                               <div>
                                 <p className="text-sm font-medium">{profile?.full_name || "Desconhecido"}</p>
+                                <p className="text-xs text-muted-foreground break-all">{accountEmails[sub.user_id] === undefined ? "E-mail indisponível" : accountEmails[sub.user_id] || "Conta sem e-mail"}</p>
                                 <div className="flex items-center gap-2 mt-0.5 text-xs text-[hsl(220,9%,50%)]">
                                   <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] h-5">
                                     {planLabels[sub.plan] || sub.plan}
