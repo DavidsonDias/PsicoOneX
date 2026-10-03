@@ -20,6 +20,7 @@ vi.mock("@/lib/patient-access", () => ({
 import {
   sendAppointmentNotification,
   resendAppointmentAccess,
+  getAppointmentEmailStatus,
 } from "./notification.service";
 
 // ---- Test fixtures ----
@@ -103,19 +104,23 @@ beforeEach(() => {
   invokeMock.mockReset();
   fromMock.mockReset();
   getSessionMock.mockReset();
-  invokeMock.mockResolvedValue({ data: { success: true, queued: true }, error: null });
+  invokeMock.mockResolvedValue({ data: { sent: false, queued: true, messageId: "synthetic-message" }, error: null });
   getSessionMock.mockResolvedValue({ data: { session: { user: { id: ctx.psychologistId, email: "psy@test.com" } } } });
 });
 
 describe("sendAppointmentNotification", () => {
-  it("envia email ao paciente e retorna portalUrl", async () => {
+  it("solicita confirmação no servidor e distingue fila de envio", async () => {
     fromMock.mockImplementation(makeFromImpl({}));
     const r = await sendAppointmentNotification(ctx);
     expect(r.success).toBe(true);
-    expect(r.emailSent).toBe(true);
+    expect(r.emailSent).toBe(false);
+    expect(r.emailQueued).toBe(true);
     expect(r.portalUrl).toContain("/portal/tok_TEST123");
     const calls = invokeMock.mock.calls.map((c) => c[0]);
-    expect(calls).toContain("send-transactional-email");
+    expect(calls).toEqual(["send-appointment-email"]);
+    expect(invokeMock.mock.calls[0][1]).toEqual({ body: {
+      appointmentId: ctx.appointmentId, patientId: ctx.patientId, token: "tok_TEST123",
+    } });
   });
 
   it("respeita skipEmail: gera token e não chama email", async () => {
@@ -135,7 +140,7 @@ describe("sendAppointmentNotification", () => {
     expect(r.portalUrl).toContain("/portal/");
   });
 
-  it("envia cópia ao psicólogo quando bcc_self está ativo", async () => {
+  it("não chama o produtor interno nem afirma envio de cópias no staging", async () => {
     fromMock.mockImplementation(
       makeFromImpl({
         notificationEmails: ["clinica@test.com"],
@@ -143,9 +148,40 @@ describe("sendAppointmentNotification", () => {
       })
     );
     const r = await sendAppointmentNotification(ctx);
-    expect(r.psychologistEmailSent).toBe(true);
-    const templates = invokeMock.mock.calls.map((c: any) => c[1]?.body?.templateName);
-    expect(templates).toContain("psychologist-patient-action");
+    expect(r.psychologistEmailSent).toBe(false);
+    expect(invokeMock.mock.calls.map(c => c[0])).toEqual(["send-appointment-email"]);
+  });
+
+  it.each([
+    null, {}, { success: true }, { queued: true },
+    { queued: true, sent: false, messageId: "" },
+    { queued: true, sent: true, messageId: "ambiguous" },
+    { success: false, reason: "email_suppressed" },
+  ])("recusa confirmação incompleta ou contraditória: %j", async data => {
+    fromMock.mockImplementation(makeFromImpl({}));
+    invokeMock.mockResolvedValue({ data, error: null });
+    const result = await sendAppointmentNotification(ctx);
+    expect(result.success).toBe(false);
+    expect(result.emailSent).toBe(false);
+    expect(result.emailQueued).not.toBe(true);
+    expect(result.portalUrl).toContain("/portal/");
+  });
+
+  it("mantém o link quando o servidor recusa o envio", async () => {
+    fromMock.mockImplementation(makeFromImpl({}));
+    invokeMock.mockResolvedValue({ data: null, error: { message: "private upstream details" } });
+    const result = await sendAppointmentNotification(ctx);
+    expect(result.success).toBe(false);
+    expect(result.emailSent).toBe(false);
+    expect(result.portalUrl).toContain("/portal/");
+    expect(result.error).not.toContain("private");
+  });
+
+  it("não troca um lembrete por confirmação nem contorna a pausa", async () => {
+    fromMock.mockImplementation(makeFromImpl({}));
+    const result = await sendAppointmentNotification(ctx, { templateName: "appointment-reminder" });
+    expect(result.reason).toBe("reminders_unavailable");
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 });
 
@@ -155,8 +191,11 @@ describe("resendAppointmentAccess", () => {
     const r = await resendAppointmentAccess(ctx.appointmentId);
     expect(r.success).toBe(true);
     const fnNames = invokeMock.mock.calls.map((c) => c[0]);
-    expect(fnNames).toContain("send-transactional-email");
+    expect(fnNames).toContain("send-appointment-email");
     expect(fnNames).toContain("dispatch-notification");
+    expect(fnNames).not.toContain("send-transactional-email");
+    const notice = invokeMock.mock.calls.find(c => c[0] === "dispatch-notification");
+    expect(notice?.[1].body.title).toBe("E-mail aguardando envio");
   });
 
   it("quando on_access_share=false, gera link mas não envia email", async () => {
@@ -167,7 +206,17 @@ describe("resendAppointmentAccess", () => {
     expect(r.emailSent).toBe(false);
     expect(r.portalUrl).toContain("/portal/");
     const fnNames = invokeMock.mock.calls.map((c) => c[0]);
-    expect(fnNames).not.toContain("send-transactional-email");
+    expect(fnNames).not.toContain("send-appointment-email");
     expect(fnNames).toContain("dispatch-notification");
+  });
+});
+
+describe("getAppointmentEmailStatus", () => {
+  it("considera somente o histórico da consulta solicitada", async () => {
+    const eq = vi.fn().mockReturnThis();
+    const query = { select: vi.fn().mockReturnThis(), eq, order: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: { status: "sent" } }) };
+    fromMock.mockReturnValue(query);
+    expect(await getAppointmentEmailStatus(ctx.appointmentId)).toBe("sent");
+    expect(eq).toHaveBeenCalledWith("metadata->>appointment_id", ctx.appointmentId);
   });
 });

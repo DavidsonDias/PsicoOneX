@@ -213,6 +213,8 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
           <p className="text-xs text-muted-foreground">
             {result.emailSent
               ? "E-mail enviado ao paciente."
+              : result.emailQueued
+              ? "E-mail na fila, aguardando envio."
               : result.reason === "no_email"
               ? "Paciente sem e-mail — copie o link manualmente."
               : "Link gerado, mas e-mail não foi enviado."}
@@ -243,6 +245,7 @@ export function PatientAgendaTab({ patientId, patientName, defaultSessionValue }
     if (result.portalUrl) {
       await navigator.clipboard.writeText(result.portalUrl);
       if (result.emailSent) toast.success("✅ Acesso enviado e link copiado!");
+      else if (result.emailQueued) toast.info("Link gerado. E-mail na fila, aguardando envio.");
       else if (result.reason === "no_email") toast.info("Paciente sem e-mail. Link copiado para envio manual.");
       else toast.warning("Link copiado, mas e-mail não foi enviado.");
     } else {
