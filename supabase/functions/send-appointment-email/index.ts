@@ -1,139 +1,94 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 import { requireUser } from "../_shared/require-auth.ts";
 
+const site = "https://psicoonex.vercel.app";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": site,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
+};
+const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), {
+  status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+});
+
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  // Require caller authentication — prevents unsolicited emails from anon callers.
-  const auth = await requireUser(req, corsHeaders);
-  if ('error' in auth) return auth.error;
-
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method !== "POST") return reply(405, { error: "POST required" });
   try {
-    const { appointmentId, patientId, token } = await req.json();
-
-
-    if (!appointmentId || !patientId || !token) {
-      return new Response(JSON.stringify({ error: "Dados obrigatórios: appointmentId, patientId, token" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const auth = await requireUser(req, corsHeaders);
+    if ("error" in auth) return auth.error;
+    const url = Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "");
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const secret = Deno.env.get("EMAIL_WORKER_SECRET");
+    const recipient = Deno.env.get("EMAIL_TEST_RECIPIENT")?.trim().toLowerCase();
+    if (url !== "https://jeguvjpfuyksqiqrrvyz.supabase.co" || !key || !secret || secret.length < 32 || !recipient) {
+      return reply(503, { error: "Invalid staging configuration" });
     }
-    // Validate token format (alnum/underscore/hyphen, reasonable length) to prevent HTML injection
-    if (typeof token !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(token)) {
-      return new Response(JSON.stringify({ error: "Token inválido" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    let body;
+    try { body = await req.json(); } catch { return reply(400, { error: "Invalid JSON" }); }
+    const { appointmentId, patientId, token } = body ?? {};
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (typeof appointmentId !== "string" || !uuid.test(appointmentId) || typeof patientId !== "string" || !uuid.test(patientId) ||
+        typeof token !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(token)) {
+      return reply(400, { error: "Dados da consulta ou token inválidos" });
     }
-
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceKey);
-
-    // Fetch patient
-    const { data: patient } = await supabase
-      .from("patients")
-      .select("full_name, email")
-      .eq("id", patientId)
-      .single();
-
-    if (!patient?.email) {
-      return new Response(JSON.stringify({ error: "Paciente sem e-mail cadastrado" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const db = createClient(url, key);
+    // Scope every privileged lookup to the verified caller and linked records.
+    const { data: apt, error: aptError } = await db.from("appointments")
+      .select("scheduled_at, duration_minutes, type, psychologist_id, patient_id")
+      .eq("id", appointmentId).eq("psychologist_id", auth.user.id)
+      .eq("patient_id", patientId).is("deleted_at", null).maybeSingle();
+    if (aptError) return reply(503, { error: "Falha ao consultar agendamento" });
+    if (!apt || apt.psychologist_id !== auth.user.id || apt.patient_id !== patientId) return reply(404, { error: "Agendamento não encontrado" });
+    const { data: patient, error: patientError } = await db.from("patients")
+      .select("full_name, email, psychologist_id")
+      .eq("id", patientId).eq("psychologist_id", auth.user.id).is("deleted_at", null).maybeSingle();
+    if (patientError) return reply(503, { error: "Falha ao consultar paciente" });
+    if (!patient || patient.psychologist_id !== auth.user.id) return reply(404, { error: "Paciente não encontrado" });
+    if (!patient.email || patient.email.trim().toLowerCase() !== recipient) {
+      return reply(403, { error: "Recipient blocked by staging allowlist" });
     }
-
-    // Fetch appointment
-    const { data: apt } = await supabase
-      .from("appointments")
-      .select("scheduled_at, duration_minutes, type, psychologist_id")
-      .eq("id", appointmentId)
-      .single();
-
-    if (!apt) {
-      return new Response(JSON.stringify({ error: "Agendamento não encontrado" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const { data: link, error: linkError } = await db.from("patient_access_links")
+      .select("id, expires_at, is_revoked, appointment_id, patient_id, created_by")
+      .eq("token", token).eq("appointment_id", appointmentId).eq("patient_id", patientId)
+      .eq("created_by", auth.user.id).eq("is_revoked", false).maybeSingle();
+    if (linkError) return reply(503, { error: "Falha ao validar link" });
+    if (!link || link.is_revoked !== false || link.appointment_id !== appointmentId || link.patient_id !== patientId ||
+        link.created_by !== auth.user.id || !Number.isFinite(Date.parse(link.expires_at)) || Date.parse(link.expires_at) <= Date.now()) {
+      return reply(400, { error: "Link inválido ou expirado" });
     }
-
-    // Ownership check: caller must own the appointment.
-    if (apt.psychologist_id !== auth.user.id) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Validate token exists in patient_access_links for this appointment/patient.
-    const { data: linkRow } = await supabase
-      .from("patient_access_links")
-      .select("id")
-      .eq("token", token)
-      .eq("patient_id", patientId)
-      .maybeSingle();
-    if (!linkRow) {
-      return new Response(JSON.stringify({ error: "Token inválido" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-
-    // Fetch psychologist name
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("full_name, clinic_name")
-      .eq("id", apt.psychologist_id)
-      .single();
-
+    const { data: prof, error: profError } = await db.from("profiles")
+      .select("full_name, clinic_name").eq("id", auth.user.id).maybeSingle();
+    if (profError) return reply(503, { error: "Falha ao consultar profissional" });
     const date = new Date(apt.scheduled_at);
-    const dateStr = date.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
-    const timeStr = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-    const portalUrl = `https://psicoonex.vercel.app/portal/${token}`;
-
-    const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
+    if (!Number.isFinite(date.getTime())) return reply(400, { error: "Data da consulta inválida" });
+    const portalUrl = `${site}/portal/${token}`;
+    const response = await fetch(`${url}/functions/v1/send-transactional-email`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+      headers: { "Content-Type": "application/json", "x-email-worker-secret": secret },
+      signal: AbortSignal.timeout(15000),
       body: JSON.stringify({
-        templateName: "appointment-confirmation",
-        recipientEmail: patient.email,
+        templateName: "appointment-confirmation", recipientEmail: recipient,
         idempotencyKey: `apt-confirm-${appointmentId}`,
         templateData: {
           patientName: patient.full_name.split(" ")[0],
-          date: dateStr,
-          time: timeStr,
-          duration: String(apt.duration_minutes || 50),
-          type: apt.type || "presential",
-          psychologistName: prof?.full_name,
-          clinicName: prof?.clinic_name,
-          portalUrl,
+          date: date.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" }),
+          time: date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }),
+          duration: String(apt.duration_minutes || 50), type: apt.type || "presential",
+          psychologistName: prof?.full_name, clinicName: prof?.clinic_name, portalUrl,
         },
-        metadata: { appointment_id: appointmentId, patient_id: patientId, channel: "legacy_send_appointment_email" },
+        metadata: { appointment_id: appointmentId, patient_id: patientId },
       }),
     });
-
-    const payload = await emailRes.json().catch(() => ({}));
-    if (!emailRes.ok || payload?.error) {
-      return new Response(JSON.stringify({ sent: false, error: payload?.error || `HTTP ${emailRes.status}` }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.success !== true || result?.queued !== true || typeof result?.messageId !== "string" || !result.messageId) {
+      return reply(502, { sent: false, queued: false, error: "Não foi possível enfileirar o e-mail" });
     }
-
-    return new Response(JSON.stringify({ sent: true, queued: true, portalUrl, messageId: payload?.messageId }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    console.error("Error:", err);
-    return new Response(JSON.stringify({ error: "Erro interno" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return reply(200, { sent: false, queued: true, manual_processing: true, portalUrl, messageId: result.messageId });
+  } catch {
+    // Never log tokens, credentials, clinical content or upstream response bodies.
+    return reply(500, { sent: false, queued: false, error: "Erro interno" });
   }
 });
+
