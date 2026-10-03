@@ -325,6 +325,8 @@ export default function Agenda() {
     }).then(result => {
       if (result.emailSent) {
         toast.success("📩 E-mail de confirmação enviado ao paciente!");
+      } else if (result.emailQueued) {
+        toast.info("E-mail de confirmação na fila, aguardando envio.");
       } else if (result.reason === "no_email") {
         toast.info("Paciente sem e-mail cadastrado — link gerado, envio manual.");
       }
@@ -593,6 +595,8 @@ export default function Agenda() {
       try { await navigator.clipboard.writeText(result.portalUrl); } catch {}
       if (result.emailSent) {
         toast.success(`✅ Acesso enviado para ${apt.patients.full_name}!`);
+      } else if (result.emailQueued) {
+        toast.info("Link gerado. E-mail na fila, aguardando envio.");
       } else if (result.reason === "no_email") {
         toast.info("Sem e-mail cadastrado. Link copiado para envio manual.");
       } else {
