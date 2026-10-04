@@ -4,13 +4,16 @@
 // Strategy:
 // - For each enabled offset (in minutes) from the psychologist's preferences,
 //   find appointments scheduled in [now + offset - WINDOW/2, now + offset + WINDOW/2].
-// - Idempotency is enforced by a deterministic idempotencyKey: `apt-rem-{offsetMin}-{appointmentId}`.
+// - A deterministic key identifies each reminder; atomic queue deduplication is a separate concern.
+// Staging defaults to dry-run. No scheduler or worker is activated by this function.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin": "https://psicoonex.vercel.app",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-email-worker-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
 };
 
 const DEFAULT_OFFSETS_MIN = [1440, 180, 60, 15];
@@ -33,45 +36,44 @@ interface AptRow {
   duration_minutes: number | null;
   type: string | null;
   status: string | null;
-  patients: { full_name: string; email: string | null } | null;
+  patients: { full_name: string; email: string | null; psychologist_id: string; deleted_at: string | null } | null;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "")
-    || req.headers.get("x-cron-secret")
-    || req.headers.get("x-internal-secret");
-  const allowed = new Set(
-    [
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-      Deno.env.get("INTERNAL_FUNCTION_SECRET"),
-      Deno.env.get("CRON_SECRET"),
-    ].filter(Boolean) as string[],
-  );
-  if (!token || !allowed.has(token)) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: 403,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), {
+    status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method !== "POST") return reply(405, { error: "POST required" });
+  const secret = Deno.env.get("EMAIL_WORKER_SECRET");
+  if (!secret || secret.length < 32 || req.headers.get("x-email-worker-secret") !== secret) {
+    return reply(403, { error: "Forbidden" });
   }
-
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const recipient = Deno.env.get("EMAIL_TEST_RECIPIENT")?.trim().toLowerCase();
+  if (supabaseUrl !== "https://jeguvjpfuyksqiqrrvyz.supabase.co" || !serviceKey || !recipient) {
+    return reply(503, { error: "Invalid staging configuration" });
+  }
+  let body;
+  try { body = await req.json(); } catch { return reply(400, { error: "Invalid JSON" }); }
+  if (!body || typeof body !== "object" || Array.isArray(body) ||
+      (body.dry_run !== undefined && typeof body.dry_run !== "boolean")) return reply(400, { error: "Invalid dry_run" });
+  const dryRun = body.dry_run !== false;
+  try {
   const supabase = createClient(supabaseUrl, serviceKey);
-
   const now = new Date();
-  const stats: Record<string, number> = { checked: 0, sent: 0, skipped: 0, failed: 0 };
+  const stats: Record<string, number> = { checked: 0, eligible: 0, queued: 0, sent: 0, skipped: 0, failed: 0 };
 
   // Map psychologist_id -> enabled offsets
-  const { data: prefRows } = await supabase
+  const { data: prefRows, error: prefError } = await supabase
     .from("user_preferences")
     .select("user_id, settings");
+  if (prefError) return reply(503, { error: "Falha ao consultar preferências" });
   const prefMap = new Map<string, number[]>();
   for (const r of (prefRows ?? []) as any[]) {
     const list = r?.settings?.reminder_minutes;
-    if (Array.isArray(list) && list.length) prefMap.set(r.user_id, list);
+    if (Array.isArray(list)) prefMap.set(r.user_id, list.filter((m: unknown) => typeof m === "number" && Number.isInteger(m) && m > 0 && m <= 10080));
   }
 
   // All offsets that might be enabled across users
@@ -85,7 +87,7 @@ Deno.serve(async (req) => {
 
     const { data: apts, error } = await supabase
       .from("appointments")
-      .select("id, patient_id, psychologist_id, scheduled_at, duration_minutes, type, status, patients(full_name, email)")
+      .select("id, patient_id, psychologist_id, scheduled_at, duration_minutes, type, status, patients(full_name, email, psychologist_id, deleted_at)")
       .gte("scheduled_at", from)
       .lt("scheduled_at", to)
       .is("deleted_at", null)
@@ -93,14 +95,15 @@ Deno.serve(async (req) => {
       .returns<AptRow[]>();
 
     if (error) {
-      console.error(`[reminders] window ${offset}m query failed:`, error);
+      stats.failed++;
       continue;
     }
     if (!apts?.length) continue;
 
     for (const apt of apts) {
       stats.checked++;
-      if (!apt.patients?.email) { stats.skipped++; continue; }
+      if (!apt.patients?.email || apt.patients.email.trim().toLowerCase() !== recipient ||
+          apt.patients.psychologist_id !== apt.psychologist_id || apt.patients.deleted_at !== null) { stats.skipped++; continue; }
 
       // Honor psychologist preference (fallback to defaults)
       const enabled = prefMap.get(apt.psychologist_id) ?? DEFAULT_OFFSETS_MIN;
@@ -109,24 +112,30 @@ Deno.serve(async (req) => {
       const idempotencyKey = `apt-rem-${offset}-${apt.id}`;
 
       // Dedup via email_send_log
-      const { data: existing } = await supabase
+      const { data: existing, error: historyError } = await supabase
         .from("email_send_log")
         .select("id")
         .eq("template_name", "appointment-reminder")
-        .or(`metadata->>idempotency_key.eq.${idempotencyKey},error_message.ilike.%${idempotencyKey}%`)
+        .eq("metadata->>idempotency_key", idempotencyKey)
+        .in("status", ["pending", "sent"])
         .limit(1)
         .maybeSingle();
+      if (historyError) { stats.failed++; continue; }
       if (existing) { stats.skipped++; continue; }
+      stats.eligible++;
+      if (dryRun) continue;
 
-      const { data: prof } = await supabase
+      const { data: prof, error: profileError } = await supabase
         .from("profiles")
         .select("full_name, clinic_name")
         .eq("id", apt.psychologist_id)
         .single();
 
+      if (profileError || !prof) { stats.failed++; continue; }
       const aptTime = new Date(apt.scheduled_at).getTime();
+      if (!Number.isFinite(aptTime)) { stats.failed++; continue; }
       const linkExpiresAt = new Date(aptTime + 6 * 60 * 60_000).toISOString();
-      const { data: link } = await supabase
+      const { data: link, error: linkError } = await supabase
         .from("patient_access_links")
         .insert({
           patient_id: apt.patient_id,
@@ -137,6 +146,7 @@ Deno.serve(async (req) => {
         .select("token")
         .single();
 
+      if (linkError || typeof link?.token !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(link.token)) { stats.failed++; continue; }
       const portalUrl = link?.token ? `https://psicoonex.vercel.app/portal/${link.token}` : undefined;
       const dateStr = new Date(apt.scheduled_at).toLocaleDateString("pt-BR", {
         weekday: "long", day: "2-digit", month: "long", year: "numeric",
@@ -152,16 +162,17 @@ Deno.serve(async (req) => {
         offset >= 60 ? `${Math.round(offset / 60)} hora${offset >= 120 ? "s" : ""}` :
         `${offset} minutos`;
 
+      try {
       const sendRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${serviceKey}`,
-          "apikey": serviceKey,
+          "x-email-worker-secret": secret,
         },
+        signal: AbortSignal.timeout(15000),
         body: JSON.stringify({
           templateName: "appointment-reminder",
-          recipientEmail: apt.patients.email,
+          recipientEmail: recipient,
           idempotencyKey,
           templateData: {
             patientName: apt.patients.full_name.split(" ")[0],
@@ -184,17 +195,16 @@ Deno.serve(async (req) => {
         }),
       });
 
-      if (sendRes.ok) stats.sent++;
-      else {
-        stats.failed++;
-        console.error(`[reminders] send failed apt=${apt.id} offset=${offset}:`, await sendRes.text());
-      }
+      const result = await sendRes.json().catch(() => null);
+      if (sendRes.ok && result?.success === true && result?.queued === true && result?.sent === false &&
+          typeof result?.messageId === "string" && result.messageId.length > 0) stats.queued++;
+      else stats.failed++;
+      } catch { stats.failed++; }
     }
   }
 
-  console.log("[reminders] done", stats);
-  return new Response(JSON.stringify({ ok: true, stats }), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return reply(stats.failed ? 503 : 200, { ok: stats.failed === 0, dry_run: dryRun, manual_processing: true, stats });
+  } catch {
+    return reply(500, { error: "Falha ao processar lembretes" });
+  }
 });
