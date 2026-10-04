@@ -74,9 +74,15 @@ interface PatientDetailSheetProps {
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast.success("Convite enviado por e-mail!", {
-        description: `Válido por 7 dias. ${patient.email}`,
-      });
+      if (data?.email_queued === true) {
+        toast.success("Convite na fila de e-mails", {
+          description: "O envio ainda aguarda processamento.",
+        });
+      } else if (data?.email_sent === true) {
+        toast.success("Convite enviado por e-mail!");
+      } else {
+        toast.warning("Convite criado, mas o e-mail não foi confirmado na fila.");
+      }
     } catch (e: any) {
       toast.error(e?.message || "Falha ao enviar convite");
     } finally {

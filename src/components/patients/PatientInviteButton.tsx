@@ -58,7 +58,11 @@ export function PatientInviteButton({
       if (payload?.error) throw new Error(payload.error);
       setInviteUrl(payload.invite_url);
       setOpen(true);
-      if (payload.email_sent === false) {
+      if (payload.email_queued === true) {
+        toast.success("Convite na fila de e-mails", {
+          description: "O envio ainda aguarda processamento. O link já está disponível abaixo.",
+        });
+      } else if (payload.email_sent !== true) {
         toast.warning("Convite criado, mas o e-mail falhou", {
           description: "Copie o link abaixo e envie manualmente ao paciente.",
         });
@@ -101,11 +105,11 @@ export function PatientInviteButton({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Convite enviado</DialogTitle>
+            <DialogTitle>Convite criado</DialogTitle>
             <DialogDescription>
-              Enviamos um e-mail para <strong>{patientEmail}</strong> com o link de
-              ativação. Caso ele não chegue (verifique também o spam), você pode
-              copiar o link abaixo e enviar manualmente. Validade: 7 dias.
+              O link de ativação para <strong>{patientEmail}</strong> está disponível
+              abaixo. A criação do convite não confirma a entrega do e-mail.
+              Você pode copiar o link para compartilhá-lo.
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
