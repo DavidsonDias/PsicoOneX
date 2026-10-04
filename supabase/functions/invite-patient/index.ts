@@ -1,157 +1,95 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { requireUser } from "../_shared/require-auth.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const site = "https://psicoonex.vercel.app";
+const headers = {
+  "Access-Control-Allow-Origin": site,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
+};
+const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), {
+  status, headers: { ...headers, "Content-Type": "application/json" },
+});
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
-
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
+  if (req.method !== "POST") return reply(405, { error: "POST required" });
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-
-    // Validate caller (psychologist) JWT
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing auth' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const auth = await requireUser(req, headers);
+    if ("error" in auth) return auth.error;
+    const url = Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "");
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const secret = Deno.env.get("EMAIL_WORKER_SECRET");
+    const recipient = Deno.env.get("EMAIL_TEST_RECIPIENT")?.trim().toLowerCase();
+    if (url !== "https://jeguvjpfuyksqiqrrvyz.supabase.co" || !key || !secret || secret.length < 32 || !recipient) {
+      return reply(503, { error: "Invalid staging configuration" });
     }
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: userData, error: userErr } = await callerClient.auth.getUser()
-    if (userErr || !userData.user) {
-      return new Response(JSON.stringify({ error: 'Invalid auth' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    let body;
+    try { body = await req.json(); } catch { return reply(400, { error: "Invalid JSON" }); }
+    const patientId = body?.patient_id;
+    if (typeof patientId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(patientId)) {
+      return reply(400, { error: "Paciente inválido" });
     }
-    const psychologistId = userData.user.id
-
-    const body = await req.json().catch(() => ({}))
-    const { patient_id } = body as { patient_id?: string }
-    if (!patient_id) {
-      return new Response(JSON.stringify({ error: 'patient_id is required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const db = createClient(url, key);
+    const { data: patient, error: patientError } = await db.from("patients")
+      .select("id, full_name, email, psychologist_id, user_id")
+      .eq("id", patientId).eq("psychologist_id", auth.user.id).is("deleted_at", null).maybeSingle();
+    if (patientError) return reply(503, { error: "Falha ao consultar paciente" });
+    if (!patient || patient.psychologist_id !== auth.user.id) return reply(404, { error: "Paciente não encontrado" });
+    if (patient.user_id) return reply(409, { error: "Paciente já tem acesso ativo ao portal" });
+    // Reject before any invite writes; never redirect a real patient's invitation.
+    if (typeof patient.email !== "string" || patient.email.trim().toLowerCase() !== recipient) {
+      return reply(403, { error: "Destinatário não autorizado para teste" });
     }
-
-    const admin = createClient(supabaseUrl, serviceKey)
-
-    // Verify the patient belongs to this psychologist & has email
-    const { data: patient, error: patientErr } = await admin
-      .from('patients')
-      .select('id, full_name, email, psychologist_id, user_id')
-      .eq('id', patient_id)
-      .single()
-
-    if (patientErr || !patient) {
-      return new Response(JSON.stringify({ error: 'Paciente não encontrado' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const { data: profile, error: profileError } = await db.from("profiles")
+      .select("full_name").eq("id", auth.user.id).maybeSingle();
+    if (profileError) return reply(503, { error: "Falha ao consultar profissional" });
+    const { data: pending, error: pendingError } = await db.from("patient_invites")
+      .select("id, token, expires_at, email").eq("patient_id", patientId)
+      .eq("psychologist_id", auth.user.id).eq("email", recipient)
+      .eq("is_revoked", false).is("accepted_at", null)
+      .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (pendingError) return reply(503, { error: "Falha ao consultar convite" });
+    let invite = pending;
+    if (!invite) {
+      const { data, error } = await db.from("patient_invites")
+        .insert({ patient_id: patientId, psychologist_id: auth.user.id, email: recipient })
+        .select("id, token, expires_at, email").single();
+      if (error || !data) return reply(503, { error: "Falha ao criar convite" });
+      invite = data;
     }
-    if (patient.psychologist_id !== psychologistId) {
-      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    // Existing valid invites survive queue failures. No automatic revocation or delivery.
+    if (typeof invite.token !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(invite.token) ||
+        !Number.isFinite(Date.parse(invite.expires_at)) || Date.parse(invite.expires_at) <= Date.now()) {
+      return reply(503, { error: "Convite inválido" });
     }
-    if (!patient.email) {
-      return new Response(JSON.stringify({ error: 'Paciente não tem e-mail cadastrado' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-    if (patient.user_id) {
-      return new Response(JSON.stringify({ error: 'Paciente já tem acesso ativo ao portal' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Get psychologist name
-    const { data: psyProfile } = await admin
-      .from('profiles')
-      .select('full_name')
-      .eq('id', psychologistId)
-      .single()
-
-    // Revoke any pending invites for this patient
-    await admin
-      .from('patient_invites')
-      .update({ is_revoked: true })
-      .eq('patient_id', patient_id)
-      .is('accepted_at', null)
-      .eq('is_revoked', false)
-
-    // Create new invite
-    const { data: invite, error: inviteErr } = await admin
-      .from('patient_invites')
-      .insert({
-        patient_id,
-        psychologist_id: psychologistId,
-        email: patient.email,
-      })
-      .select('token, expires_at')
-      .single()
-
-    if (inviteErr || !invite) {
-      console.error('Invite create error:', inviteErr)
-      return new Response(JSON.stringify({ error: 'Falha ao criar convite' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Build invite URL — always use a trusted, server-controlled base URL.
-    // Never trust the caller-supplied Origin/Referer header.
-    const origin = 'https://psicoonex.vercel.app';
-    const inviteUrl = `${origin}/portal/aceitar-convite/${invite.token}`
-
-
-    // Send email via send-transactional-email
-    const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${serviceKey}`,
-      },
-      body: JSON.stringify({
-        templateName: 'patient-portal-invite',
-        recipientEmail: patient.email,
-        templateData: {
-          patientName: patient.full_name,
-          psychologistName: psyProfile?.full_name || 'Seu profissional',
-          inviteUrl,
-          expiresInDays: 7,
-        },
-        metadata: { patient_id, invite_token: invite.token },
-      }),
-    })
-
-    let emailSent = true
-    let emailError: string | null = null
-    if (!emailRes.ok) {
-      emailSent = false
-      emailError = await emailRes.text().catch(() => 'unknown')
-      console.error('Email send failed:', emailError)
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        invite_url: inviteUrl,
-        expires_at: invite.expires_at,
-        email_sent: emailSent,
-        email_error: emailError,
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  } catch (e) {
-    console.error('invite-patient error:', e)
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    const inviteUrl = site + "/portal/aceitar-convite/" + invite.token;
+    let queued = false;
+    try {
+      const response = await fetch(url + "/functions/v1/send-transactional-email", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-email-worker-secret": secret },
+        signal: AbortSignal.timeout(15000),
+        body: JSON.stringify({
+          templateName: "patient-portal-invite", recipientEmail: recipient,
+          idempotencyKey: "patient-invite-" + invite.id,
+          templateData: {
+            patientName: patient.full_name, psychologistName: profile?.full_name || "Seu profissional",
+            inviteUrl, expiresInDays: Math.max(1, Math.ceil((Date.parse(invite.expires_at) - Date.now()) / 86400000)),
+          },
+          metadata: { patient_id: patientId },
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      queued = response.ok && result?.success === true && result?.queued === true &&
+        typeof result?.messageId === "string" && result.messageId.length > 0;
+    } catch { /* Keep the invitation available for a manual retry. */ }
+    return reply(200, {
+      success: true, invite_url: inviteUrl, expires_at: invite.expires_at,
+      email_sent: false, email_queued: queued, manual_processing: true,
+      email_error: queued ? null : "Não foi possível confirmar o e-mail na fila",
+    });
+  } catch {
+    return reply(500, { error: "Erro interno ao criar convite" });
   }
-})
+});
