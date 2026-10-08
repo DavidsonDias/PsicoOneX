@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
   try {
   const supabase = createClient(supabaseUrl, serviceKey);
   const now = new Date();
-  const stats: Record<string, number> = { checked: 0, eligible: 0, queued: 0, sent: 0, skipped: 0, failed: 0 };
+  const stats: Record<string, number> = { checked: 0, eligible: 0, queued: 0, sent: 0, already_sent: 0, skipped: 0, failed: 0 };
 
   // Map psychologist_id -> enabled offsets
   const { data: prefRows, error: prefError } = await supabase
@@ -198,6 +198,9 @@ Deno.serve(async (req) => {
       const result = await sendRes.json().catch(() => null);
       if (sendRes.ok && result?.success === true && result?.queued === true && result?.sent === false &&
           typeof result?.messageId === "string" && result.messageId.length > 0) stats.queued++;
+      else if (sendRes.ok && result?.success === true && result?.queued === false &&
+          result?.sent === true && result?.already_sent === true &&
+          typeof result?.messageId === "string" && result.messageId.length > 0) stats.already_sent++;
       else stats.failed++;
       } catch { stats.failed++; }
     }
