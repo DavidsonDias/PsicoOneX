@@ -91,6 +91,10 @@ Deno.serve(async (req) => {
     )
   }
 
+  if (typeof idempotencyKey !== 'string' || !idempotencyKey.trim() || new TextEncoder().encode(idempotencyKey).length > 512) {
+    return respond(400, { error: 'Invalid idempotency key' })
+  }
+
   if (!templateName) {
     return new Response(
       JSON.stringify({ error: 'templateName is required' }),
@@ -327,17 +331,10 @@ Deno.serve(async (req) => {
   // 5. Enqueue the pre-rendered email for async processing by the dispatcher.
   // The dispatcher (process-email-queue) handles sending, retries, and rate-limit backoff.
 
-  // Log pending BEFORE enqueue so we have a record even if enqueue crashes
-  await supabase.from('email_send_log').insert({
-    message_id: messageId,
-    template_name: templateName,
-    recipient_email: effectiveRecipient,
-    status: 'pending',
-    metadata: externalMetadata || null,
-  })
-
-  const { error: enqueueError } = await supabase.rpc('enqueue_email', {
-    queue_name: 'transactional_emails',
+  // Commit the receipt, queue entry and pending log in one database transaction.
+  const { data: receipt, error: enqueueError } = await supabase.rpc('enqueue_transactional_email_once', {
+    request_key: idempotencyKey,
+    log_metadata: externalMetadata || {},
     payload: {
       message_id: messageId,
       to: effectiveRecipient,
@@ -355,29 +352,27 @@ Deno.serve(async (req) => {
   })
 
   if (enqueueError) {
-    console.error('Failed to enqueue email', {
-      error: enqueueError,
-      templateName,
-      effectiveRecipient,
-    })
-
-    await supabase.from('email_send_log').insert({
-      message_id: messageId,
-      template_name: templateName,
-      recipient_email: effectiveRecipient,
-      status: 'failed',
-      error_message: 'Failed to enqueue email',
-    })
-
     return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
-      status: 500,
+      status: enqueueError.code === '22023' ? 409 : 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
+  if (!receipt || typeof receipt.message_id !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receipt.message_id)) {
+    return respond(502, { error: 'Invalid queue acknowledgement' })
+  }
+  if (receipt.state !== 'queued') {
+    if (receipt.state === 'sent') return respond(200, {
+      success: true, queued: false, sent: true, already_sent: true, messageId: receipt.message_id,
+    })
+    return respond(409, { success: false, queued: false, sent: false, error: 'Existing message requires review' })
+  }
+  messageId = receipt.message_id
+
   // Manual staging: do not wake the worker or activate scheduled jobs.
 
-  console.log('Transactional email enqueued', { templateName, effectiveRecipient })
+  console.log('Transactional email enqueued')
 
   return new Response(
     JSON.stringify({ success: true, queued: true, sent: false, manual_processing: true, messageId }),
