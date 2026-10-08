@@ -109,6 +109,13 @@ beforeEach(() => {
 });
 
 describe("sendAppointmentNotification", () => {
+  it("reconhece envio anterior sem criar nova confirmação de fila", async () => {
+    fromMock.mockImplementation(makeFromImpl({}));
+    invokeMock.mockResolvedValue({data:{sent:true,queued:false,already_sent:true,messageId:"existing"},error:null});
+    const r = await sendAppointmentNotification(ctx);
+    expect(r).toMatchObject({success:true,emailSent:true,emailQueued:false,reason:"already_sent"});
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+  });
   it("solicita confirmação no servidor e distingue fila de envio", async () => {
     fromMock.mockImplementation(makeFromImpl({}));
     const r = await sendAppointmentNotification(ctx);

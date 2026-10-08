@@ -66,6 +66,7 @@ Deno.serve(async (req) => {
     }
     const inviteUrl = site + "/portal/aceitar-convite/" + invite.token;
     let queued = false;
+    let alreadySent = false;
     try {
       const response = await fetch(url + "/functions/v1/send-transactional-email", {
         method: "POST", headers: { "Content-Type": "application/json", "x-email-worker-secret": secret },
@@ -81,13 +82,16 @@ Deno.serve(async (req) => {
         }),
       });
       const result = await response.json().catch(() => null);
-      queued = response.ok && result?.success === true && result?.queued === true &&
+      alreadySent = response.ok && result?.success === true && result?.queued === false &&
+        result?.sent === true && result?.already_sent === true &&
+        typeof result?.messageId === "string" && result.messageId.length > 0;
+      queued = response.ok && result?.success === true && result?.queued === true && result?.sent === false &&
         typeof result?.messageId === "string" && result.messageId.length > 0;
     } catch { /* Keep the invitation available for a manual retry. */ }
     return reply(200, {
       success: true, invite_url: inviteUrl, expires_at: invite.expires_at,
-      email_sent: false, email_queued: queued, manual_processing: true,
-      email_error: queued ? null : "Não foi possível confirmar o e-mail na fila",
+      email_sent: alreadySent, email_already_sent: alreadySent, email_queued: queued, manual_processing: true,
+      email_error: queued || alreadySent ? null : "Não foi possível confirmar o e-mail na fila",
     });
   } catch {
     return reply(500, { error: "Erro interno ao criar convite" });
