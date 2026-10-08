@@ -19,7 +19,7 @@ async function test(name,o={},status=200){
  const text=await res.text();assert.equal(res.status,status,name);assert(!text.includes(secret));assert(!text.includes('private'));
  assert.equal(calls,o.calls??0,name+': calls');assert.equal(writes,o.writes??0,name+': writes');
  if(o.noReads)assert.equal(reads,0);
- if(status===200){const data=JSON.parse(text);assert.equal(data.stats.sent,0);assert.equal(data.stats.queued,o.queued??0);if(o.eligible!==undefined)assert.equal(data.stats.eligible,o.eligible)}
+ if(status===200){const data=JSON.parse(text);assert.equal(data.stats.sent,0);assert.equal(data.stats.queued,o.queued??0);assert.equal(data.stats.already_sent,o.alreadySent??0);assert.equal(data.stats.failed,0);if(o.eligible!==undefined)assert.equal(data.stats.eligible,o.eligible)}
  passed++;
 }
 (async()=>{
@@ -37,8 +37,13 @@ async function test(name,o={},status=200){
  for(const table of ['user_preferences','appointments','email_send_log','profiles'])await test('query error '+table,{dbError:table,body:{dry_run:false}},503);
  await test('link fails',{dbError:'patient_access_links',body:{dry_run:false},writes:1},503);
  await test('queue acknowledged',{body:{dry_run:false},writes:1,calls:1,queued:1});
+ await test('already sent acknowledged',{body:{dry_run:false},writes:1,calls:1,alreadySent:1,response:{success:true,queued:false,sent:true,already_sent:true,messageId:'test-message'}});
+ await test('sent without dedup acknowledgement',{body:{dry_run:false},writes:1,calls:1,response:{success:true,queued:false,sent:true,messageId:'test-message'}},503);
+ await test('contradictory dedup acknowledgement',{body:{dry_run:false},writes:1,calls:1,response:{success:true,queued:true,sent:true,already_sent:true,messageId:'test-message'}},503);
+ await test('dedup without message id',{body:{dry_run:false},writes:1,calls:1,response:{success:true,queued:false,sent:true,already_sent:true}},503);
  await test('queue incomplete',{body:{dry_run:false},writes:1,calls:1,response:{success:true}},503);
  await test('queue refused',{body:{dry_run:false},writes:1,calls:1,upstreamStatus:403},503);
  await test('network failure',{body:{dry_run:false},writes:1,calls:1,throwFetch:true},503);
  console.log(passed+' appointment reminder tests passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
