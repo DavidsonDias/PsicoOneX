@@ -72,7 +72,7 @@ async function run(label, options = {}, expected = 200, calls = 0) {
   assert(!text.includes(secret)); assert(!text.includes('synthetic-service')); assert(!text.includes('private '));
   if (expected === 200) {
     const payload = JSON.parse(text);
-    assert.equal(payload.sent, false); assert.equal(payload.queued, true); assert.equal(payload.manual_processing, true);
+    assert.equal(payload.sent, options.alreadySent??false); assert.equal(payload.queued, !options.alreadySent); if(options.alreadySent) assert.equal(payload.already_sent,true); else assert.equal(payload.manual_processing, true);
   }
   if (options.noAuth || options.invalidAuth || options.method) assert.equal(reads.length, 0);
   if (options.invalidAuth) assert.equal(verified, 1);
@@ -108,6 +108,9 @@ async function run(label, options = {}, expected = 200, calls = 0) {
   await run('invalid response JSON', { rawResponse: '<html>' }, 502, 1);
   await run('network failure', { throwFetch: true }, 500, 1);
   await run('valid request queued only', {}, 200, 1);
+  await run('already sent', {alreadySent:true,response:{success:true,queued:false,sent:true,already_sent:true,messageId:'id'}},200,1);
+  await run('sent is not dedup acknowledgement', {response:{success:true,queued:false,sent:true,messageId:'id'}},502,1);
+  await run('contradictory response', {response:{success:true,queued:true,sent:true,already_sent:true,messageId:'id'}},502,1);
   console.log(`PASS ${passed} synthetic authorization, linkage, allowlist and queue-contract scenarios. No network or database writes.`);
 })().catch(error => { console.error(error); process.exitCode = 1; });
 

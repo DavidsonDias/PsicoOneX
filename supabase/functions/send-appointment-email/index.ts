@@ -82,7 +82,11 @@ Deno.serve(async (req) => {
       }),
     });
     const result = await response.json().catch(() => null);
-    if (!response.ok || result?.success !== true || result?.queued !== true || typeof result?.messageId !== "string" || !result.messageId) {
+    if (response.ok && result?.success === true && result?.already_sent === true &&
+        result?.sent === true && result?.queued === false && typeof result?.messageId === "string" && result.messageId) {
+      return reply(200, { sent: true, queued: false, already_sent: true, portalUrl, messageId: result.messageId });
+    }
+    if (!response.ok || result?.success !== true || result?.queued !== true || result?.sent !== false || typeof result?.messageId !== "string" || !result.messageId) {
       return reply(502, { sent: false, queued: false, error: "Não foi possível enfileirar o e-mail" });
     }
     return reply(200, { sent: false, queued: true, manual_processing: true, portalUrl, messageId: result.messageId });

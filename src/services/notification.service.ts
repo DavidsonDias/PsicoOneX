@@ -56,6 +56,10 @@ export async function sendAppointmentNotification(
     });
     if (error) return { success: false, emailSent: false, portalUrl, error: "Não foi possível solicitar o e-mail." };
     const queued = data?.queued === true && data?.sent === false && typeof data?.messageId === "string" && data.messageId.length > 0;
+    if (data?.already_sent === true && data?.sent === true && data?.queued === false &&
+        typeof data?.messageId === "string" && data.messageId.length > 0) {
+      return { success: true, emailSent: true, emailQueued: false, psychologistEmailSent: false, portalUrl, reason: "already_sent" };
+    }
     if (!queued) return { success: false, emailSent: false, portalUrl, reason: "queue_not_confirmed" };
     return { success: true, emailSent: false, emailQueued: true, psychologistEmailSent: false, portalUrl, reason: "queued" };
   } catch {

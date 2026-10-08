@@ -20,13 +20,13 @@ async function test(label,o={},status=200){
  outgoing++;assert.equal(init.headers['x-email-worker-secret'],env.EMAIL_WORKER_SECRET);assert.equal(init.headers.Authorization,undefined);
  const body=JSON.parse(init.body);assert.equal(body.recipientEmail,'test@example.invalid');assert.equal(body.metadata.invite_token,undefined);assert.equal(body.templateData.inviteUrl,'https://psicoonex.vercel.app/portal/aceitar-convite/'+invite.token);
  if(o.networkError)throw Error('private network failure');
- return new Response(o.rawResponse??JSON.stringify(o.response??{success:true,queued:true,messageId:'synthetic-message'}),{status:o.upstreamStatus??200});
+ return new Response(o.rawResponse??JSON.stringify(o.response??{success:true,queued:true,sent:false,messageId:'synthetic-message'}),{status:o.upstreamStatus??200});
  }});
  const method=o.method||'POST';
  const r=await handler(new Request('https://example.invalid',{method,headers:o.noAuth?{}:{Authorization:'Bearer test'},...(method==='POST'?{body:o.raw??JSON.stringify(o.body??{patient_id:pid})}:{})}));
  const text=await r.text();assert.equal(r.status,status,label);assert(!text.includes('private '));if(env.EMAIL_WORKER_SECRET)assert(!text.includes(env.EMAIL_WORKER_SECRET));
  if(status!==200){assert.equal(outgoing,0);assert.equal(writes,0)}else{
- const data=JSON.parse(text);assert.equal(data.email_sent,false);assert.equal(data.email_queued,o.expectQueued??true);assert.equal(data.manual_processing,true);assert.equal(writes,o.noPending?1:0);assert.equal(outgoing,1);
+ const data=JSON.parse(text);assert.equal(data.email_sent,o.alreadySent??false);assert.equal(data.email_queued,o.expectQueued??true);if(o.alreadySent){assert.equal(data.email_already_sent,true);assert.equal(data.email_error,null)}assert.equal(data.manual_processing,true);assert.equal(writes,o.noPending?1:0);assert.equal(outgoing,1);
  }
  passed++;
 }
@@ -47,5 +47,9 @@ async function test(label,o={},status=200){
  await test('upstream rejected',{upstreamStatus:401,expectQueued:false});
  await test('invalid response',{rawResponse:'not json',expectQueued:false});
  await test('timeout preserves invite',{networkError:true,expectQueued:false});
+ await test('already sent',{alreadySent:true,expectQueued:false,response:{success:true,queued:false,sent:true,already_sent:true,messageId:'id'}});
+ await test('unconfirmed sent',{expectQueued:false,response:{success:true,queued:false,sent:true,messageId:'id'}});
+ await test('contradictory response',{expectQueued:false,response:{success:true,queued:true,sent:true,already_sent:true,messageId:'id'}});
  console.log(passed+' invite-patient tests passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
