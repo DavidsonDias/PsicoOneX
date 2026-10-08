@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Mail, RefreshCw, CheckCircle2, XCircle, Ban, Clock, Send } from "lucide-react";
+import { Mail, RefreshCw, CheckCircle2, XCircle, Ban, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -46,8 +46,6 @@ export const EmailMonitoringDashboard = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [templateFilter, setTemplateFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [sending, setSending] = useState(false);
-  const [testEmail, setTestEmail] = useState("davidsonfe7@gmail.com");
 
   const load = async () => {
     setLoading(true);
@@ -101,33 +99,6 @@ export const EmailMonitoringDashboard = () => {
     return { total, sent, failed, suppressed };
   }, [dedupedLogs]);
 
-  const sendTest = async () => {
-    if (!testEmail) return;
-    setSending(true);
-    try {
-      const { error } = await supabase.functions.invoke("send-transactional-email", {
-        body: {
-          templateName: "appointment-confirmation",
-          recipientEmail: testEmail,
-          idempotencyKey: `test-${Date.now()}`,
-          templateData: {
-            patientName: "Teste PsicoOne",
-            appointmentDate: format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }),
-            psychologistName: "Sistema PsicoOne",
-            sessionType: "E-mail de teste de entregabilidade",
-          },
-        },
-      });
-      if (error) throw error;
-      toast({ title: "E-mail enviado", description: `Disparado para ${testEmail}. Atualize em alguns segundos.` });
-      setTimeout(load, 3000);
-    } catch (e: any) {
-      toast({ title: "Falha no envio", description: e.message, variant: "destructive" });
-    } finally {
-      setSending(false);
-    }
-  };
-
   const StatCard = ({ label, value, color }: { label: string; value: number; color: string }) => (
     <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
       <CardContent className="p-5">
@@ -139,27 +110,10 @@ export const EmailMonitoringDashboard = () => {
 
   return (
     <div className="space-y-4">
-      {/* Status DNS */}
       <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
         <CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Mail className="h-4 w-4 text-emerald-400" />
-            <p className="text-sm font-medium">Domínio: notify.sevendevx.com</p>
-            <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">Active</Badge>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            {[
-              { k: "SPF", v: "✓ v=spf1 mailgun" },
-              { k: "DKIM", v: "✓ Gerenciado" },
-              { k: "MX", v: "✓ Mailgun EU" },
-              { k: "DMARC", v: "✓ Padrão" },
-            ].map(i => (
-              <div key={i.k} className="p-3 rounded bg-[hsl(222,47%,14%)] border border-[hsl(222,47%,20%)]">
-                <p className="text-[hsl(220,9%,55%)]">{i.k}</p>
-                <p className="font-medium text-emerald-400">{i.v}</p>
-              </div>
-            ))}
-          </div>
+          <p className="text-sm font-medium flex items-center gap-2"><Mail className="h-4 w-4" /> Histórico de e-mails</p>
+          <p className="text-xs text-[hsl(220,9%,65%)] mt-2">Os resultados abaixo vêm do histórico de processamento. A configuração do domínio e os registros DNS não são verificados por este painel.</p>
         </CardContent>
       </Card>
 
@@ -171,24 +125,10 @@ export const EmailMonitoringDashboard = () => {
         <StatCard label="Suprimidos" value={stats.suppressed} color="text-yellow-400" />
       </div>
 
-      {/* Test send */}
       <Card className="bg-[hsl(222,47%,12%)] border-[hsl(222,47%,18%)] text-[hsl(0,0%,95%)]">
         <CardContent className="p-5">
-          <p className="text-sm font-medium mb-3 flex items-center gap-2">
-            <Send className="h-4 w-4" /> Enviar e-mail de teste
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            <Input
-              type="email"
-              value={testEmail}
-              onChange={e => setTestEmail(e.target.value)}
-              className="bg-[hsl(222,47%,14%)] border-[hsl(222,47%,20%)] text-sm flex-1 min-w-[200px]"
-            />
-            <Button onClick={sendTest} disabled={sending} className="bg-blue-600 hover:bg-blue-700">
-              {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-              {sending ? "Enviando..." : "Disparar"}
-            </Button>
-          </div>
+          <p className="text-sm font-medium">Teste de envio pelo painel indisponível</p>
+          <p className="text-xs text-[hsl(220,9%,65%)] mt-2">Neste ambiente, os testes são executados de forma controlada no servidor. Você pode acompanhar os resultados no histórico abaixo.</p>
         </CardContent>
       </Card>
 
@@ -293,3 +233,4 @@ export const EmailMonitoringDashboard = () => {
     </div>
   );
 };
+
