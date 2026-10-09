@@ -4,9 +4,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, AlertCircle, Loader2, Mail, BellRing, Radio, ListChecks, Send, TestTube2 } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle, Loader2, Radio, ListChecks } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
 type Health = "ok" | "warn" | "fail" | "loading";
@@ -17,7 +16,6 @@ interface CheckResult {
   detail?: string;
 }
 
-type FullTestResults = Record<"internal" | "push" | "email", CheckResult>;
 
 function StatusDot({ s }: { s: Health }) {
   if (s === "loading") return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
@@ -27,23 +25,21 @@ function StatusDot({ s }: { s: Health }) {
 }
 
 export default function NotificationDiagnostics() {
-  const [email, setEmail] = useState<CheckResult>({ status: "loading", label: "E-mail (Resend / SMTP)" });
+  const [email, setEmail] = useState<CheckResult>({ status: "loading", label: "Histórico de e-mails" });
   const [realtime, setRealtime] = useState<CheckResult>({ status: "loading", label: "Realtime" });
-  const [queue, setQueue] = useState<CheckResult>({ status: "loading", label: "Fila pgmq" });
-  const [push, setPush] = useState<CheckResult>({ status: "loading", label: "Push (VAPID)" });
+  const [queue, setQueue] = useState<CheckResult>({ status: "loading", label: "Atividade registrada" });
+  const [push, setPush] = useState<CheckResult>({ status: "loading", label: "Dispositivos inscritos em push" });
   const [lastSend, setLastSend] = useState<any>(null);
   const [lastFailure, setLastFailure] = useState<any>(null);
-  const [sending, setSending] = useState<string | null>(null);
-  const [me, setMe] = useState<{ id: string; email: string } | null>(null);
-  const [fullTest, setFullTest] = useState<FullTestResults | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const runChecks = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) setMe({ id: user.id, email: user.email || "" });
+    setChecking(true);
 
     // Last send + last failure (last 24h)
     const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-    const { data: lastOk } = await supabase
+    const { data: lastOk, error: sentError } = await supabase
       .from("email_send_log")
       .select("template_name, recipient_email, status, created_at")
       .eq("status", "sent")
@@ -51,7 +47,7 @@ export default function NotificationDiagnostics() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const { data: lastFail } = await supabase
+    const { data: lastFail, error: failureError } = await supabase
       .from("email_send_log")
       .select("template_name, recipient_email, status, error_message, created_at")
       .eq("status", "failed")
@@ -63,20 +59,20 @@ export default function NotificationDiagnostics() {
     setLastFailure(lastFail);
 
     setEmail({
-      status: lastFail && !lastOk ? "fail" : lastOk ? "ok" : "warn",
+      status: sentError || failureError ? "fail" : lastFail && !lastOk ? "fail" : lastOk ? "ok" : "warn",
       label: "E-mail (Resend / SMTP)",
-      detail: lastOk ? `Último envio: ${new Date(lastOk.created_at).toLocaleString("pt-BR")}` : "Sem envios nas últimas 24h",
+      detail: sentError || failureError ? "Não foi possível consultar o histórico." : lastOk ? `Último envio: ${new Date(lastOk.created_at).toLocaleString("pt-BR")}` : "Sem envios nas últimas 24h",
     });
 
     // Push subscriptions
-    const { count: pushCount } = await supabase
+    const { count: pushCount, error: pushError } = await supabase
       .from("push_subscriptions")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user?.id || "");
     setPush({
-      status: (pushCount ?? 0) > 0 ? "ok" : "warn",
+      status: pushError ? "fail" : "warn",
       label: "Push (VAPID)",
-      detail: (pushCount ?? 0) > 0 ? `${pushCount} dispositivo(s) inscritos` : "Nenhum dispositivo inscrito",
+      detail: pushError ? "Não foi possível consultar as inscrições." : (pushCount ?? 0) > 0 ? `${pushCount} dispositivo(s) inscritos; entrega não verificada` : "Nenhum dispositivo inscrito",
     });
 
     // Realtime ping
@@ -95,93 +91,20 @@ export default function NotificationDiagnostics() {
       }
     });
 
-    // Queue: check email_send_state recent activity (proxy)
-    const { count: recent } = await supabase
+    // History count is not proof of queue or worker health.
+    const { count: recent, error: activityError } = await supabase
       .from("email_send_log")
       .select("*", { count: "exact", head: true })
       .gte("created_at", since);
     setQueue({
-      status: (recent ?? 0) > 0 ? "ok" : "warn",
-      label: "Fila pgmq",
-      detail: `${recent ?? 0} mensagens processadas nas últimas 24h`,
+      status: activityError ? "fail" : "warn",
+      label: "Atividade registrada",
+      detail: activityError ? "Não foi possível consultar a atividade." : `${recent ?? 0} registros nas últimas 24h; fila e processamento não verificados`,
     });
+    setChecking(false);
   };
 
   useEffect(() => { runChecks(); }, []);
-
-  const runTest = async (key: string, fn: () => Promise<void>) => {
-    setSending(key);
-    try { await fn(); } catch (e: any) { toast.error(e?.message || "Erro no teste"); }
-    finally { setSending(null); }
-  };
-
-  const testEmail = () =>
-    runTest("email", async () => {
-      if (!me?.email) throw new Error("Sem e-mail do usuário");
-      const { error } = await supabase.functions.invoke("send-transactional-email", {
-        body: {
-          templateName: "appointment-confirmation",
-          recipientEmail: me.email,
-          idempotencyKey: `diag-${Date.now()}`,
-          templateData: {
-            patientName: "Teste",
-            date: new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }),
-            time: "09:00",
-            duration: "50",
-            type: "presential",
-            psychologistName: "Diagnóstico",
-            portalUrl: "https://psicoonex.vercel.app",
-          },
-          metadata: { test: true },
-        },
-      });
-      if (error) throw error;
-      toast.success("E-mail de teste enfileirado");
-      runChecks();
-    });
-
-  const testPush = () =>
-    runTest("push", async () => {
-      const { error } = await supabase.functions.invoke("send-push", {
-        body: { user_id: me?.id, title: "Teste de push", body: "Diagnóstico de notificações ✓" },
-      });
-      if (error) throw error;
-      toast.success("Push enviado — verifique notificações do dispositivo (precisa estar inscrito)");
-      runChecks();
-    });
-
-  const testNotification = () =>
-    runTest("notif", async () => {
-      const { error } = await supabase.functions.invoke("dispatch-notification", {
-        body: {
-          user_id: me?.id,
-          category: "system",
-          type: "alert",
-          title: "Diagnóstico",
-          message: "Notificação de teste do painel.",
-          action_path: "/configuracoes/diagnostico-notificacoes",
-          action_label: "Abrir diagnóstico",
-        },
-      });
-      if (error) throw error;
-      toast.success("Notificação disparada — abra o sino 🔔 no topo");
-      runChecks();
-    });
-
-  const testFull = () =>
-    runTest("full", async () => {
-      const { data, error } = await supabase.functions.invoke("notification-full-test", { body: {} });
-      if (error) throw error;
-      if (!data?.results) throw new Error(data?.error || "Teste completo sem retorno");
-      setFullTest(data.results as FullTestResults);
-      const values = Object.values(data.results as FullTestResults);
-      const failed = values.filter((r) => r.status === "fail").length;
-      const warned = values.filter((r) => r.status === "warn").length;
-      if (failed) toast.error(`Teste completo finalizado com ${failed} falha(s)`);
-      else if (warned) toast.warning("Teste completo finalizado com alerta(s)");
-      else toast.success("Teste completo aprovado em todos os canais");
-      runChecks();
-    });
 
   const checks: CheckResult[] = [email, realtime, queue, push];
 
@@ -191,13 +114,13 @@ export default function NotificationDiagnostics() {
       <div className="container max-w-4xl py-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Diagnóstico de Notificações</h1>
-          <p className="text-sm text-muted-foreground">Verifique a saúde do pipeline de e-mails, push, realtime e fila.</p>
+          <p className="text-sm text-muted-foreground">Consulte os registros disponíveis e a conexão Realtime. O histórico não confirma a entrega atual dos canais.</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Saúde dos canais</CardTitle>
-            <CardDescription>Atualizado em tempo real</CardDescription>
+            <CardTitle>Verificações disponíveis</CardTitle>
+            <CardDescription>Atualizado ao abrir esta tela ou reexecutar as verificações.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {checks.map((c) => (
@@ -214,62 +137,21 @@ export default function NotificationDiagnostics() {
                 </Badge>
               </div>
             ))}
-            <Button variant="outline" onClick={runChecks} className="w-full">Re-executar verificações</Button>
+            <Button variant="outline" onClick={runChecks} disabled={checking} className="w-full">Re-executar verificações</Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Testes manuais</CardTitle>
-            <CardDescription>Dispare eventos reais e veja a chegada</CardDescription>
+            <CardTitle>Testes de envio indisponíveis neste ambiente</CardTitle>
+            <CardDescription>Durante a migração, os testes de envio são controlados no servidor. Esta tela consulta o histórico, as inscrições em push e a conexão Realtime.</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Button onClick={testEmail} disabled={!!sending} className="gap-2">
-              {sending === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Enviar e-mail de teste
-            </Button>
-            <Button onClick={testPush} disabled={!!sending} className="gap-2">
-              {sending === "push" ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
-              Enviar push de teste
-            </Button>
-            <Button onClick={testNotification} disabled={!!sending} className="gap-2">
-              {sending === "notif" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Disparar notificação
-            </Button>
-            <Button onClick={testFull} disabled={!!sending} className="gap-2">
-              {sending === "full" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
-              Teste completo
-            </Button>
+          <CardContent>
             <Button asChild variant="outline" className="gap-2">
               <Link to="/configuracoes/diagnostico-push"><Radio className="h-4 w-4" />Diagnóstico avançado de Push</Link>
             </Button>
           </CardContent>
         </Card>
-
-        {fullTest && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Resultado do teste completo</CardTitle>
-              <CardDescription>Registro simultâneo de push, notificação interna e e-mail</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {Object.entries(fullTest).map(([key, result]) => (
-                <div key={key} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                  <div className="flex items-center gap-3">
-                    <StatusDot s={result.status} />
-                    <div>
-                      <div className="font-medium">{result.label}</div>
-                      <div className="text-xs text-muted-foreground">{result.detail}</div>
-                    </div>
-                  </div>
-                  <Badge variant={result.status === "ok" ? "default" : result.status === "warn" ? "secondary" : "destructive"}>
-                    {result.status.toUpperCase()}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
 
         <Card>
           <CardHeader>
