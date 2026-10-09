@@ -46,11 +46,40 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (new Date(link.expires_at) < new Date()) {
+    if (!Number.isFinite(Date.parse(link.expires_at)) || Date.parse(link.expires_at) <= Date.now()) {
       return new Response(JSON.stringify({ error: "Link expirado" }), {
         status: 410,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // A bearer link must not bridge patients or professionals.
+    const { data: linkedPatient, error: patientError } = await supabase
+      .from("patients")
+      .select("id, psychologist_id, deleted_at")
+      .eq("id", link.patient_id)
+      .single();
+    if (patientError) throw new Error("Portal relationship lookup failed");
+    if (!linkedPatient || linkedPatient.deleted_at || !link.created_by ||
+        linkedPatient.psychologist_id !== link.created_by) {
+      return new Response(JSON.stringify({ error: "Vínculo do portal inválido" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (link.appointment_id) {
+      const { data: linkedAppointment, error: appointmentError } = await supabase
+        .from("appointments")
+        .select("id, patient_id, psychologist_id, deleted_at")
+        .eq("id", link.appointment_id)
+        .single();
+      if (appointmentError) throw new Error("Portal relationship lookup failed");
+      if (!linkedAppointment || linkedAppointment.deleted_at ||
+          linkedAppointment.patient_id !== link.patient_id ||
+          linkedAppointment.psychologist_id !== link.created_by) {
+        return new Response(JSON.stringify({ error: "Vínculo do portal inválido" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Helper: get psychologist_id for the appointment
@@ -467,7 +496,7 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("[patient-portal] Error:", err);
+    console.error("[patient-portal] Request failed");
     return new Response(JSON.stringify({ error: "Erro interno" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
